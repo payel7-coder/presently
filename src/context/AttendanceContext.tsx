@@ -87,6 +87,7 @@ interface AttendanceContextType {
   getSessionByDate: (subjectId: string, date: string) => AttendanceSession | undefined;
   getSessionRecords: (sessionId: string) => AttendanceRecord[];
   resetToDefaultBTEBData: () => Promise<void>;
+  clearAllDemoData: () => Promise<void>;
 }
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
@@ -114,7 +115,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [classes, setClasses] = useState<ClassGroup[]>(BTEB_CLASSES);
   const [subjects, setSubjects] = useState<Subject[]>(BTEB_CURRICULUM_2022_SUBJECTS);
   const [assignments, setAssignments] = useState<SubjectAssignment[]>(BTEB_INITIAL_ASSIGNMENTS);
-  const [students, setStudents] = useState<Student[]>(BTEB_INITIAL_STUDENTS);
+  const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [isFirebaseLive, setIsFirebaseLive] = useState(false);
@@ -256,11 +257,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Seed initial assignments
         BTEB_INITIAL_ASSIGNMENTS.forEach(a => {
           batch.set(doc(db, 'assignments', a.id), a);
-        });
-
-        // Seed students
-        BTEB_INITIAL_STUDENTS.forEach(stu => {
-          batch.set(doc(db, 'students', stu.id), stu);
         });
 
         await batch.commit();
@@ -741,11 +737,31 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setSubjects(BTEB_CURRICULUM_2022_SUBJECTS);
     setClasses(BTEB_CLASSES);
     setAssignments(BTEB_INITIAL_ASSIGNMENTS);
-    setStudents(BTEB_INITIAL_STUDENTS);
+    setStudents([]);
     setSessions([]);
     setRecords([]);
     setCurrentUserState(BTEB_FACULTY_USERS[1]);
     await seedInitialFirestore();
+  };
+
+  const clearAllDemoData = async () => {
+    setSessions([]);
+    setRecords([]);
+    setStudents([]);
+
+    try {
+      const collectionsToWipe = ['sessions', 'records', 'students'];
+      for (const col of collectionsToWipe) {
+        const snap = await getDocs(collection(db, col));
+        if (!snap.empty) {
+          const batch = writeBatch(db);
+          snap.forEach(d => batch.delete(doc(db, col, d.id)));
+          await batch.commit();
+        }
+      }
+    } catch (e) {
+      console.warn('Clearing Firestore demo collections:', e);
+    }
   };
 
   return (
@@ -784,6 +800,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         getSessionByDate,
         getSessionRecords,
         resetToDefaultBTEBData,
+        clearAllDemoData,
       }}
     >
       {children}

@@ -27,6 +27,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = ({ onSwitchToTe
     unassignSubject,
     createSubject,
     getClassStudents,
+    clearAllDemoData,
   } = useAttendance();
 
   // Semester Filter
@@ -99,6 +100,17 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = ({ onSwitchToTe
     }, 4000);
   };
 
+  const handleClearDemoData = async () => {
+    if (!window.confirm('Are you sure you want to clear all demo sessions, records, and student lists to start with a fresh database?')) {
+      return;
+    }
+    await clearAllDemoData();
+    setSuccessBanner('All demo sessions, attendance records, and student lists have been cleared. Database is fresh!');
+    setTimeout(() => {
+      setSuccessBanner(null);
+    }, 4000);
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       {/* Header */}
@@ -120,7 +132,16 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = ({ onSwitchToTe
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            onClick={handleClearDemoData}
+            className="flex items-center gap-1.5 px-3 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-colors shadow-2xs"
+            title="Wipe demo records and start with a completely fresh database"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Fresh Database</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowAddSubjectModal(true)}
