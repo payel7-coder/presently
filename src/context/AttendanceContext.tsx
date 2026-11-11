@@ -740,7 +740,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setStudents([]);
     setSessions([]);
     setRecords([]);
-    setCurrentUserState(BTEB_FACULTY_USERS[1]);
     await seedInitialFirestore();
   };
 

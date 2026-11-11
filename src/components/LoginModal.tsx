@@ -1,18 +1,12 @@
 import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
-import { User } from '../types/attendance';
 import {
   LogIn,
   KeyRound,
   Mail,
-  Shield,
-  UserCheck,
-  Sparkles,
-  School,
   X,
   AlertCircle,
-  Database,
-  CheckCircle2
+  Database
 } from 'lucide-react';
 
 interface LoginModalProps {
@@ -21,9 +15,9 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
-  const { users, currentUser, loginWithPreset, loginWithEmail, registerWithEmail, isFirebaseLive } = useAttendance();
+  const { loginWithEmail, registerWithEmail } = useAttendance();
 
-  const [mode, setMode] = useState<'presets' | 'email-login' | 'register'>('presets');
+  const [mode, setMode] = useState<'email-login' | 'register'>('email-login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -50,13 +44,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSelectPreset = async (user: User) => {
-    setLoading(true);
-    await loginWithPreset(user);
-    setLoading(false);
-    onClose();
   };
 
   return (
@@ -95,21 +82,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         <div className="mt-4 flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
           <button
             type="button"
-            onClick={() => { setMode('presets'); setErrorMsg(null); }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              mode === 'presets' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            1-Click Faculty Demo Login
-          </button>
-          <button
-            type="button"
             onClick={() => { setMode('email-login'); setErrorMsg(null); }}
             className={`flex-1 py-2 rounded-lg transition-all ${
               mode === 'email-login' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            Firebase Auth
+            Sign In
           </button>
           <button
             type="button"
@@ -126,67 +104,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
-          </div>
-        )}
-
-        {/* 1-Click Presets */}
-        {mode === 'presets' && (
-          <div className="mt-5 space-y-2.5">
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Select institutional profile to test role permissions:
-            </p>
-
-            {users.map(u => {
-              const isActive = currentUser ? u.id === currentUser.id : false;
-              const isAdmin = u.role === 'admin';
-
-              return (
-                <button
-                  key={u.id}
-                  type="button"
-                  onClick={() => handleSelectPreset(u)}
-                  className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all text-left ${
-                    isActive
-                      ? 'bg-emerald-50 border-emerald-300 ring-2 ring-emerald-500/20'
-                      : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={u.avatar}
-                      alt={u.name}
-                      className="w-10 h-10 rounded-xl object-cover"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-slate-900">{u.name}</span>
-                        <span
-                          className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
-                            isAdmin
-                              ? 'bg-indigo-100 text-indigo-800'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {u.role}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500">{u.title || u.department}</p>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {isAdmin ? 'Has Student Import Access' : 'Teacher View (Import Restricted)'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {isActive ? (
-                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                  ) : (
-                    <span className="text-xs font-bold text-emerald-700 hover:underline">
-                      Sign In →
-                    </span>
-                  )}
-                </button>
-              );
-            })}
           </div>
         )}
 

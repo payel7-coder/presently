@@ -6,7 +6,6 @@ import {
   Plus,
   Trash2,
   CheckCircle2,
-  ArrowRight,
   BookOpen,
   Filter,
   Layers,
@@ -14,10 +13,10 @@ import {
 } from 'lucide-react';
 
 interface AdminAssignmentsProps {
-  onSwitchToTeacher: (teacherId: string) => void;
+  onSwitchToTeacher?: (teacherId: string) => void;
 }
 
-export const AdminAssignments: React.FC<AdminAssignmentsProps> = ({ onSwitchToTeacher }) => {
+export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
   const {
     teachers,
     subjects,
@@ -340,16 +339,12 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = ({ onSwitchToTe
                 </div>
               </div>
 
-              {/* Bottom Switch button */}
-              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => onSwitchToTeacher(teacher.id)}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
-                >
-                  <span>Switch to {teacher.name.split(' ')[1] || teacher.name}'s Account</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
+              {/* Bottom Faculty Meta */}
+              <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+                <span className="font-mono text-[11px] text-slate-400 truncate">{teacher.email}</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  {teacherAssignments.length} {teacherAssignments.length === 1 ? 'Course' : 'Courses'} Assigned
+                </span>
               </div>
             </div>
           );

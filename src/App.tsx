@@ -62,14 +62,6 @@ function AttendanceApp() {
     setIsBulkImportOpen(true);
   };
 
-  const handleSwitchToTeacher = (teacherId: string) => {
-    const teacher = users.find(u => u.id === teacherId);
-    if (teacher) {
-      setCurrentUser(teacher);
-      setActiveTab('my-subjects');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-900 font-sans">
       {/* Top Navigation */}
@@ -111,7 +103,7 @@ function AttendanceApp() {
           /* Admin View */
           <>
             {activeTab === 'admin-assignments' && (
-              <AdminAssignments onSwitchToTeacher={handleSwitchToTeacher} />
+              <AdminAssignments />
             )}
             {activeTab === 'admin-classes' && (
               <ClassRosterView onOpenBulkImport={handleOpenBulkImport} />

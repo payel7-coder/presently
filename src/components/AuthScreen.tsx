@@ -9,15 +9,9 @@ import {
   ArrowRight,
   ShieldCheck,
   Sparkles,
-  School,
   Database,
-  Users,
-  AlertCircle,
-  KeyRound,
-  GraduationCap,
-  BookOpen
+  AlertCircle
 } from 'lucide-react';
-import { BTEB_FACULTY_USERS } from '../data/btebCurriculum';
 
 export const AuthScreen: React.FC = () => {
   const { loginWithEmail, registerWithEmail, isFirebaseLive } = useAttendance();
@@ -71,14 +65,6 @@ export const AuthScreen: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickFill = (demoEmail: string, demoRole: 'admin' | 'teacher', demoName: string) => {
-    setEmail(demoEmail);
-    setPassword('Polytechnic@2022');
-    setName(demoName);
-    setRole(demoRole);
-    setErrorMessage(null);
   };
 
   return (
@@ -369,54 +355,14 @@ export const AuthScreen: React.FC = () => {
             </form>
           </div>
 
-          {/* Quick-Fill Demo Profiles for 1-Click Evaluation */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                <KeyRound className="w-3 h-3 text-emerald-600" />
-                Quick-Fill Demo Credentials (1-Click)
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono">Password: Polytechnic@2022</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {BTEB_FACULTY_USERS.map(user => {
-                const isAdminUser = user.role === 'admin';
-                return (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => handleQuickFill(user.email, user.role, user.name)}
-                    className="flex items-center gap-2.5 p-2 rounded-xl text-left border border-slate-200/80 hover:border-emerald-400 hover:bg-emerald-50/30 transition-all text-xs group"
-                  >
-                    <img
-                      src={user.avatar}
-                      alt={user.name}
-                      className="w-7 h-7 rounded-lg object-cover ring-1 ring-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="font-bold text-slate-900 truncate group-hover:text-emerald-700">
-                          {user.name.split(' ')[0]} {user.name.split(' ')[1] || ''}
-                        </span>
-                        <span
-                          className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded ${
-                            isAdminUser
-                              ? 'bg-indigo-100 text-indigo-700'
-                              : 'bg-emerald-100 text-emerald-800'
-                          }`}
-                        >
-                          {user.role}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-slate-400 truncate block">
-                        {user.email}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+          {/* Institutional Compliance Notice */}
+          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <p className="text-xs text-slate-500">
+              Bangladesh Technical Education Board (BTEB) Curricula • Authorized institutional accounts only.
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Contact your academic coordinator or ICT cell if you need account access.
+            </p>
           </div>
         </div>
       </div>

@@ -608,7 +608,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <h3 className="text-sm font-bold text-slate-800">No Subjects Assigned Yet</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
               The administrator has not yet assigned any subjects to your account.
-              Switch to the Admin account using the top-right switcher to assign subjects.
+              Please contact your institutional administrator to allocate BTEB courses.
             </p>
           </div>
         ) : (
