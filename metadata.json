@@ -1,0 +1,6 @@
+{
+  "name": "Presently - Smart Student Attendance & Analytics",
+  "description": "Interactive student attendance system with 1-click roll call for teachers, admin subject assignment, real-time student performance trends, CSV bulk import, and exportable attendance reports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

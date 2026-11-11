@@ -1,0 +1,140 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account and role in the attendance system",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Auth UID" },
+        "name": { "type": "string", "description": "Full name" },
+        "email": { "type": "string", "description": "Email address" },
+        "role": { "type": "string", "enum": ["admin", "teacher"], "description": "User role" },
+        "avatar": { "type": "string", "description": "Avatar image URL" },
+        "department": { "type": "string", "description": "Academic department" },
+        "employeeId": { "type": "string", "description": "Institutional faculty/admin ID" },
+        "dailyClassTarget": { "type": "number", "description": "Target total classes conducted per day by teacher" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "BTEB Curricula 2022 course subject",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "description": "Official BTEB 5-digit subject code" },
+        "name": { "type": "string", "description": "Course title" },
+        "semester": { "type": "string", "description": "BTEB Semester (e.g. 1st, 2nd, 3rd, ...)" },
+        "curriculum": { "type": "string", "description": "BTEB Probidhan 2022" },
+        "technology": { "type": "string", "description": "Computer Science and Technology" },
+        "credits": { "type": "number", "description": "Credit points" },
+        "classId": { "type": "string", "description": "Class identifier" }
+      },
+      "required": ["code", "name", "semester", "curriculum"]
+    },
+    "ClassGroup": {
+      "title": "ClassGroup",
+      "description": "BTEB Technology Semester Batch",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Class name" },
+        "section": { "type": "string", "description": "Section or Shift (Shift-1 / Shift-2)" },
+        "semester": { "type": "string", "description": "BTEB Semester" },
+        "academicYear": { "type": "string", "description": "Session year" },
+        "roomNumber": { "type": "string", "description": "Lab or Room number" }
+      },
+      "required": ["name", "section", "semester"]
+    },
+    "SubjectAssignment": {
+      "title": "SubjectAssignment",
+      "description": "Teacher course allocation by admin",
+      "type": "object",
+      "properties": {
+        "subjectId": { "type": "string", "description": "Subject reference" },
+        "teacherId": { "type": "string", "description": "Teacher user ID" },
+        "classId": { "type": "string", "description": "Class reference" },
+        "semester": { "type": "string", "description": "Semester" },
+        "academicYear": { "type": "string", "description": "Academic Session" }
+      },
+      "required": ["subjectId", "teacherId", "classId"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Enrolled student",
+      "type": "object",
+      "properties": {
+        "rollNumber": { "type": "string", "description": "BTEB Board Roll / Class Roll" },
+        "registrationNumber": { "type": "string", "description": "BTEB Registration Number" },
+        "name": { "type": "string", "description": "Student full name" },
+        "email": { "type": "string", "description": "Student email" },
+        "gender": { "type": "string", "enum": ["Male", "Female", "Other"] },
+        "classId": { "type": "string", "description": "Class group ID" },
+        "semester": { "type": "string", "description": "BTEB Semester" },
+        "phone": { "type": "string", "description": "Student phone" },
+        "parentEmail": { "type": "string", "description": "Parent email" },
+        "status": { "type": "string", "enum": ["active", "inactive"] }
+      },
+      "required": ["rollNumber", "name", "classId"]
+    },
+    "AttendanceSession": {
+      "title": "AttendanceSession",
+      "description": "Attendance session roll call",
+      "type": "object",
+      "properties": {
+        "subjectId": { "type": "string", "description": "Subject ID" },
+        "classId": { "type": "string", "description": "Class ID" },
+        "teacherId": { "type": "string", "description": "Teacher UID" },
+        "date": { "type": "string", "description": "Session date YYYY-MM-DD" },
+        "timeSlot": { "type": "string", "description": "Session period" },
+        "totalStudents": { "type": "number", "description": "Total students" },
+        "presentCount": { "type": "number", "description": "Count present" },
+        "absentCount": { "type": "number", "description": "Count absent" },
+        "lateCount": { "type": "number", "description": "Count late" },
+        "excusedCount": { "type": "number", "description": "Count excused" }
+      },
+      "required": ["subjectId", "classId", "date", "teacherId"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Individual student attendance status",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string", "description": "Attendance session ID" },
+        "studentId": { "type": "string", "description": "Student ID" },
+        "status": { "type": "string", "enum": ["present", "absent", "late", "excused"] },
+        "remarks": { "type": "string", "description": "Reason notes" },
+        "markedAt": { "type": "string", "description": "Timestamp" }
+      },
+      "required": ["sessionId", "studentId", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Registered faculty and admin users"
+    },
+    "/subjects/{subjectId}": {
+      "schema": "Subject",
+      "description": "BTEB Curricula 2022 course catalog"
+    },
+    "/classes/{classId}": {
+      "schema": "ClassGroup",
+      "description": "BTEB Semester class groups"
+    },
+    "/assignments/{assignmentId}": {
+      "schema": "SubjectAssignment",
+      "description": "Admin assignments of subjects to teachers"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Student profiles (import restricted to admin)"
+    },
+    "/sessions/{sessionId}": {
+      "schema": "AttendanceSession",
+      "description": "Attendance sessions logged by teachers"
+    },
+    "/records/{recordId}": {
+      "schema": "AttendanceRecord",
+      "description": "Detailed student attendance marks"
+    }
+  }
+}
