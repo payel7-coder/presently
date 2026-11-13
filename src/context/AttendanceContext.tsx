@@ -292,7 +292,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
         return null;
       })
-      .filter((item): item is { subject: Subject; classGroup: ClassGroup; assignment: SubjectAssignment } => item !== null);
+      .filter((item): item is { subject: Subject; classGroup: ClassGroup; assignment: SubjectAssignment } => item !== null)
+      .sort((a, b) => {
+        const codeCmp = a.subject.code.localeCompare(b.subject.code);
+        if (codeCmp !== 0) return codeCmp;
+        const partOrder = (p: SubjectPart) => (p === 'theory' ? 0 : 1);
+        return partOrder(a.assignment.part) - partOrder(b.assignment.part);
+      });
   };
 
   const getClassStudents = (classId: string) => {
@@ -577,7 +583,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Admin: Assign Subject Part (Theory or Practical) to Teacher — enforces different teachers per part
+  // Admin: Assign Subject Part (Theory or Practical) to Teacher — Theory & Practical are tracked separately (can share or use different teachers)
   const assignSubjectToTeacher = async (
     subjectId: string,
     teacherId: string,

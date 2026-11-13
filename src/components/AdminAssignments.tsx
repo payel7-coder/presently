@@ -229,7 +229,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
             Faculty & Subject Part Allocations (BTEB Curricula 2022)
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Each subject has separate <strong>Theory</strong> and <strong>Practical</strong> parts assigned to different teachers.
+            Each subject has separate <strong>Theory</strong> and <strong>Practical</strong> parts. Assign different teachers or let the same teacher take both parts.
           </p>
         </div>
 
@@ -303,7 +303,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                 No Teachers Added Yet (Clean Institutional Database)
               </h2>
               <p className="text-xs text-slate-600 mt-0.5 max-w-2xl leading-relaxed">
-                Add at least two faculty teachers so you can assign <strong>Theory</strong> and <strong>Practical</strong> parts of each BTEB subject to different instructors. Teachers can also self-register from the sign-in page.
+                Add faculty teachers to assign <strong>Theory</strong> and <strong>Practical</strong> parts of each BTEB subject independently (the same teacher may take both parts, or you may assign separate instructors). Teachers can also self-register from the sign-in page.
               </p>
             </div>
           </div>
@@ -773,7 +773,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
               {/* 3. Subject Part Selector */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  3. Select Subject Part (Separate Teachers Required)
+                  3. Select Subject Part (Theory &amp; Practical Tracked Separately)
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   <button
@@ -821,8 +821,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                 {currentOppositeTeacher && (
                   <p className="text-[11px] text-slate-600 mt-2 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5">
                     <strong>{oppositePart === 'theory' ? 'Theory' : 'Practical'}</strong> is currently taught by{' '}
-                    <strong className="text-slate-900">{currentOppositeTeacher.name}</strong>. Select a different teacher for{' '}
-                    <strong>{selectedPart === 'theory' ? 'Theory' : 'Practical'}</strong>.
+                    <strong className="text-slate-900">{currentOppositeTeacher.name}</strong>. You may choose another teacher or assign the same teacher to both parts separately.
                   </p>
                 )}
               </div>
@@ -846,7 +845,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                     const isSameAsOther = currentOppositeAssignment?.teacherId === t.id;
                     return (
                       <option key={t.id} value={t.id}>
-                        {t.name} ({t.email}) {isSameAsOther ? `[Already ${oppositePart}]` : ''}
+                        {t.name} ({t.email}) {isSameAsOther ? `[Also takes ${oppositePart === 'theory' ? 'Theory' : 'Practical'}]` : ''}
                       </option>
                     );
                   })}

@@ -447,10 +447,12 @@ export function calculateDailyClassTargetProgress(
 }
 
 /**
- * Validates that Theory and Practical parts of the same subject+class are taught by different teachers.
+ * Validates a Theory or Practical assignment payload.
+ * Theory and Practical are separate parts of each subject; they can be taught
+ * either by different teachers or by the same teacher independently.
  */
 export function validateSubjectPartAssignment(
-  assignments: SubjectAssignment[],
+  _assignments: SubjectAssignment[],
   subjectId: string,
   classId: string,
   part: SubjectPart,
@@ -460,18 +462,8 @@ export function validateSubjectPartAssignment(
     return { valid: false, error: 'Teacher, course, and class group are all required.' };
   }
 
-  const oppositePart: SubjectPart = part === 'theory' ? 'practical' : 'theory';
-  const oppositeAssignment = assignments.find(
-    a => a.subjectId === subjectId && a.classId === classId && (a.part || 'theory') === oppositePart
-  );
-
-  if (oppositeAssignment && oppositeAssignment.teacherId === teacherId) {
-    const partLabel = part === 'theory' ? 'Theory' : 'Practical';
-    const oppositeLabel = oppositePart === 'theory' ? 'Theory' : 'Practical';
-    return {
-      valid: false,
-      error: `Theory and Practical parts of the same subject must be taken by different teachers. This teacher is already assigned to the ${oppositeLabel} part, so another teacher must take the ${partLabel} part.`,
-    };
+  if (part !== 'theory' && part !== 'practical') {
+    return { valid: false, error: 'Subject part must be either Theory or Practical.' };
   }
 
   return { valid: true };

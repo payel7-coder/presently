@@ -355,7 +355,7 @@ test('calculateDailyClassTargetProgress accurately computes daily progress, perc
   assert.equal(res5.isCompleted, true);
 });
 
-test('validateSubjectPartAssignment enforces different teachers for Theory and Practical parts of same subject', () => {
+test('validateSubjectPartAssignment allows both same-teacher and different-teacher assignments across separate Theory and Practical parts', () => {
   const existingAssignments: SubjectAssignment[] = [
     {
       id: 'asg-1',
@@ -368,7 +368,7 @@ test('validateSubjectPartAssignment enforces different teachers for Theory and P
     },
   ];
 
-  // Rejects assigning the same teacher to Practical part of the same subject & class
+  // Allows the same teacher to also take the Practical part (tracked separately from Theory)
   const sameTeacherPractical = validateSubjectPartAssignment(
     existingAssignments,
     'bteb-28542',
@@ -376,10 +376,9 @@ test('validateSubjectPartAssignment enforces different teachers for Theory and P
     'practical',
     'teacher-a'
   );
-  assert.equal(sameTeacherPractical.valid, false);
-  assert.ok(sameTeacherPractical.error?.includes('different teachers'));
+  assert.equal(sameTeacherPractical.valid, true);
 
-  // Allows assigning a different teacher to Practical part of the same subject & class
+  // Also allows assigning a different teacher to the Practical part
   const diffTeacherPractical = validateSubjectPartAssignment(
     existingAssignments,
     'bteb-28542',
@@ -389,7 +388,7 @@ test('validateSubjectPartAssignment enforces different teachers for Theory and P
   );
   assert.equal(diffTeacherPractical.valid, true);
 
-  // Allows reassigning Theory part to the same teacher (updating/keeping Theory)
+  // Allows reassigning Theory part
   const reassignTheory = validateSubjectPartAssignment(
     existingAssignments,
     'bteb-28542',
@@ -399,17 +398,7 @@ test('validateSubjectPartAssignment enforces different teachers for Theory and P
   );
   assert.equal(reassignTheory.valid, true);
 
-  // Allows the same teacher to take Practical of a DIFFERENT subject or DIFFERENT class
-  const diffSubjectPractical = validateSubjectPartAssignment(
-    existingAssignments,
-    'bteb-28544',
-    'class-cst-4',
-    'practical',
-    'teacher-a'
-  );
-  assert.equal(diffSubjectPractical.valid, true);
-
-  // Also checks reverse direction: Practical exists -> Theory cannot have same teacher
+  // Reverse direction: Practical exists -> same teacher can also take Theory
   const practicalFirst: SubjectAssignment[] = [
     {
       id: 'asg-2',
@@ -428,7 +417,16 @@ test('validateSubjectPartAssignment enforces different teachers for Theory and P
     'theory',
     'teacher-b'
   );
-  assert.equal(sameTeacherTheory.valid, false);
-});
+  assert.equal(sameTeacherTheory.valid, true);
 
+  // Rejects missing required fields
+  const missingTeacher = validateSubjectPartAssignment(
+    existingAssignments,
+    'bteb-28542',
+    'class-cst-4',
+    'practical',
+    ''
+  );
+  assert.equal(missingTeacher.valid, false);
+});
 
