@@ -8,6 +8,8 @@ import {
   isValidAttendanceDate,
   calculateDailyClassTargetProgress,
   validateSubjectPartAssignment,
+  getCurrentWeekBounds,
+  calculateWeeklyStudentAttendanceSummary,
 } from './attendanceLogic';
 import { Student, AttendanceSession, AttendanceRecord, SubjectAssignment } from '../types/attendance';
 
@@ -428,5 +430,70 @@ test('validateSubjectPartAssignment allows both same-teacher and different-teach
     ''
   );
   assert.equal(missingTeacher.valid, false);
+});
+
+test('getCurrentWeekBounds returns accurate Sunday-Saturday bounds and labels', () => {
+  // Friday Nov 13, 2026 -> Sun Nov 8 to Sat Nov 14, 2026
+  const bounds1 = getCurrentWeekBounds('2026-11-13');
+  assert.equal(bounds1.startDate, '2026-11-08');
+  assert.equal(bounds1.endDate, '2026-11-14');
+  assert.equal(bounds1.label, 'Nov 8 – Nov 14, 2026');
+
+  // Cross-year boundary: Thursday Jan 1, 2026 -> Sun Dec 28, 2025 to Sat Jan 3, 2026
+  const bounds2 = getCurrentWeekBounds('2026-01-01');
+  assert.equal(bounds2.startDate, '2025-12-28');
+  assert.equal(bounds2.endDate, '2026-01-03');
+  assert.equal(bounds2.label, 'Dec 28, 2025 – Jan 3, 2026');
+});
+
+test('calculateWeeklyStudentAttendanceSummary computes per-student weekly averages and ignores out-of-week sessions', () => {
+  const students: Student[] = [
+    { id: 's1', rollNumber: '621001', name: 'Naimur Rahman', email: 'n@s.edu', gender: 'Male', classId: 'c1', status: 'active' },
+    { id: 's2', rollNumber: '621002', name: 'Jannatul Ferdous', email: 'j@s.edu', gender: 'Female', classId: 'c1', status: 'active' },
+    { id: 's3', rollNumber: '621003', name: 'NoRecords Yet', email: 'x@s.edu', gender: 'Male', classId: 'c2', status: 'active' },
+  ];
+
+  const sessions: AttendanceSession[] = [
+    // Current week (Nov 8 - Nov 14, 2026) Theory
+    { id: 'w-theory', subjectId: 'sub-1', classId: 'c1', teacherId: 't1', part: 'theory', date: '2026-11-10', totalStudents: 2, presentCount: 1, absentCount: 1, lateCount: 0, excusedCount: 0, createdAt: '', isSubmitted: true },
+    // Current week Practical
+    { id: 'w-practical', subjectId: 'sub-1', classId: 'c1', teacherId: 't1', part: 'practical', date: '2026-11-13', totalStudents: 2, presentCount: 1, absentCount: 0, lateCount: 1, excusedCount: 0, createdAt: '', isSubmitted: true },
+    // Prior week (should be ignored!)
+    { id: 'old-sess', subjectId: 'sub-1', classId: 'c1', teacherId: 't1', part: 'theory', date: '2026-11-05', totalStudents: 2, presentCount: 0, absentCount: 2, lateCount: 0, excusedCount: 0, createdAt: '', isSubmitted: true },
+  ];
+
+  const records: AttendanceRecord[] = [
+    // s1: Present (Theory) + Present (Practical) => 100% this week (even though absent in old-sess)
+    { id: 'r1', sessionId: 'w-theory', studentId: 's1', status: 'present', markedAt: '' },
+    { id: 'r2', sessionId: 'w-practical', studentId: 's1', status: 'present', markedAt: '' },
+    { id: 'r3', sessionId: 'old-sess', studentId: 's1', status: 'absent', markedAt: '' },
+    // s2: Absent (Theory) + Late (Practical, 0.75) => 0.75 / 2 = 37.5% (at risk)
+    { id: 'r4', sessionId: 'w-theory', studentId: 's2', status: 'absent', markedAt: '' },
+    { id: 'r5', sessionId: 'w-practical', studentId: 's2', status: 'late', markedAt: '' },
+  ];
+
+  const summary = calculateWeeklyStudentAttendanceSummary(students, sessions, records, '2026-11-13');
+  assert.equal(summary.weekStart, '2026-11-08');
+  assert.equal(summary.weekEnd, '2026-11-14');
+  assert.equal(summary.totalWeekSessions, 2);
+  assert.equal(summary.studentsWithSessions, 2);
+  assert.equal(summary.studentPoints.length, 2);
+
+  assert.equal(summary.studentPoints[0].rollNumber, '621001');
+  assert.equal(summary.studentPoints[0].attendancePercentage, 100);
+  assert.equal(summary.studentPoints[0].isAtRisk, false);
+
+  assert.equal(summary.studentPoints[1].rollNumber, '621002');
+  assert.equal(summary.studentPoints[1].attendancePercentage, 37.5);
+  assert.equal(summary.studentPoints[1].isAtRisk, true);
+
+  // Average of 100 and 37.5 = 68.8
+  assert.equal(summary.weeklyAveragePercentage, 68.8);
+
+  // Week with zero sessions returns clean empty state
+  const emptyWeek = calculateWeeklyStudentAttendanceSummary(students, sessions, records, '2026-10-01');
+  assert.equal(emptyWeek.totalWeekSessions, 0);
+  assert.equal(emptyWeek.studentPoints.length, 0);
+  assert.equal(emptyWeek.weeklyAveragePercentage, 0);
 });
 

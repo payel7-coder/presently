@@ -469,3 +469,166 @@ export function validateSubjectPartAssignment(
   return { valid: true };
 }
 
+export interface WeeklyStudentAttendancePoint {
+  studentId: string;
+  rollNumber: string;
+  studentName: string;
+  shortLabel: string;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  totalSessions: number;
+  attendancePercentage: number;
+  isAtRisk: boolean;
+}
+
+export interface WeeklyAttendanceSummary {
+  weekStart: string;
+  weekEnd: string;
+  weekLabel: string;
+  totalWeekSessions: number;
+  weeklyAveragePercentage: number;
+  studentsWithSessions: number;
+  studentPoints: WeeklyStudentAttendancePoint[];
+}
+
+function toUTCDateOnly(input?: Date | string): Date {
+  if (!input) {
+    const iso = new Date().toISOString().split('T')[0];
+    return new Date(`${iso}T00:00:00Z`);
+  }
+  if (typeof input === 'string') {
+    const clean = input.split('T')[0];
+    return new Date(`${clean}T00:00:00Z`);
+  }
+  const iso = input.toISOString().split('T')[0];
+  return new Date(`${iso}T00:00:00Z`);
+}
+
+function formatUTCDateString(date: Date): string {
+  return date.toISOString().split('T')[0];
+}
+
+function formatShortMonthDay(date: Date, includeYear: boolean): string {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const base = `${months[date.getUTCMonth()]} ${date.getUTCDate()}`;
+  return includeYear ? `${base}, ${date.getUTCFullYear()}` : base;
+}
+
+/**
+ * Computes Sunday–Saturday calendar bounds (YYYY-MM-DD) for the week containing referenceDate.
+ */
+export function getCurrentWeekBounds(referenceDate?: Date | string): {
+  startDate: string;
+  endDate: string;
+  label: string;
+} {
+  const ref = toUTCDateOnly(referenceDate);
+  const dayOfWeek = ref.getUTCDay(); // 0 = Sun, 6 = Sat
+
+  const start = new Date(ref);
+  start.setUTCDate(ref.getUTCDate() - dayOfWeek);
+
+  const end = new Date(start);
+  end.setUTCDate(start.getUTCDate() + 6);
+
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+  const label = `${formatShortMonthDay(start, !sameYear)} – ${formatShortMonthDay(end, true)}`;
+
+  return {
+    startDate: formatUTCDateString(start),
+    endDate: formatUTCDateString(end),
+    label,
+  };
+}
+
+/**
+ * Calculates average attendance percentage per student for the current week.
+ */
+export function calculateWeeklyStudentAttendanceSummary(
+  students: Student[],
+  sessions: AttendanceSession[],
+  records: AttendanceRecord[],
+  referenceDate?: Date | string,
+  minThreshold: number = 75
+): WeeklyAttendanceSummary {
+  const { startDate, endDate, label } = getCurrentWeekBounds(referenceDate);
+
+  const weekSessions = sessions.filter(
+    s => s.date >= startDate && s.date <= endDate
+  );
+  const weekSessionIds = new Set(weekSessions.map(s => s.id));
+
+  const studentPoints: WeeklyStudentAttendancePoint[] = [];
+
+  if (weekSessionIds.size > 0) {
+    students.forEach(student => {
+      const studentWeekRecords = records.filter(
+        r => r.studentId === student.id && weekSessionIds.has(r.sessionId)
+      );
+      const totalSessions = studentWeekRecords.length;
+      if (totalSessions === 0) return;
+
+      let present = 0;
+      let absent = 0;
+      let late = 0;
+      let excused = 0;
+
+      studentWeekRecords.forEach(r => {
+        if (r.status === 'present') present++;
+        else if (r.status === 'absent') absent++;
+        else if (r.status === 'late') late++;
+        else if (r.status === 'excused') excused++;
+      });
+
+      const effectiveAttended = present + late * 0.75 + excused;
+      const attendancePercentage = Math.min(
+        100,
+        Math.round((effectiveAttended / totalSessions) * 1000) / 10
+      );
+
+      const firstName = student.name.trim().split(/\s+/)[0] || student.name;
+      const shortLabel = `${firstName} (${student.rollNumber})`;
+
+      studentPoints.push({
+        studentId: student.id,
+        rollNumber: student.rollNumber,
+        studentName: student.name,
+        shortLabel,
+        present,
+        absent,
+        late,
+        excused,
+        totalSessions,
+        attendancePercentage,
+        isAtRisk: attendancePercentage < minThreshold,
+      });
+    });
+
+    studentPoints.sort((a, b) =>
+      a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true })
+    );
+  }
+
+  const weeklyAveragePercentage =
+    studentPoints.length > 0
+      ? Math.round(
+          (studentPoints.reduce((sum, p) => sum + p.attendancePercentage, 0) /
+            studentPoints.length) *
+            10
+        ) / 10
+      : 0;
+
+  return {
+    weekStart: startDate,
+    weekEnd: endDate,
+    weekLabel: label,
+    totalWeekSessions: weekSessions.length,
+    weeklyAveragePercentage,
+    studentsWithSessions: studentPoints.length,
+    studentPoints,
+  };
+}
+
+

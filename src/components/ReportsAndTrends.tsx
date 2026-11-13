@@ -23,8 +23,21 @@ import {
 import {
   calculateSessionSummary,
   calculateStudentAttendanceStats,
+  calculateWeeklyStudentAttendanceSummary,
   exportAttendanceToCSV,
+  WeeklyStudentAttendancePoint,
 } from '../utils/attendanceLogic';
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ReferenceLine,
+  Cell,
+} from 'recharts';
 import { Student, AttendanceSession, Subject, ClassGroup, SubjectPart } from '../types/attendance';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
 
@@ -131,6 +144,11 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const chronologicalSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredSessions]);
+
+  // Weekly attendance average per student for the current week
+  const weeklySummary = useMemo(() => {
+    return calculateWeeklyStudentAttendanceSummary(filteredStudents, filteredSessions, records);
+  }, [filteredStudents, filteredSessions, records]);
 
   // CSV Export Trigger
   const handleExportCSV = () => {
@@ -380,6 +398,154 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
             Require early attendance intervention
           </p>
         </div>
+      </div>
+
+      {/* Current Week Per-Student Attendance Bar Chart Summary (Recharts) */}
+      <div
+        data-testid="weekly-summary-card"
+        className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4"
+      >
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-indigo-600" />
+              <span>Current Week Student Attendance Summary</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
+              <span>{weeklySummary.weekLabel}</span>
+              <span aria-hidden="true" className="mx-1.5">·</span>
+              <span>{weeklySummary.totalWeekSessions} session{weeklySummary.totalWeekSessions === 1 ? '' : 's'} this week</span>
+              <span aria-hidden="true" className="mx-1.5">·</span>
+              <span>{weeklySummary.studentsWithSessions} student{weeklySummary.studentsWithSessions === 1 ? '' : 's'} evaluated</span>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
+            <div className="tabular-nums font-bold text-slate-900">
+              Week Avg:{' '}
+              <span
+                className={
+                  weeklySummary.weeklyAveragePercentage >= 85
+                    ? 'text-emerald-700'
+                    : weeklySummary.weeklyAveragePercentage >= 75
+                    ? 'text-amber-700'
+                    : weeklySummary.studentsWithSessions > 0
+                    ? 'text-rose-600'
+                    : 'text-slate-500'
+                }
+              >
+                {weeklySummary.weeklyAveragePercentage}%
+              </span>
+            </div>
+            <div className="flex items-center gap-3 font-medium">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500" /> &ge; 85% Good
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-xs bg-amber-500" /> 75%–84% Caution
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-xs bg-rose-500" /> &lt; 75% At Risk
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {weeklySummary.studentPoints.length === 0 ? (
+          <div className="py-10 px-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+            <p className="text-xs font-semibold text-slate-600">
+              No attendance sessions recorded for the current week ({weeklySummary.weekLabel}).
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Record a Theory or Practical roll call this week or adjust filters to inspect weekly student averages.
+            </p>
+          </div>
+        ) : (
+          <div className="w-full h-72 pt-2" data-testid="weekly-bar-chart">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={weeklySummary.studentPoints}
+                margin={{ top: 16, right: 28, left: 0, bottom: 12 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis
+                  dataKey="shortLabel"
+                  tick={{ fontSize: 11, fill: '#475569' }}
+                  axisLine={{ stroke: '#cbd5e1' }}
+                  tickLine={false}
+                  interval={weeklySummary.studentPoints.length > 12 ? 'preserveStartEnd' : 0}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  tickFormatter={val => `${val}%`}
+                  tick={{ fontSize: 11, fill: '#64748b' }}
+                  axisLine={false}
+                  tickLine={false}
+                  width={44}
+                />
+                <Tooltip
+                  cursor={{ fill: 'rgba(148, 163, 184, 0.12)' }}
+                  content={({ active, payload }) => {
+                    if (!active || !payload || payload.length === 0) return null;
+                    const point = payload[0].payload as WeeklyStudentAttendancePoint;
+                    return (
+                      <div className="bg-slate-900 text-white rounded-xl px-3 py-2 text-xs shadow-xl border border-slate-700 space-y-1">
+                        <p className="font-bold text-white">{point.studentName}</p>
+                        <p className="text-[11px] text-slate-400 font-mono">
+                          Roll: {point.rollNumber} · {point.totalSessions} session{point.totalSessions === 1 ? '' : 's'}
+                        </p>
+                        <p className="font-black text-emerald-300 tabular-nums">
+                          {point.attendancePercentage}% Weekly Avg
+                        </p>
+                        <p className="text-[11px] text-slate-300 tabular-nums">
+                          {point.present}P / {point.absent}A / {point.late}L / {point.excused}E
+                        </p>
+                      </div>
+                    );
+                  }}
+                />
+                <ReferenceLine
+                  y={75}
+                  stroke="#f43f5e"
+                  strokeDasharray="4 4"
+                  label={{
+                    value: '75% Min',
+                    position: 'right',
+                    fill: '#e11d48',
+                    fontSize: 10,
+                    fontWeight: 700,
+                  }}
+                />
+                <Bar
+                  dataKey="attendancePercentage"
+                  name="Weekly Attendance %"
+                  radius={[6, 6, 0, 0]}
+                  maxBarSize={48}
+                  onClick={barData => {
+                    const point = barData?.payload as WeeklyStudentAttendancePoint | undefined;
+                    if (!point) return;
+                    const matchedStu = students.find(s => s.id === point.studentId);
+                    if (matchedStu) setDrilldownStudent(matchedStu);
+                  }}
+                  className="cursor-pointer"
+                >
+                  {weeklySummary.studentPoints.map(entry => (
+                    <Cell
+                      key={entry.studentId}
+                      fill={
+                        entry.attendancePercentage >= 85
+                          ? '#10b981'
+                          : entry.attendancePercentage >= 75
+                          ? '#f59e0b'
+                          : '#f43f5e'
+                      }
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
       </div>
 
       {/* Visual Attendance Trend Graph */}
