@@ -1,24 +1,18 @@
 import React, { useState, useMemo } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
+import { Avatar } from './Avatar';
 import {
   BarChart3,
   TrendingUp,
   AlertTriangle,
   Download,
   Printer,
-  Calendar,
-  Filter,
-  Users,
   Search,
   CheckCircle2,
-  XCircle,
-  Clock,
   Mail,
-  ExternalLink,
-  ChevronRight,
   Flame,
-  FileSpreadsheet,
-  FileText
+  FileText,
+  X
 } from 'lucide-react';
 import {
   calculateSessionSummary,
@@ -39,7 +33,7 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { Student, AttendanceSession, Subject, ClassGroup, SubjectPart } from '../types/attendance';
+import { Student, Subject, ClassGroup, SubjectPart } from '../types/attendance';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
 
 interface ReportsAndTrendsProps {
@@ -51,7 +45,6 @@ interface ReportsAndTrendsProps {
 export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   initialSubjectId,
   initialPart,
-  onOpenBulkImport,
 }) => {
   const { subjects, classes, assignments, students, sessions, records, currentUser, isAdmin } = useAttendance();
 
@@ -73,14 +66,12 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const visibleSessions = roleScope.visibleSessions;
   const visibleStudents = roleScope.visibleStudents;
 
-  // Filters
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId || 'all');
   const [selectedPartFilter, setSelectedPartFilter] = useState<'all' | SubjectPart>(initialPart || 'all');
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [riskOnlyFilter, setRiskOnlyFilter] = useState<boolean>(false);
 
-  // Sync filters when user or role scope changes
   React.useEffect(() => {
     if (selectedSubjectId !== 'all' && !visibleSubjects.some(s => s.id === selectedSubjectId)) {
       setSelectedSubjectId('all');
@@ -96,14 +87,9 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
     setSelectedClassId('all');
   }, [currentUser?.id, initialSubjectId, initialPart]);
 
-  // Drilldown modal for student history
   const [drilldownStudent, setDrilldownStudent] = useState<Student | null>(null);
-
-  // Parent notification modal
   const [parentNoticeStudent, setParentNoticeStudent] = useState<Student | null>(null);
   const [noticeSentBanner, setNoticeSentBanner] = useState<string | null>(null);
-
-  // PDF Register Download modal
   const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup } | null>(null);
 
   const handleOpenPdfRegister = () => {
@@ -112,14 +98,17 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       targetSub = visibleSubjects[0];
     }
     if (targetSub) {
-      const cls = visibleClasses.find(c => c.id === targetSub.classId) || classes.find(c => c.id === targetSub.classId) || visibleClasses[0] || classes[0];
+      const cls =
+        visibleClasses.find(c => c.id === targetSub.classId) ||
+        classes.find(c => c.id === targetSub.classId) ||
+        visibleClasses[0] ||
+        classes[0];
       if (cls) {
         setPdfModalSubject({ subject: targetSub, classGroup: cls });
       }
     }
   };
 
-  // Filtered Sessions (strictly scoped to role-visible sessions)
   const filteredSessions = useMemo(() => {
     return visibleSessions.filter(s => {
       const matchSubject = selectedSubjectId === 'all' || s.subjectId === selectedSubjectId;
@@ -129,16 +118,13 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
     });
   }, [visibleSessions, selectedSubjectId, selectedClassId, selectedPartFilter]);
 
-  // Overall metrics
   const summary = useMemo(() => {
     return calculateSessionSummary(filteredSessions);
   }, [filteredSessions]);
 
-  // Filtered Students (strictly scoped to role-visible students & classes)
   const filteredStudents = useMemo(() => {
     return visibleStudents.filter(stu => {
       const matchClass = selectedClassId === 'all' || stu.classId === selectedClassId;
-      // If subject is selected, student must belong to class of that subject
       let matchSubject = true;
       if (selectedSubjectId !== 'all') {
         const sub = visibleSubjects.find(s => s.id === selectedSubjectId);
@@ -154,22 +140,17 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
     });
   }, [visibleStudents, selectedClassId, selectedSubjectId, searchStudent, visibleSubjects]);
 
-  // Compute student stats for each
   const studentStatsList = useMemo(() => {
-    return filteredStudents.map(student => {
-      return {
-        student,
-        stats: calculateStudentAttendanceStats(student, filteredSessions, records, 75),
-      };
-    });
+    return filteredStudents.map(student => ({
+      student,
+      stats: calculateStudentAttendanceStats(student, filteredSessions, records, 75),
+    }));
   }, [filteredStudents, filteredSessions, records]);
 
-  // At-risk students (<75%)
   const atRiskStudents = useMemo(() => {
     return studentStatsList.filter(item => item.stats.isAtRisk);
   }, [studentStatsList]);
 
-  // Displayed students list (respecting riskOnlyFilter)
   const displayedStudents = useMemo(() => {
     if (riskOnlyFilter) {
       return studentStatsList.filter(item => item.stats.isAtRisk);
@@ -177,17 +158,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
     return studentStatsList;
   }, [studentStatsList, riskOnlyFilter]);
 
-  // Chronological sessions for trend line
   const chronologicalSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => a.date.localeCompare(b.date));
   }, [filteredSessions]);
 
-  // Weekly attendance average per student for the current week
   const weeklySummary = useMemo(() => {
     return calculateWeeklyStudentAttendanceSummary(filteredStudents, filteredSessions, records);
   }, [filteredStudents, filteredSessions, records]);
 
-  // CSV Export Trigger
   const handleExportCSV = () => {
     const activeSubjectName =
       selectedSubjectId === 'all'
@@ -225,58 +203,56 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   };
 
   const handleSendParentNotice = (student: Student) => {
-    setNoticeSentBanner(`Notice dispatched to parent of ${student.name} (${student.parentEmail || student.parentContact})`);
+    setNoticeSentBanner(`Notice dispatched to parent of ${student.name} (${student.parentEmail || student.parentContact || 'Registered Contact'})`);
     setParentNoticeStudent(null);
     setTimeout(() => setNoticeSentBanner(null), 4000);
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Top Banner / Filter Bar */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Editorial Header */}
+      <div className="pb-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-cyan-100 text-cyan-800">
-              Real-Time Performance Analytics
-            </span>
-            <span className="text-xs text-slate-500">Live Attendance Ledger</span>
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="font-semibold text-emerald-700">Performance Analytics</span>
+            <span>·</span>
+            <span>Live Attendance Ledger</span>
           </div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            Attendance Reports & Trend Analysis
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+            Attendance Reports &amp; Trend Analysis
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Monitor attendance health, detect chronic absenteeism early, and export audit-ready spreadsheets.
+          <p className="text-xs text-slate-500 mt-1">
+            Monitor weekly attendance standing, identify students below 75% eligibility, and export registers.
           </p>
         </div>
 
-        {/* Export / Print Actions */}
-        <div className="flex items-center gap-2.5 self-start lg:self-auto flex-wrap">
+        <div className="flex items-center gap-2 self-start lg:self-auto flex-wrap">
           <button
             type="button"
             onClick={handleOpenPdfRegister}
             disabled={visibleSubjects.length === 0}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Download official BTEB PDF attendance register"
           >
-            <FileText className="w-4 h-4" />
+            <FileText className="w-3.5 h-3.5" />
             <span>Download PDF Register</span>
           </button>
           <button
             type="button"
             onClick={handleExportCSV}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Download formatted CSV spreadsheet"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
           </button>
           <button
             type="button"
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-colors"
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Print Attendance Summary"
           >
-            <Printer className="w-4 h-4" />
+            <Printer className="w-3.5 h-3.5 text-slate-500" />
             <span>Print Report</span>
           </button>
         </div>
@@ -284,30 +260,34 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
 
       {/* Notice Banner */}
       {noticeSentBanner && (
-        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl p-4 flex items-center justify-between text-xs font-semibold animate-in fade-in">
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-3.5 flex items-center justify-between text-xs font-medium">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span>{noticeSentBanner}</span>
           </div>
-          <button type="button" onClick={() => setNoticeSentBanner(null)} className="font-bold">
-            ✕
+          <button
+            type="button"
+            onClick={() => setNoticeSentBanner(null)}
+            className="text-emerald-700 hover:text-emerald-900 p-1"
+            aria-label="Dismiss notice"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* Filters Ribbon */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-3 no-print">
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Subject Filter */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              {isAdmin ? 'Filter by Subject (All)' : 'My Assigned Subjects'}
+      {/* Filter Toolbar */}
+      <div className="bg-white rounded-xl p-4 border border-slate-200 flex flex-col xl:flex-row xl:items-end justify-between gap-3 no-print">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap items-end gap-3 min-w-0 flex-1">
+          <div className="min-w-0 w-full sm:w-auto lg:max-w-[230px]">
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              {isAdmin ? 'Subject (All)' : 'My Assigned Subjects'}
             </label>
             <select
               aria-label="Filter by Subject"
               value={selectedSubjectId}
               onChange={e => setSelectedSubjectId(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+              className="w-full max-w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 truncate"
             >
               <option value="all">
                 {isAdmin
@@ -322,33 +302,31 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
             </select>
           </div>
 
-          {/* Subject Part Filter */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+          <div className="min-w-0 w-full sm:w-auto">
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
               Course Part
             </label>
             <select
               aria-label="Filter by Course Part"
               value={selectedPartFilter}
               onChange={e => setSelectedPartFilter(e.target.value as 'all' | SubjectPart)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+              className="w-full max-w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
             >
-              <option value="all">All Parts (Theory & Practical)</option>
+              <option value="all">All Parts (Theory &amp; Practical)</option>
               <option value="theory">Theory Part Only</option>
               <option value="practical">Practical Part Only</option>
             </select>
           </div>
 
-          {/* Class Filter */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Filter by Class Group
+          <div className="min-w-0 w-full sm:w-auto">
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+              Class Group
             </label>
             <select
               aria-label="Filter by Class Group"
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
-              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+              className="w-full max-w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
             >
               <option value="all">
                 {isAdmin
@@ -363,32 +341,28 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
             </select>
           </div>
 
-          {/* At-Risk Toggle Pill */}
-          <div className="self-end pb-0.5">
-            <button
-              type="button"
-              onClick={() => setRiskOnlyFilter(!riskOnlyFilter)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                riskOnlyFilter
-                  ? 'bg-rose-600 text-white shadow-xs'
-                  : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200/60'
-              }`}
-            >
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Show At-Risk Only (&lt;75%) ({atRiskStudents.length})</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setRiskOnlyFilter(!riskOnlyFilter)}
+            className={`h-9 w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap tabular-nums ${
+              riskOnlyFilter
+                ? 'bg-rose-600 text-white'
+                : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+            }`}
+          >
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            <span>At-Risk Only (&lt;75%) ({atRiskStudents.length})</span>
+          </button>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full sm:w-64">
-          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <div className="relative w-full xl:w-56 shrink-0">
+          <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             placeholder="Search student or roll no..."
             value={searchStudent}
             onChange={e => setSearchStudent(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500"
+            className="w-full h-9 pl-9 pr-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
           />
         </div>
       </div>
@@ -397,11 +371,11 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       {!isAdmin && visibleSubjects.length === 0 && (
         <div
           data-testid="teacher-no-assigned-subjects"
-          className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3 text-amber-900"
+          className="bg-amber-50/80 border border-amber-200 rounded-xl p-5 flex items-start gap-3 text-amber-900"
         >
           <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
-            <h3 className="text-sm font-bold">No Assigned Subjects Yet</h3>
+            <h3 className="text-sm font-semibold">No Assigned Subjects Yet</h3>
             <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
               Only subjects assigned to you by the administrator are visible here. Once your Theory or Practical subjects are allocated, your attendance reports and charts will populate automatically.
             </p>
@@ -410,61 +384,57 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
+        <div className="bg-white rounded-xl p-5 border border-slate-200">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
             Average Attendance
           </span>
-          <p className="text-3xl font-black text-slate-900 mt-2">
+          <p className="text-3xl font-bold text-slate-900 mt-2">
             {summary.averageAttendanceRate}%
           </p>
-          <div className="mt-2 flex items-center gap-1.5">
-            <span
-              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                summary.averageAttendanceRate >= 85
-                  ? 'bg-emerald-100 text-emerald-800'
-                  : 'bg-amber-100 text-amber-800'
-              }`}
-            >
-              {summary.averageAttendanceRate >= 85 ? 'Healthy Standing' : 'Needs Monitoring'}
-            </span>
-          </div>
+          <p
+            className={`text-xs font-medium mt-1.5 ${
+              summary.averageAttendanceRate >= 85 ? 'text-emerald-700' : 'text-amber-700'
+            }`}
+          >
+            {summary.averageAttendanceRate >= 85 ? 'Healthy Standing' : 'Needs Monitoring'}
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+        <div className="bg-white rounded-xl p-5 border border-slate-200">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
             Total Sessions
           </span>
-          <p className="text-3xl font-black text-slate-900 mt-2">
+          <p className="text-3xl font-bold text-slate-900 mt-2">
             {summary.totalSessions}
           </p>
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-xs text-slate-500 mt-1.5">
             Roll calls conducted
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-            Present vs Absent Ratio
+        <div className="bg-white rounded-xl p-5 border border-slate-200">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+            Present vs Absent
           </span>
-          <p className="text-3xl font-black text-emerald-700 mt-2">
+          <p className="text-3xl font-bold text-emerald-700 mt-2">
             {summary.totalPresent}{' '}
-            <span className="text-base font-semibold text-slate-400">/ {summary.totalAbsent} abs</span>
+            <span className="text-base font-medium text-slate-400">/ {summary.totalAbsent} abs</span>
           </p>
-          <p className="text-[11px] text-slate-500 mt-1">
-            {summary.totalLate} late marks • {summary.totalExcused} excused
+          <p className="text-xs text-slate-500 mt-1.5">
+            {summary.totalLate} late · {summary.totalExcused} excused
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs">
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+        <div className="bg-white rounded-xl p-5 border border-slate-200">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
             At-Risk Students (&lt;75%)
           </span>
-          <p className="text-3xl font-black text-rose-600 mt-2">
+          <p className="text-3xl font-bold text-rose-600 mt-2">
             {atRiskStudents.length}
           </p>
-          <p className="text-[11px] text-rose-600 font-semibold mt-1">
-            Require early attendance intervention
+          <p className="text-xs text-rose-600 font-medium mt-1.5">
+            Require early intervention
           </p>
         </div>
       </div>
@@ -472,12 +442,12 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       {/* Current Week Per-Student Attendance Bar Chart Summary (Recharts) */}
       <div
         data-testid="weekly-summary-card"
-        className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4"
+        className="bg-white rounded-xl p-6 border border-slate-200 space-y-4"
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-indigo-600" />
+              <BarChart3 className="w-4 h-4 text-slate-500" />
               <span>Current Week Student Attendance Summary</span>
             </h3>
             <p className="text-xs text-slate-500 mt-0.5 tabular-nums">
@@ -490,7 +460,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600">
-            <div className="tabular-nums font-bold text-slate-900">
+            <div className="tabular-nums font-semibold text-slate-900">
               Week Avg:{' '}
               <span
                 className={
@@ -506,26 +476,26 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                 {weeklySummary.weeklyAveragePercentage}%
               </span>
             </div>
-            <div className="flex items-center gap-3 font-medium">
+            <div className="flex items-center gap-3 text-[11px] font-medium">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-xs bg-emerald-500" /> &ge; 85% Good
+                <span className="w-2 h-2 rounded-xs bg-emerald-500" /> &ge; 85% Good
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-xs bg-amber-500" /> 75%–84% Caution
+                <span className="w-2 h-2 rounded-xs bg-amber-500" /> 75%–84% Caution
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-xs bg-rose-500" /> &lt; 75% At Risk
+                <span className="w-2 h-2 rounded-xs bg-rose-500" /> &lt; 75% At Risk
               </span>
             </div>
           </div>
         </div>
 
         {weeklySummary.studentPoints.length === 0 ? (
-          <div className="py-10 px-4 text-center border border-dashed border-slate-200 rounded-xl bg-slate-50/50">
+          <div className="py-10 px-4 text-center border border-dashed border-slate-200 rounded-lg bg-slate-50/50">
             <p className="text-xs font-semibold text-slate-600">
               No attendance sessions recorded for the current week ({weeklySummary.weekLabel}).
             </p>
-            <p className="text-[11px] text-slate-400 mt-1">
+            <p className="text-xs text-slate-400 mt-1">
               Record a Theory or Practical roll call this week or adjust filters to inspect weekly student averages.
             </p>
           </div>
@@ -558,12 +528,12 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                     if (!active || !payload || payload.length === 0) return null;
                     const point = payload[0].payload as WeeklyStudentAttendancePoint;
                     return (
-                      <div className="bg-slate-900 text-white rounded-xl px-3 py-2 text-xs shadow-xl border border-slate-700 space-y-1">
-                        <p className="font-bold text-white">{point.studentName}</p>
+                      <div className="bg-slate-900 text-white rounded-lg px-3 py-2 text-xs shadow-lg border border-slate-800 space-y-1">
+                        <p className="font-semibold text-white">{point.studentName}</p>
                         <p className="text-[11px] text-slate-400 font-mono">
-                          Roll: {point.rollNumber} · {point.totalSessions} session{point.totalSessions === 1 ? '' : 's'}
+                          Roll {point.rollNumber} · {point.totalSessions} session{point.totalSessions === 1 ? '' : 's'}
                         </p>
-                        <p className="font-black text-emerald-300 tabular-nums">
+                        <p className="font-bold text-emerald-400 tabular-nums">
                           {point.attendancePercentage}% Weekly Avg
                         </p>
                         <p className="text-[11px] text-slate-300 tabular-nums">
@@ -582,14 +552,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                     position: 'right',
                     fill: '#e11d48',
                     fontSize: 10,
-                    fontWeight: 700,
+                    fontWeight: 600,
                   }}
                 />
                 <Bar
                   dataKey="attendancePercentage"
                   name="Weekly Attendance %"
-                  radius={[6, 6, 0, 0]}
-                  maxBarSize={48}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={44}
                   onClick={barData => {
                     const point = barData?.payload as WeeklyStudentAttendancePoint | undefined;
                     if (!point) return;
@@ -617,27 +587,27 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
         )}
       </div>
 
-      {/* Visual Attendance Trend Graph */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs space-y-4">
+      {/* Session Attendance Trend Chart */}
+      <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+              <TrendingUp className="w-4 h-4 text-emerald-600" />
               <span>Session Attendance Trends Over Time</span>
             </h3>
-            <p className="text-xs text-slate-500">
-              Rate (%) across recent sessions with 75% critical academic threshold line.
+            <p className="text-xs text-slate-500 mt-0.5">
+              Session-by-session rate (%) relative to the 75% examination eligibility threshold.
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
+          <div className="flex items-center gap-3 text-[11px] font-medium text-slate-600">
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-emerald-500" /> &gt;= 85% Good
+              <span className="w-2 h-2 rounded-xs bg-emerald-500" /> &ge; 85% Good
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-3 rounded bg-amber-500" /> 75% - 84% Caution
+              <span className="w-2 h-2 rounded-xs bg-amber-500" /> 75%–84% Caution
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="w-3 h-0.5 bg-rose-500 border border-dashed border-rose-500" /> 75% Threshold
+              <span className="w-2 h-2 rounded-xs bg-rose-500" /> &lt; 75% Risk
             </span>
           </div>
         </div>
@@ -646,9 +616,8 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           <p className="text-xs text-slate-400 py-8 text-center">No sessions match current filter.</p>
         ) : (
           <div className="pt-4">
-            {/* SVG Visual Chart */}
-            <div className="h-44 w-full flex items-end gap-2 border-b border-l border-slate-200 px-2 pb-2">
-              {chronologicalSessions.map((sess, idx) => {
+            <div className="h-44 w-full flex items-end gap-2 border-b border-l border-slate-200 px-3 pb-2">
+              {chronologicalSessions.map((sess) => {
                 const total = sess.totalStudents || 1;
                 const effective = sess.presentCount + sess.lateCount * 0.75 + sess.excusedCount;
                 const rate = Math.round((effective / total) * 100);
@@ -659,21 +628,16 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                     key={sess.id}
                     className="flex-1 flex flex-col items-center group relative h-full justify-end"
                   >
-                    {/* Tooltip on hover */}
-                    <div className="absolute -top-12 z-20 hidden group-hover:flex flex-col items-center bg-slate-900 text-white text-[10px] rounded-lg py-1 px-2 pointer-events-none whitespace-nowrap shadow-lg">
-                      <span className="font-bold">
-                        {rate}% Attendance ({sess.part === 'practical' ? 'Practical' : 'Theory'})
+                    <div className="absolute -top-12 z-20 hidden group-hover:flex flex-col items-center bg-slate-900 text-white text-[11px] rounded-lg py-1.5 px-2.5 pointer-events-none whitespace-nowrap shadow-lg tabular-nums">
+                      <span className="font-semibold">
+                        {rate}% ({sess.part === 'practical' ? 'Practical' : 'Theory'})
                       </span>
-                      <span className="text-slate-400">{sess.date}</span>
-                      <span className="text-emerald-300">
-                        {sess.presentCount}P / {sess.absentCount}A / {sess.lateCount}L
-                      </span>
+                      <span className="text-slate-400 text-[10px]">{sess.date}</span>
                     </div>
 
-                    {/* Bar */}
                     <div
                       style={{ height: `${heightPercent}%` }}
-                      className={`w-full max-w-[28px] rounded-t-md transition-all group-hover:opacity-80 ${
+                      className={`w-full max-w-[26px] rounded-t-sm transition-opacity group-hover:opacity-80 ${
                         rate >= 85
                           ? 'bg-emerald-500'
                           : rate >= 75
@@ -682,8 +646,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                       }`}
                     />
 
-                    {/* X-axis date label */}
-                    <span className="text-[9px] text-slate-400 mt-2 truncate max-w-[36px] font-mono">
+                    <span className="text-[10px] text-slate-400 mt-2 truncate max-w-[40px] font-mono tabular-nums">
                       {sess.date.slice(5)}
                     </span>
                   </div>
@@ -694,93 +657,87 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
         )}
       </div>
 
-      {/* At-Risk Intervention Alert Banner */}
+      {/* At-Risk Intervention Section */}
       {atRiskStudents.length > 0 && (
-        <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border border-rose-200 rounded-2xl p-6 shadow-xs space-y-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-base font-bold text-slate-900 tracking-tight">
-                  At-Risk Student Alerts ({atRiskStudents.length} Students Under 75% Threshold)
-                </h3>
-                <p className="text-xs text-slate-600">
-                  School academic policy requires at least 75% attendance for exam qualification.
-                </p>
-              </div>
+        <div className="bg-white border border-rose-200 rounded-xl p-6 space-y-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                At-Risk Student Alerts ({atRiskStudents.length} below 75%)
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                BTEB academic policy requires at least 75% attendance for semester examination eligibility.
+              </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-            {atRiskStudents.map(({ student, stats }) => {
-              return (
-                <div
-                  key={student.id}
-                  className="bg-white p-4 rounded-xl border border-rose-200 shadow-2xs flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
-                        {student.rollNumber}
-                      </span>
-                      <span className="text-xs font-black text-rose-600">
-                        {stats.attendancePercentage}% Attendance
-                      </span>
-                    </div>
-                    <h4 className="text-sm font-bold text-slate-900 mt-1">{student.name}</h4>
-                    <p className="text-[11px] text-slate-500">
-                      Missed {stats.absent} of {stats.totalSessions} sessions
-                    </p>
-                    <p className="text-[11px] text-amber-700 font-medium mt-1">
-                      Needs <strong>{stats.requiredForThreshold}</strong> consecutive attended sessions to recover to 75%.
-                    </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1 tabular-nums">
+            {atRiskStudents.map(({ student, stats }) => (
+              <div
+                key={student.id}
+                className="bg-rose-50/40 p-4 rounded-lg border border-rose-200/80 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-mono font-semibold text-slate-700">
+                      {student.rollNumber}
+                    </span>
+                    <span className="text-xs font-bold text-rose-600">
+                      {stats.attendancePercentage}%
+                    </span>
                   </div>
-
-                  <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setParentNoticeStudent(student)}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline"
-                    >
-                      <Mail className="w-3.5 h-3.5" />
-                      <span>Send Parent Warning</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDrilldownStudent(student)}
-                      className="text-[11px] font-semibold text-slate-600 hover:text-slate-900"
-                    >
-                      View Log →
-                    </button>
-                  </div>
+                  <h4 className="text-sm font-semibold text-slate-900 mt-1">{student.name}</h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Missed {stats.absent} of {stats.totalSessions} sessions
+                  </p>
+                  <p className="text-xs text-amber-800 font-medium mt-1">
+                    Needs <strong>{stats.requiredForThreshold}</strong> consecutive sessions to reach 75%.
+                  </p>
                 </div>
-              );
-            })}
+
+                <div className="mt-3 pt-3 border-t border-rose-200/60 flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => setParentNoticeStudent(student)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-rose-700 hover:underline"
+                  >
+                    <Mail className="w-3.5 h-3.5" />
+                    <span>Parent Warning</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDrilldownStudent(student)}
+                    className="text-xs font-medium text-slate-600 hover:text-slate-900"
+                  >
+                    View Log →
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       {/* Student Attendance Ledger Table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-xs">
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-bold text-slate-900 tracking-tight">
               Student Attendance Performance History
             </h3>
             <p className="text-xs text-slate-500">
-              Click any student row to view their comprehensive session ledger and absence reasons.
+              Select a student row to inspect their complete session log and remarks.
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-lg self-start sm:self-auto">
-            Showing {displayedStudents.length} Students
+          <span className="text-xs font-medium text-slate-500 tabular-nums">
+            Showing {displayedStudents.length} student{displayedStudents.length === 1 ? '' : 's'}
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
+            <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
               <tr>
                 <th className="py-3 px-4">Roll</th>
                 <th className="py-3 px-4">Student Name</th>
@@ -802,70 +759,66 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                   <tr
                     key={student.id}
                     onClick={() => setDrilldownStudent(student)}
-                    className="hover:bg-slate-50/80 cursor-pointer transition-colors group"
+                    className="hover:bg-slate-50 cursor-pointer transition-colors group"
                   >
-                    <td className="py-3 px-4 font-mono font-bold text-slate-700">
+                    <td className="py-3 px-4 font-mono font-semibold text-slate-700">
                       {student.rollNumber}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2.5">
-                        <img
-                          src={student.avatar}
-                          alt={student.name}
-                          className="w-7 h-7 rounded-lg object-cover"
-                        />
+                        <Avatar src={student.avatar} name={student.name} size="sm" />
                         <div>
-                          <span className="font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                          <span className="font-semibold text-slate-900 group-hover:text-emerald-700 transition-colors block">
                             {student.name}
                           </span>
-                          <span className="text-[10px] text-slate-400 block">{student.email}</span>
+                          <span className="text-[11px] text-slate-400">{student.email}</span>
                         </div>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-slate-600 font-medium">
                       {classGroup?.name}
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-slate-700">
+                    <td className="py-3 px-4 text-center font-semibold text-slate-700">
                       {stats.totalSessions}
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-emerald-600">
+                    <td className="py-3 px-4 text-center font-semibold text-emerald-700">
                       {stats.present}
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-rose-600">
+                    <td className="py-3 px-4 text-center font-semibold text-rose-600">
                       {stats.absent}
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-amber-600">
+                    <td className="py-3 px-4 text-center font-semibold text-amber-600">
                       {stats.late}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span
-                          className={`font-black ${
+                          className={`font-bold ${
                             stats.isAtRisk
                               ? 'text-rose-600'
                               : stats.attendancePercentage >= 90
                               ? 'text-emerald-700'
-                              : 'text-slate-800'
+                              : 'text-slate-900'
                           }`}
                         >
                           {stats.attendancePercentage}%
                         </span>
                         {stats.isAtRisk ? (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">
-                            AT RISK
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                            At Risk
                           </span>
                         ) : stats.attendancePercentage >= 90 ? (
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
-                            EXCELLENT
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            Good
                           </span>
                         ) : null}
                       </div>
                     </td>
                     <td className="py-3 px-4">
                       {stats.currentStreak >= 3 ? (
-                        <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700">
                           <Flame className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                          {stats.currentStreak} days
+                          {stats.currentStreak}d
                         </span>
                       ) : (
                         <span className="text-[11px] text-slate-400 font-mono">
@@ -880,7 +833,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                           e.stopPropagation();
                           setDrilldownStudent(student);
                         }}
-                        className="px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                        className="px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 rounded-md transition-colors"
                       >
                         History →
                       </button>
@@ -896,75 +849,70 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       {/* Drilldown History Modal */}
       {drilldownStudent && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-3xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200 my-8 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-xl max-w-2xl w-full p-6 shadow-xl border border-slate-200 my-8">
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <img
-                  src={drilldownStudent.avatar}
-                  alt={drilldownStudent.name}
-                  className="w-12 h-12 rounded-2xl object-cover ring-2 ring-emerald-500/20"
-                />
+                <Avatar src={drilldownStudent.avatar} name={drilldownStudent.name} size="lg" />
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                    <h3 className="text-base font-bold text-slate-900">
                       {drilldownStudent.name}
                     </h3>
-                    <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700">
-                      {drilldownStudent.rollNumber}
+                    <span className="text-xs font-mono text-slate-500">
+                      · {drilldownStudent.rollNumber}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">
-                    {drilldownStudent.email} • Parent: {drilldownStudent.parentEmail || 'Not configured'}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {drilldownStudent.email} · Parent: {drilldownStudent.parentEmail || 'Not configured'}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setDrilldownStudent(null)}
-                className="text-slate-400 hover:text-slate-600 font-bold"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md"
+                aria-label="Close modal"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Quick Metrics */}
             {(() => {
               const stuStats = calculateStudentAttendanceStats(drilldownStudent, sessions, records);
               return (
-                <div className="mt-4 grid grid-cols-4 gap-2 text-center">
-                  <div className="p-3 bg-slate-50 rounded-xl">
-                    <span className="text-[10px] text-slate-400 font-bold uppercase block">Rate</span>
-                    <span className="text-lg font-black text-slate-900">{stuStats.attendancePercentage}%</span>
+                <div className="mt-4 grid grid-cols-4 divide-x divide-slate-200 border border-slate-200 rounded-lg text-center tabular-nums">
+                  <div className="p-3">
+                    <span className="text-[11px] text-slate-500 font-medium block">Rate</span>
+                    <span className="text-lg font-bold text-slate-900">{stuStats.attendancePercentage}%</span>
                   </div>
-                  <div className="p-3 bg-emerald-50 rounded-xl">
-                    <span className="text-[10px] text-emerald-600 font-bold uppercase block">Present</span>
-                    <span className="text-lg font-black text-emerald-700">{stuStats.present}</span>
+                  <div className="p-3">
+                    <span className="text-[11px] text-emerald-700 font-medium block">Present</span>
+                    <span className="text-lg font-bold text-emerald-700">{stuStats.present}</span>
                   </div>
-                  <div className="p-3 bg-rose-50 rounded-xl">
-                    <span className="text-[10px] text-rose-600 font-bold uppercase block">Absent</span>
-                    <span className="text-lg font-black text-rose-700">{stuStats.absent}</span>
+                  <div className="p-3">
+                    <span className="text-[11px] text-rose-600 font-medium block">Absent</span>
+                    <span className="text-lg font-bold text-rose-600">{stuStats.absent}</span>
                   </div>
-                  <div className="p-3 bg-amber-50 rounded-xl">
-                    <span className="text-[10px] text-amber-600 font-bold uppercase block">Late</span>
-                    <span className="text-lg font-black text-amber-700">{stuStats.late}</span>
+                  <div className="p-3">
+                    <span className="text-[11px] text-amber-600 font-medium block">Late</span>
+                    <span className="text-lg font-bold text-amber-600">{stuStats.late}</span>
                   </div>
                 </div>
               );
             })()}
 
-            {/* Session timeline table */}
             <div className="mt-5">
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+              <h4 className="text-xs font-semibold text-slate-700 uppercase tracking-wider mb-2">
                 Detailed Session Log
               </h4>
-              <div className="max-h-72 overflow-y-auto rounded-xl border border-slate-200">
+              <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-200">
                 <table className="w-full text-left text-xs">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-500 sticky top-0 border-b border-slate-200">
+                  <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 sticky top-0 border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-3">Date</th>
                       <th className="py-2.5 px-3">Subject</th>
                       <th className="py-2.5 px-3">Status</th>
-                      <th className="py-2.5 px-3">Remarks / Reason</th>
+                      <th className="py-2.5 px-3">Remarks</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -984,12 +932,12 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                               {session.date}
                             </td>
                             <td className="py-2.5 px-3 font-medium text-slate-800">
-                              <span>{sub?.code || 'Course'}</span>
+                              <span className="font-mono">{sub?.code || 'Course'}</span>
                               <span
-                                className={`ml-1.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                className={`ml-1.5 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
                                   session.part === 'practical'
-                                    ? 'bg-emerald-100 text-emerald-800'
-                                    : 'bg-indigo-100 text-indigo-800'
+                                    ? 'bg-emerald-50 text-emerald-700'
+                                    : 'bg-indigo-50 text-indigo-700'
                                 }`}
                               >
                                 {session.part === 'practical' ? 'Practical' : 'Theory'}
@@ -997,14 +945,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                             </td>
                             <td className="py-2.5 px-3">
                               <span
-                                className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                className={`inline-flex items-center text-[11px] font-semibold capitalize px-2 py-0.5 rounded ${
                                   status === 'present'
-                                    ? 'bg-emerald-100 text-emerald-800'
+                                    ? 'bg-emerald-50 text-emerald-700'
                                     : status === 'absent'
-                                    ? 'bg-rose-100 text-rose-800'
+                                    ? 'bg-rose-50 text-rose-700'
                                     : status === 'late'
-                                    ? 'bg-amber-100 text-amber-800'
-                                    : 'bg-sky-100 text-sky-800'
+                                    ? 'bg-amber-50 text-amber-700'
+                                    : 'bg-sky-50 text-sky-700'
                                 }`}
                               >
                                 {status}
@@ -1021,11 +969,11 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-end">
+            <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-end">
               <button
                 type="button"
                 onClick={() => setDrilldownStudent(null)}
-                className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold"
+                className="h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors"
               >
                 Close
               </button>
@@ -1037,25 +985,23 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       {/* Parent Warning Notice Modal */}
       {parentNoticeStudent && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mb-3">
+          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-slate-200">
+            <div className="w-10 h-10 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center mb-3">
               <Mail className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold text-slate-900">
-              Dispatch Attendance Warning to Parent
+              Dispatch Attendance Warning to Guardian
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Recipient: <strong className="text-slate-800">{parentNoticeStudent.parentEmail || 'guardian@academy.edu'}</strong>
+              Recipient: <strong className="text-slate-800">{parentNoticeStudent.parentEmail || parentNoticeStudent.parentContact || 'Registered Guardian'}</strong>
             </p>
 
-            <div className="mt-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-2 text-slate-700">
-              <p className="font-bold text-slate-900">
-                Subject: Official Attendance Advisory Notice - {parentNoticeStudent.name}
+            <div className="mt-4 p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-xs space-y-2 text-slate-700">
+              <p className="font-semibold text-slate-900">
+                Subject: Attendance Advisory Notice — {parentNoticeStudent.name}
               </p>
-              <p className="text-[11px] leading-relaxed">
-                Dear Guardian, this is an automated academic alert from the Academy Attendance Department.
-                {parentNoticeStudent.name} currently holds an attendance rate under the mandatory 75% standard.
-                Please contact the academic office or student affairs to address these missed sessions.
+              <p className="text-xs leading-relaxed text-slate-600">
+                Dear Guardian, {parentNoticeStudent.name} currently holds an attendance rate under the mandatory 75% BTEB examination threshold. Please contact the department office to address these absences.
               </p>
             </div>
 
@@ -1063,23 +1009,22 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
               <button
                 type="button"
                 onClick={() => setParentNoticeStudent(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+                className="h-9 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
                 onClick={() => handleSendParentNotice(parentNoticeStudent)}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                className="h-9 px-4 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold transition-colors"
               >
-                Dispatch Warning Email
+                Dispatch Warning Notice
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* PDF Attendance Register Download Modal */}
       {pdfModalSubject && (
         <DownloadRegisterModal
           isOpen={Boolean(pdfModalSubject)}

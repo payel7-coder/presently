@@ -8,25 +8,21 @@ import {
   EyeOff,
   ArrowRight,
   ShieldCheck,
-  Sparkles,
   Database,
-  AlertCircle
+  AlertCircle,
+  ClipboardCheck
 } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
   const { loginWithEmail, registerWithEmail, isFirebaseLive } = useAttendance();
 
-  // Mode: 'signin' | 'register'
   const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
-
-  // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'admin' | 'teacher'>('teacher');
   const [showPassword, setShowPassword] = useState(false);
 
-  // Status states
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
@@ -68,119 +64,104 @@ export const AuthScreen: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 sm:p-6 lg:p-8 relative overflow-hidden font-sans">
-      {/* Background radial gradients */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
-
-      <div className="max-w-5xl w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch relative z-10">
-        {/* Left Column: Institutional Brand & System Highlights */}
-        <div className="lg:col-span-5 bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-950 text-white rounded-3xl p-8 sm:p-10 border border-slate-700/60 shadow-2xl flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-5xl w-full mx-auto grid grid-cols-1 lg:grid-cols-12 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+        {/* Left Column on Desktop, Second on Mobile: Institutional Brand & Overview */}
+        <div className="order-2 lg:order-1 lg:col-span-5 bg-slate-900 text-white p-8 sm:p-10 flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 flex items-center justify-center text-slate-950 shadow-lg shadow-emerald-500/30">
-                <CheckCircle2 className="w-7 h-7 stroke-[2.5]" />
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center text-white shrink-0">
+                <CheckCircle2 className="w-5 h-5 stroke-[2.25]" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-black text-2xl tracking-tight text-white">
-                    Presently
-                  </span>
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                    BTEB 2022
-                  </span>
+                  <span className="font-bold text-lg tracking-tight text-white">Presently</span>
+                  <span className="text-slate-500">·</span>
+                  <span className="text-xs font-medium text-emerald-400">BTEB 2022</span>
                 </div>
                 <p className="text-xs text-slate-400">
-                  Diploma in Computer Science & Technology
+                  Diploma in Computer Science &amp; Technology
                 </p>
               </div>
             </div>
 
-            <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-snug">
-              Authorized Institutional Attendance System
-            </h1>
-            <p className="text-sm text-slate-300 mt-3 leading-relaxed">
-              Secure institutional access portal for polytechnic faculty and administration.
-              Sign in with your email and password to access your role-specific workspace.
-            </p>
+            <div className="mt-8">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">
+                Institutional Portal
+              </p>
+              <h1 className="text-2xl font-bold tracking-tight text-white mt-2 leading-snug">
+                Attendance &amp; Academic Analytics
+              </h1>
+              <p className="text-sm text-slate-300 mt-2.5 leading-relaxed">
+                Sign in with your faculty or administrator account to manage Theory and Practical roll calls, student rosters, and board-compliant registers.
+              </p>
+            </div>
 
-            {/* Feature Highlights */}
-            <div className="mt-8 space-y-4">
-              <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center shrink-0 mt-0.5">
-                  <Sparkles className="w-4 h-4" />
-                </div>
+            {/* Structured Capability List */}
+            <div className="mt-8 divide-y divide-slate-800 border-t border-slate-800">
+              <div className="py-4 flex items-start gap-3">
+                <ClipboardCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Teacher Interface</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    1-click roll call for assigned BTEB courses, notes, and attendance tracking.
+                  <h2 className="text-xs font-semibold text-white">Teacher Roll Call Workspace</h2>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Separate Theory and Practical roll calls, daily teaching targets, and printable BTEB PDF registers.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 mt-0.5">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
+              <div className="py-4 flex items-start gap-3">
+                <ShieldCheck className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Admin Interface (RBAC)</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    BTEB Probidhan 2022 course allocation across 1st-8th semesters & CSV student import.
+                  <h2 className="text-xs font-semibold text-white">Role-Based Academic Control</h2>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Course allocation across 1st–8th semesters, CSV roster imports, and faculty-scoped reporting.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3.5 p-3.5 rounded-2xl bg-white/5 border border-white/10">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shrink-0 mt-0.5">
-                  <Database className="w-4 h-4" />
-                </div>
+              <div className="py-4 flex items-start gap-3">
+                <Database className="w-4 h-4 text-slate-300 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-xs font-bold text-white">Realtime Firebase Firestore</h4>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    Live database synchronization with session-by-session history and &lt;75% risk alerts.
+                  <h2 className="text-xs font-semibold text-white">Live Attendance Ledger</h2>
+                  <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                    Real-time Cloud Firestore synchronization with weekly summaries and &lt;75% eligibility alerts.
                   </p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-8 pt-6 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-            <span className="flex items-center gap-1.5 font-mono">
-              <span className={`w-2 h-2 rounded-full ${isFirebaseLive ? 'bg-emerald-400' : 'bg-emerald-400 animate-pulse'}`} />
-              Firebase Database Active
-            </span>
-            <span>Technology Code: 85</span>
+          <div className="mt-8 pt-5 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
+            <span>{isFirebaseLive ? 'Cloud Firestore Sync' : 'Cloud Firestore Ready'}</span>
+            <span className="font-mono text-[11px] text-slate-400">Tech Code 85</span>
           </div>
         </div>
 
-        {/* Right Column: Sign In / Registration Form */}
-        <div className="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-200/90 flex flex-col justify-between">
+        {/* Right Column on Desktop, First on Mobile: Sign In / Registration Form */}
+        <div className="order-1 lg:order-2 lg:col-span-7 p-6 sm:p-10 flex flex-col justify-between bg-white">
           <div>
-            {/* Header Tabs */}
-            <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
               <div>
-                <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-                  {authMode === 'signin' ? 'Sign In to Your Account' : 'Register New Faculty Profile'}
+                <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+                  {authMode === 'signin' ? 'Sign in to your account' : 'Register faculty account'}
                 </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-1">
                   {authMode === 'signin'
-                    ? 'Enter institutional credentials to view your assigned dashboard'
-                    : 'Create your institutional profile on Firebase Auth'}
+                    ? 'Enter your institutional email and password to continue'
+                    : 'Create an institutional profile for your department role'}
                 </p>
               </div>
 
-              {/* Mode Toggle Switch */}
-              <div className="flex items-center bg-slate-100 p-1 rounded-xl shrink-0">
+              <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg self-start sm:self-auto shrink-0">
                 <button
                   type="button"
                   onClick={() => {
                     setAuthMode('signin');
                     setErrorMessage(null);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                     authMode === 'signin'
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'bg-white text-slate-900 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -192,9 +173,9 @@ export const AuthScreen: React.FC = () => {
                     setAuthMode('register');
                     setErrorMessage(null);
                   }}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                     authMode === 'register'
-                      ? 'bg-white text-slate-900 shadow-xs'
+                      ? 'bg-white text-slate-900 shadow-2xs'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -203,29 +184,29 @@ export const AuthScreen: React.FC = () => {
               </div>
             </div>
 
-            {/* Error Alert */}
             {errorMessage && (
-              <div className="mt-4 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2.5 animate-in fade-in">
+              <div
+                role="alert"
+                className="mt-5 p-3.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2.5"
+              >
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-                <span className="font-semibold leading-relaxed">{errorMessage}</span>
+                <span className="font-medium leading-relaxed">{errorMessage}</span>
               </div>
             )}
 
-            {/* Success Alert */}
             {successNotice && (
-              <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2 animate-in fade-in">
+              <div className="mt-5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span className="font-bold">{successNotice}</span>
+                <span className="font-medium">{successNotice}</span>
               </div>
             )}
 
-            {/* Main Form */}
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               {authMode === 'register' && (
                 <>
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Full Name *
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Full Name <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -233,20 +214,20 @@ export const AuthScreen: React.FC = () => {
                       placeholder="e.g. Engr. Payel Ahmed"
                       value={name}
                       onChange={e => setName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                      className="w-full h-10 px-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Institutional Role *
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Institutional Role <span className="text-rose-500">*</span>
                     </label>
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <label
-                        className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
                           role === 'teacher'
-                            ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-emerald-50/60 border-emerald-600'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         <input
@@ -254,21 +235,21 @@ export const AuthScreen: React.FC = () => {
                           name="role"
                           checked={role === 'teacher'}
                           onChange={() => setRole('teacher')}
-                          className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                          className="mt-0.5 accent-emerald-600"
                         />
                         <div>
-                          <span className="text-xs font-bold text-slate-900 block">Teacher</span>
-                          <span className="text-[10px] text-slate-500 leading-tight block">
-                            1-Click roll call, assigned classes
+                          <span className="text-xs font-semibold text-slate-900 block">Teacher</span>
+                          <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                            Roll call &amp; assigned courses
                           </span>
                         </div>
                       </label>
 
                       <label
-                        className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                        className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
                           role === 'admin'
-                            ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-500/20'
-                            : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                            ? 'bg-indigo-50/60 border-indigo-600'
+                            : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         <input
@@ -276,12 +257,12 @@ export const AuthScreen: React.FC = () => {
                           name="role"
                           checked={role === 'admin'}
                           onChange={() => setRole('admin')}
-                          className="mt-0.5 text-indigo-600 focus:ring-indigo-500"
+                          className="mt-0.5 accent-indigo-600"
                         />
                         <div>
-                          <span className="text-xs font-bold text-slate-900 block">Administrator</span>
-                          <span className="text-[10px] text-slate-500 leading-tight block">
-                            Curricula allocation, student CSV import
+                          <span className="text-xs font-semibold text-slate-900 block">Administrator</span>
+                          <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
+                            Allocations &amp; roster import
                           </span>
                         </div>
                       </label>
@@ -291,41 +272,42 @@ export const AuthScreen: React.FC = () => {
               )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Institutional Email Address *
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Institutional Email Address <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="email"
                     required
                     placeholder="e.g. payelahmed70@gmail.com"
                     value={email}
                     onChange={e => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full h-10 pl-10 pr-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Password *
+                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Password <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="Enter password (min 6 characters)"
                     value={password}
                     onChange={e => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    className="w-full h-10 pl-10 pr-10 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md"
                     title={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -336,18 +318,18 @@ export const AuthScreen: React.FC = () => {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className={`w-full py-3 px-6 rounded-xl text-xs font-black tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg active:scale-95 ${
+                  className={`w-full h-10 px-5 rounded-lg text-sm font-semibold flex items-center justify-center gap-2 transition-colors ${
                     isLoading
-                      ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-emerald-500/25'
+                      ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   }`}
                 >
                   {isLoading ? (
-                    <span>Authenticating with Firebase...</span>
+                    <span>Authenticating...</span>
                   ) : (
                     <>
                       <span>{authMode === 'signin' ? 'Sign In to My Interface' : 'Create Account & Enter'}</span>
-                      <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                      <ArrowRight className="w-4 h-4" />
                     </>
                   )}
                 </button>
@@ -355,14 +337,9 @@ export const AuthScreen: React.FC = () => {
             </form>
           </div>
 
-          {/* Institutional Compliance Notice */}
-          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
-            <p className="text-xs text-slate-500">
-              Bangladesh Technical Education Board (BTEB) Curricula • Authorized institutional accounts only.
-            </p>
-            <p className="text-[11px] text-slate-400 mt-1">
-              Contact your academic coordinator or ICT cell if you need account access.
-            </p>
+          <div className="mt-8 pt-5 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-slate-500">
+            <span>Bangladesh Technical Education Board · Probidhan 2022</span>
+            <span className="text-slate-400">Authorized faculty accounts only</span>
           </div>
         </div>
       </div>

@@ -6,12 +6,11 @@ import {
   CheckCircle2,
   AlertCircle,
   Download,
-  Users,
-  Sparkles,
   Check,
   X,
   Lock,
-  ShieldAlert
+  ShieldAlert,
+  FileText
 } from 'lucide-react';
 import {
   parseStudentCSV,
@@ -35,7 +34,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
   const { classes, bulkImportStudents, canImportStudents, currentUser } = useAttendance();
 
   const [selectedClassId, setSelectedClassId] = useState<string>(
-    defaultClassId || (classes[3]?.id || classes[0]?.id || '') // Defaults to 4th semester or first
+    defaultClassId || (classes[3]?.id || classes[0]?.id || '')
   );
   const [csvRawText, setCsvRawText] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
@@ -47,24 +46,23 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Strict Access Control Guard
   if (!canImportStudents) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-rose-200 text-center animate-in fade-in zoom-in-95 duration-150">
-          <div className="w-14 h-14 rounded-2xl bg-rose-100 text-rose-600 mx-auto flex items-center justify-center mb-4">
-            <Lock className="w-7 h-7" />
+        <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200 text-center">
+          <div className="w-12 h-12 rounded-lg bg-rose-50 border border-rose-200 text-rose-600 mx-auto flex items-center justify-center mb-4">
+            <Lock className="w-6 h-6" />
           </div>
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 text-[10px] font-bold uppercase mb-2">
+          <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-700 mb-1.5">
             <ShieldAlert className="w-3.5 h-3.5" /> Restricted Access
           </div>
-          <h3 className="text-xl font-black text-slate-900 tracking-tight">
-            Admin Privilege Required
+          <h3 className="text-lg font-bold text-slate-900 tracking-tight">
+            Administrator Privilege Required
           </h3>
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-            Student list bulk import is strictly restricted to institutional administrators. You are currently logged in as a teacher ({currentUser?.name || 'Faculty Member'}).
+          <p className="text-xs text-slate-500 mt-1.5 leading-relaxed">
+            Student bulk import is restricted to institutional administrators. Signed in as {currentUser?.name || 'Faculty Member'}.
           </p>
-          <div className="mt-6 flex flex-col gap-2">
+          <div className="mt-5 flex flex-col gap-2">
             {onOpenLoginModal && (
               <button
                 type="button"
@@ -72,7 +70,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   onClose();
                   onOpenLoginModal();
                 }}
-                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
+                className="w-full h-9 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors"
               >
                 Sign In as Administrator
               </button>
@@ -80,7 +78,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="w-full py-2 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+              className="w-full h-9 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               Close
             </button>
@@ -156,23 +154,17 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-3xl w-full p-6 sm:p-8 shadow-2xl border border-slate-200/90 my-8 animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
+      <div className="bg-white rounded-xl max-w-3xl w-full p-6 shadow-xl border border-slate-200 my-8">
         <div className="flex items-start justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
-              <FileSpreadsheet className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+              <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  Bulk Import Students (Admin Access)
-                </h2>
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
-                  Admin Authorized
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight">
+                Bulk Import Students
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
                 Import BTEB Probidhan 2022 student rolls and registration numbers into semester batches.
               </p>
             </div>
@@ -180,40 +172,38 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100"
+            aria-label="Close modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Error Alert */}
         {errorMessage && (
-          <div className="mt-4 p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+          <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMessage}</span>
           </div>
         )}
 
-        {/* Success Alert */}
         {importSuccessCount !== null && (
-          <div className="mt-4 p-4 rounded-2xl bg-emerald-500 text-white flex items-center gap-3 shadow-md">
-            <CheckCircle2 className="w-6 h-6 shrink-0" />
+          <div className="mt-4 p-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
-              <p className="font-bold text-sm">
-                Successfully Imported {importSuccessCount} Students into {targetClass?.name}!
+              <p className="font-semibold text-sm">
+                Imported {importSuccessCount} students into {targetClass?.name}
               </p>
-              <p className="text-xs text-emerald-100">
-                Synced in real-time to Firebase Firestore.
+              <p className="text-xs text-emerald-700">
+                Synchronized to Cloud Firestore.
               </p>
             </div>
           </div>
         )}
 
-        {/* Configuration Row */}
         <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Select BTEB Semester Class
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Target BTEB Semester Class
             </label>
             <select
               value={selectedClassId}
@@ -223,7 +213,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                   setParseResult(parseStudentCSV(csvRawText, e.target.value));
                 }
               }}
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+              className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
             >
               {classes.map(c => (
                 <option key={c.id} value={c.id}>
@@ -234,31 +224,30 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-              Template & Quick Helpers
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              CSV Template
             </label>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleDownloadTemplate}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 px-3 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>BTEB Template</span>
+                <span>Download Template</span>
               </button>
               <button
                 type="button"
                 onClick={handleLoadSample}
-                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 rounded-xl transition-colors"
+                className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 px-3 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors"
               >
-                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Load Sample Data</span>
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Load Sample CSV</span>
               </button>
             </div>
           </div>
         </div>
 
-        {/* Drop Zone */}
         <div className="mt-5">
           <input
             type="file"
@@ -269,14 +258,14 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           />
           <div
             onClick={() => fileInputRef.current?.click()}
-            className="border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/20 rounded-2xl p-6 text-center cursor-pointer transition-all group"
+            className="border-2 border-dashed border-slate-200 hover:border-emerald-500 hover:bg-emerald-50/20 rounded-xl p-6 text-center cursor-pointer transition-colors group"
           >
-            <Upload className="w-8 h-8 text-slate-400 group-hover:text-emerald-600 mx-auto mb-2 transition-colors" />
-            <p className="text-xs font-bold text-slate-700">
+            <Upload className="w-7 h-7 text-slate-400 group-hover:text-emerald-600 mx-auto mb-2 transition-colors" />
+            <p className="text-xs font-semibold text-slate-700">
               {fileName ? (
                 <span className="text-emerald-700 font-mono">Selected: {fileName}</span>
               ) : (
-                'Click to upload or drag & drop BTEB student CSV'
+                'Click to upload BTEB student CSV file'
               )}
             </p>
             <p className="text-[11px] text-slate-400 mt-1">
@@ -285,28 +274,25 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
         </div>
 
-        {/* Validation Feedback & Preview */}
         {parseResult && (
           <div className="mt-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold">
-                <span className="text-slate-800">Preview Parsed List:</span>
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
-                  {parseResult.validCount} Valid BTEB Students
+            <div className="flex items-center gap-2 text-xs font-semibold tabular-nums">
+              <span className="text-slate-700">Preview:</span>
+              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                {parseResult.validCount} valid students
+              </span>
+              {parseResult.errors.length > 0 && (
+                <span className="px-2 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                  {parseResult.errors.length} issues
                 </span>
-                {parseResult.errors.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-800">
-                    {parseResult.errors.length} Issues Flagged
-                  </span>
-                )}
-              </div>
+              )}
             </div>
 
             {parseResult.errors.length > 0 && (
-              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 space-y-1">
-                <p className="font-bold flex items-center gap-1">
+              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
                   <AlertCircle className="w-4 h-4 shrink-0" />
-                  Please fix the following line errors:
+                  Row validation issues:
                 </p>
                 <ul className="list-disc list-inside text-[11px] space-y-0.5 max-h-24 overflow-y-auto">
                   {parseResult.errors.map((err, i) => (
@@ -318,9 +304,9 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               </div>
             )}
 
-            <div className="max-h-56 overflow-y-auto rounded-xl border border-slate-200">
+            <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200">
               <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 sticky top-0 text-[10px] uppercase font-bold text-slate-500 border-b border-slate-200">
+                <thead className="bg-slate-50 sticky top-0 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
                   <tr>
                     <th className="py-2 px-3">Board Roll</th>
                     <th className="py-2 px-3">Reg No</th>
@@ -332,13 +318,13 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
                 <tbody className="divide-y divide-slate-100">
                   {parseResult.students.map((stu, i) => (
                     <tr key={i} className="hover:bg-slate-50">
-                      <td className="py-2 px-3 font-mono font-bold text-slate-700">
+                      <td className="py-2 px-3 font-mono font-semibold text-slate-700">
                         {stu.rollNumber}
                       </td>
                       <td className="py-2 px-3 font-mono text-slate-500">
                         {stu.registrationNumber || '—'}
                       </td>
-                      <td className="py-2 px-3 font-bold text-slate-900">{stu.name}</td>
+                      <td className="py-2 px-3 font-semibold text-slate-900">{stu.name}</td>
                       <td className="py-2 px-3 text-slate-500">{stu.email}</td>
                       <td className="py-2 px-3 text-slate-500">{stu.parentContact || '—'}</td>
                     </tr>
@@ -349,17 +335,16 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
           </div>
         )}
 
-        {/* Footer Actions */}
-        <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-          <p className="text-[11px] text-slate-400">
-            Target Batch: <strong className="text-slate-700">{targetClass?.name} ({targetClass?.section})</strong>
+        <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-xs text-slate-500">
+            Target batch: <strong className="text-slate-800">{targetClass?.name} ({targetClass?.section})</strong>
           </p>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
+              className="h-9 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -367,14 +352,14 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               type="button"
               disabled={!parseResult || parseResult.validCount === 0}
               onClick={handleConfirmImport}
-              className={`flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold transition-all shadow-xs ${
+              className={`h-9 flex items-center gap-1.5 px-4 rounded-lg text-xs font-semibold transition-colors ${
                 parseResult && parseResult.validCount > 0
                   ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                   : 'bg-slate-200 text-slate-400 cursor-not-allowed'
               }`}
             >
               <Check className="w-4 h-4" />
-              <span>Import {parseResult?.validCount || 0} Students to Firestore</span>
+              <span>Import {parseResult?.validCount || 0} Students</span>
             </button>
           </div>
         </div>

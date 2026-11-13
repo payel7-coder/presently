@@ -1,29 +1,22 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { AttendanceStatus, Student, SubjectPart } from '../types/attendance';
+import { Avatar } from './Avatar';
 import {
   CheckCircle2,
-  XCircle,
-  Clock,
-  ShieldCheck,
   Search,
-  Filter,
-  Sparkles,
-  Calendar,
-  Layers,
   Check,
   AlertTriangle,
   RotateCcw,
   MessageSquare,
   FileCheck,
-  ChevronRight,
-  UserCheck,
   Grid,
   List,
   Flame,
   ArrowRight,
   FileText,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { calculateStudentAttendanceStats } from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
@@ -69,7 +62,6 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
   const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(findInitialAssignmentId);
 
-  // Sync if assignedSubjects or initial props change
   useEffect(() => {
     if (assignedSubjects.length === 0) return;
     if (initialSubjectId) {
@@ -88,40 +80,31 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     }
   }, [assignedSubjects, initialSubjectId, initialPart, selectedAssignmentId]);
 
-  // Date & validation (tomorrow / future dates are strictly prohibited)
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const [sessionDate, setSessionDate] = useState<string>(() => {
-    return new Date().toISOString().split('T')[0];
-  });
+  const [sessionDate, setSessionDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const isFutureDate = sessionDate > today;
   const [topic, setTopic] = useState<string>('');
 
-  // Active Subject & Part details
   const activeAssignment = assignedSubjects.find(item => item.assignment.id === selectedAssignmentId);
   const activeSubject = activeAssignment?.subject;
   const activeClass = activeAssignment?.classGroup;
   const activePart: SubjectPart = activeAssignment?.assignment.part || 'theory';
   const activeSubjectId = activeSubject?.id || '';
 
-  // Students in class
   const classStudents = useMemo(() => {
     return activeClass ? getClassStudents(activeClass.id) : [];
   }, [activeClass, getClassStudents]);
 
-  // Attendance status dictionary: studentId -> { status, remarks }
   const [statuses, setStatuses] = useState<Record<string, { status: AttendanceStatus; remarks?: string }>>({});
   const [existingSessionId, setExistingSessionId] = useState<string | null>(null);
 
-  // Search and view mode
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | AttendanceStatus>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
-  // Remarks modal
   const [activeRemarkStudent, setActiveRemarkStudent] = useState<Student | null>(null);
   const [remarkInput, setRemarkInput] = useState('');
 
-  // Submission state
   const [justSubmitted, setJustSubmitted] = useState(false);
   const [submittedSessionInfo, setSubmittedSessionInfo] = useState<{
     present: number;
@@ -131,10 +114,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     rate: number;
   } | null>(null);
 
-  // PDF Register Modal
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
-  // Initialize or load existing records when subject, part, or date changes
   useEffect(() => {
     if (!activeSubjectId || !sessionDate || classStudents.length === 0) return;
 
@@ -155,7 +136,6 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     } else {
       setExistingSessionId(null);
       setTopic('');
-      // Default all to 'present' for fast 1-click experience!
       const initialMap: Record<string, { status: AttendanceStatus; remarks?: string }> = {};
       classStudents.forEach(stu => {
         initialMap[stu.id] = { status: 'present' };
@@ -164,7 +144,6 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     }
   }, [activeSubjectId, activePart, sessionDate, classStudents.length]);
 
-  // Single-Click handlers
   const setStudentStatus = (studentId: string, status: AttendanceStatus) => {
     setStatuses(prev => ({
       ...prev,
@@ -193,7 +172,6 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     setStatuses(nextMap);
   };
 
-  // Metrics
   const stats = useMemo(() => {
     let present = 0;
     let absent = 0;
@@ -212,7 +190,6 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     return { total, present, absent, late, excused, rate };
   }, [statuses, classStudents.length]);
 
-  // Filtered student list
   const filteredStudents = useMemo(() => {
     return classStudents.filter(student => {
       const currentStatus = statuses[student.id]?.status || 'present';
@@ -225,11 +202,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   }, [classStudents, statuses, searchQuery, statusFilter]);
 
   const handleSaveAttendance = async () => {
-    if (!activeSubject || !activeClass) return;
-
-    if (isFutureDate) {
-      return;
-    }
+    if (!activeSubject || !activeClass || isFutureDate) return;
 
     try {
       const partLabel = activePart === 'practical' ? 'Practical' : 'Theory';
@@ -261,178 +234,172 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
   if (assignedSubjects.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto py-12 px-4 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-amber-100 text-amber-700 mx-auto flex items-center justify-center mb-4">
-          <AlertTriangle className="w-8 h-8" />
+      <div className="max-w-3xl mx-auto py-16 px-4 text-center">
+        <div className="bg-white rounded-xl border border-slate-200 p-10">
+          <AlertTriangle className="w-8 h-8 text-amber-600 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-slate-900 mb-1">No Assigned Subjects</h2>
+          <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+            You currently have no subjects assigned to your faculty account. Contact an administrator to allocate Theory or Practical courses.
+          </p>
         </div>
-        <h2 className="text-xl font-bold text-slate-900 mb-2">No Assigned Subjects</h2>
-        <p className="text-sm text-slate-600 max-w-md mx-auto mb-6">
-          You currently have no subjects assigned to your teacher account. Please switch to the{' '}
-          <strong className="text-indigo-600">Admin profile</strong> to assign subjects to teachers.
-        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      {/* Top Banner & Subject Selector */}
-      <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Editorial Header & Subject Switcher */}
+      <div className="pb-5 border-b border-slate-200 space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
-                <Sparkles className="w-3.5 h-3.5" /> 1-Click Roll Call Mode
-              </span>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <span className="font-semibold text-emerald-700">1-Click Roll Call</span>
+              <span>·</span>
               <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider ${
+                className={`font-semibold px-2 py-0.5 rounded-md ${
                   activePart === 'practical'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-indigo-600 text-white'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'
                 }`}
               >
                 {activePart === 'practical' ? 'Practical Session' : 'Theory Session'}
               </span>
               {existingSessionId && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-100 text-sky-800">
-                  <FileCheck className="w-3.5 h-3.5" /> Editing Existing Session
-                </span>
+                <>
+                  <span>·</span>
+                  <span className="inline-flex items-center gap-1 text-sky-700 font-medium">
+                    <FileCheck className="w-3.5 h-3.5" /> Editing Existing Session
+                  </span>
+                </>
               )}
             </div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
               Take Student Attendance
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select course part, click status badges or use bulk 1-click tools, and save instantly.
+              Select a course part, toggle P / A / L / E attendance marks, and commit directly to Firestore.
             </p>
-          </div>
-
-          {/* Quick Subject & Part Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-            {assignedSubjects.map(({ subject, classGroup, assignment }) => {
-              const part: SubjectPart = assignment.part || 'theory';
-              const isSelected = assignment.id === selectedAssignmentId;
-              return (
-                <button
-                  key={assignment.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedAssignmentId(assignment.id);
-                    setJustSubmitted(false);
-                  }}
-                  className={`px-4 py-2.5 rounded-xl text-left border transition-all shrink-0 ${
-                    isSelected
-                      ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-600/20 ring-2 ring-emerald-600/20'
-                      : 'bg-slate-50 hover:bg-white text-slate-700 border-slate-200 hover:border-slate-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-extrabold uppercase tracking-wide">
-                      {subject.code}
-                    </span>
-                    <span
-                      className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
-                        isSelected
-                          ? 'bg-white/20 text-white'
-                          : part === 'practical'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-indigo-100 text-indigo-800'
-                      }`}
-                    >
-                      {part === 'practical' ? 'Practical' : 'Theory'}
-                    </span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-200 text-slate-700'}`}>
-                      {classGroup.name}
-                    </span>
-                  </div>
-                  <p className="text-xs font-medium truncate max-w-[190px] mt-0.5">
-                    {subject.name}
-                  </p>
-                </button>
-              );
-            })}
           </div>
         </div>
 
-        {/* Session Metadata Controls */}
-        <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+        {/* Course & Part Tabs */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {assignedSubjects.map(({ subject, classGroup, assignment }) => {
+            const part: SubjectPart = assignment.part || 'theory';
+            const isSelected = assignment.id === selectedAssignmentId;
+            return (
+              <button
+                key={assignment.id}
+                type="button"
+                onClick={() => {
+                  setSelectedAssignmentId(assignment.id);
+                  setJustSubmitted(false);
+                }}
+                className={`px-3.5 py-2 rounded-lg text-left border transition-colors shrink-0 ${
+                  isSelected
+                    ? 'bg-slate-900 text-white border-slate-900'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span className="font-mono font-semibold">{subject.code}</span>
+                  <span
+                    className={`font-semibold uppercase px-1.5 py-0.5 rounded text-[10px] ${
+                      isSelected
+                        ? 'bg-white/15 text-white'
+                        : part === 'practical'
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-indigo-50 text-indigo-700'
+                    }`}
+                  >
+                    {part === 'practical' ? 'Practical' : 'Theory'}
+                  </span>
+                  <span className={isSelected ? 'text-slate-300' : 'text-slate-400'}>
+                    {classGroup.name}
+                  </span>
+                </div>
+                <p className="text-xs font-medium truncate max-w-[190px] mt-0.5">
+                  {subject.name}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Session Metadata Controls */}
+      <div className="bg-white rounded-xl p-5 border border-slate-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
-              Class & Room
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+              Class &amp; Room
             </label>
-            <div className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 flex items-center justify-between">
-              <span>{activeClass?.name} - {activeClass?.section}</span>
-              <span className="text-[10px] text-slate-500 font-mono">{activeClass?.roomNumber}</span>
+            <div className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 flex items-center justify-between">
+              <span>{activeClass?.name} · {activeClass?.section}</span>
+              <span className="text-[11px] text-slate-500 font-mono">{activeClass?.roomNumber}</span>
             </div>
           </div>
 
           <div>
-            <div className="flex items-center justify-between mb-1">
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-semibold text-slate-700">
                 Session Date
               </label>
               {sessionDate === today ? (
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
-                  Today
-                </span>
+                <span className="text-[11px] font-medium text-emerald-700">Today</span>
               ) : isFutureDate ? (
-                <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider bg-rose-50 border border-rose-200 px-1.5 py-0.2 rounded flex items-center gap-0.5">
-                  <AlertCircle className="w-2.5 h-2.5" /> Future Date
+                <span className="text-[11px] font-semibold text-rose-600 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" /> Future date invalid
                 </span>
               ) : null}
             </div>
-            <div className="relative">
-              <input
-                type="date"
-                max={today}
-                value={sessionDate}
-                onChange={e => {
-                  setSessionDate(e.target.value);
-                  setJustSubmitted(false);
-                }}
-                className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-semibold text-slate-800 transition-colors ${
-                  isFutureDate
-                    ? 'border-rose-400 bg-rose-50/60 text-rose-900 focus:ring-2 focus:ring-rose-500'
-                    : 'border-slate-200 hover:border-slate-300 focus:ring-2 focus:ring-emerald-500'
-                }`}
-              />
-            </div>
+            <input
+              type="date"
+              max={today}
+              value={sessionDate}
+              onChange={e => {
+                setSessionDate(e.target.value);
+                setJustSubmitted(false);
+              }}
+              className={`w-full h-9 px-3 bg-white border rounded-lg text-xs font-medium text-slate-800 focus:outline-none focus:ring-2 transition-colors ${
+                isFutureDate
+                  ? 'border-rose-400 bg-rose-50/40 text-rose-900 focus:ring-rose-500/20'
+                  : 'border-slate-300 focus:ring-emerald-600/20 focus:border-emerald-600'
+              }`}
+            />
             {isFutureDate && (
-              <p className="mt-1 text-[11px] font-semibold text-rose-600 flex items-center gap-1">
-                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                Tomorrow or future dates are not allowed
+              <p className="mt-1 text-[11px] font-medium text-rose-600">
+                Tomorrow or future dates are not allowed.
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-semibold text-slate-700 mb-1.5">
               Lesson / Topic (Optional)
             </label>
             <input
               type="text"
-              placeholder="e.g. Chapter 4 Practice Quiz"
+              placeholder="e.g. Chapter 4 Lab Assessment"
               value={topic}
               onChange={e => setTopic(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-200 hover:border-slate-300 focus:ring-2 focus:ring-emerald-500 rounded-xl text-xs text-slate-800 placeholder:text-slate-400"
+              className="w-full h-9 px-3 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
             />
           </div>
         </div>
 
-        {/* Future Date Blocking Alert */}
         {isFutureDate && (
-          <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-rose-800 animate-in fade-in">
-            <div className="flex items-center gap-2.5">
-              <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-              <div className="text-xs">
-                <strong className="font-bold">Cannot take attendance for tomorrow or future dates:</strong>{' '}
-                Selected date ({sessionDate}) is in the future. Please select today ({today}) or a past date to take attendance.
-              </div>
+          <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800">
+            <div className="flex items-center gap-2 text-xs">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>
+                Selected date ({sessionDate}) is in the future. Choose today ({today}) or an earlier date to record attendance.
+              </span>
             </div>
             <button
               type="button"
               onClick={() => setSessionDate(today)}
-              className="shrink-0 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-lg transition-colors shadow-xs"
+              className="shrink-0 h-8 px-3 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs rounded-lg transition-colors"
             >
               Reset to Today
             </button>
@@ -441,12 +408,11 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
       </div>
 
       {/* Live Metrics HUD & 1-Click Action Bar */}
-      <div className="sticky top-16 z-30 bg-slate-900 text-white rounded-2xl p-4 shadow-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
-        {/* Quick Counters */}
-        <div className="flex items-center gap-4 sm:gap-6">
+      <div className="sticky top-16 z-30 bg-slate-900 text-white rounded-xl p-4 border border-slate-800 flex flex-wrap items-center justify-between gap-4 tabular-nums">
+        <div className="flex items-center gap-5">
           <div className="flex items-center gap-3">
-            <div className="relative w-12 h-12 flex items-center justify-center">
-              <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
+            <div className="relative w-11 h-11 flex items-center justify-center">
+              <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
                 <path
                   className="text-slate-800"
                   strokeWidth="3.5"
@@ -464,54 +430,50 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
               </svg>
-              <span className="absolute text-xs font-black tracking-tight">{stats.rate}%</span>
+              <span className="absolute text-[11px] font-bold tracking-tight">{stats.rate}%</span>
             </div>
             <div>
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Attendance Rate</p>
-              <p className="text-sm font-extrabold text-white">
+              <p className="text-[11px] text-slate-400 font-medium">Attendance Rate</p>
+              <p className="text-xs font-semibold text-white">
                 {stats.present + stats.late + stats.excused} of {stats.total} Attended
               </p>
             </div>
           </div>
 
-          <div className="h-8 w-px bg-slate-800 hidden sm:block" />
+          <div className="h-7 w-px bg-slate-800 hidden sm:block" />
 
-          {/* Breakdown pills */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+          <div className="flex items-center gap-3 text-xs font-medium flex-wrap">
+            <span className="inline-flex items-center gap-1.5 text-emerald-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               {stats.present} Present
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-bold border border-rose-500/30">
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
+            <span className="inline-flex items-center gap-1.5 text-rose-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
               {stats.absent} Absent
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/30">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
+            <span className="inline-flex items-center gap-1.5 text-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
               {stats.late} Late
             </span>
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-300 text-xs font-bold border border-sky-500/30">
-              <span className="w-2 h-2 rounded-full bg-sky-400" />
+            <span className="inline-flex items-center gap-1.5 text-sky-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
               {stats.excused} Excused
             </span>
           </div>
         </div>
 
-        {/* 1-Click Batch Actions + Save Button */}
         <div className="flex items-center gap-2 ml-auto">
-          {/* Mark All Present 1-Click CTA */}
           <button
             type="button"
             onClick={() => markAll('present')}
             disabled={isFutureDate}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all border shadow-xs ${
+            className={`h-9 flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-colors border whitespace-nowrap ${
               isFutureDate
-                ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed opacity-60'
-                : 'bg-emerald-700/60 hover:bg-emerald-600 text-emerald-100 hover:text-white border-emerald-500/30'
+                ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
+                : 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border-slate-700'
             }`}
-            title={isFutureDate ? 'Cannot take attendance for tomorrow or future dates' : 'Single-click to mark all students present'}
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+            <CheckCircle2 className="w-3.5 h-3.5" />
             <span>Mark All Present</span>
           </button>
 
@@ -519,48 +481,43 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             type="button"
             onClick={() => markAll('absent')}
             disabled={isFutureDate}
-            className={`hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-medium transition-all border ${
+            className={`hidden sm:flex h-9 items-center gap-1 px-2.5 rounded-lg text-xs font-medium transition-colors border whitespace-nowrap ${
               isFutureDate
-                ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed opacity-60'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-slate-700'
+                ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
             }`}
-            title={isFutureDate ? 'Future date selected' : 'Mark all absent'}
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Clear</span>
           </button>
 
-          {/* Submit CTA */}
           <button
             type="button"
             onClick={handleSaveAttendance}
             disabled={isFutureDate}
-            className={`flex items-center gap-2 px-5 py-2.5 font-black rounded-xl text-xs tracking-wide transition-all shadow-lg ${
+            className={`h-9 flex items-center gap-1.5 px-4 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap ${
               isFutureDate
-                ? 'bg-slate-700 text-slate-400 cursor-not-allowed shadow-none opacity-60'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-500/25 active:scale-95'
+                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                : 'bg-emerald-600 hover:bg-emerald-500 text-white'
             }`}
-            title={isFutureDate ? 'Cannot take attendance for tomorrow or future dates' : undefined}
           >
-            <Check className="w-4 h-4 stroke-[3]" />
+            <Check className="w-4 h-4" />
             <span>{existingSessionId ? 'Update Attendance' : 'Save Attendance'}</span>
           </button>
         </div>
       </div>
 
-      {/* Success Celebration Alert */}
+      {/* Confirmation Banner */}
       {justSubmitted && submittedSessionInfo && (
-        <div className="bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 text-white rounded-2xl p-5 shadow-lg border border-emerald-400/40 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in duration-200">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0">
-              <CheckCircle2 className="w-7 h-7 text-white" />
-            </div>
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
-              <h3 className="font-extrabold text-base tracking-tight">
-                Attendance Successfully Recorded!
+              <h3 className="font-semibold text-sm text-emerald-950">
+                Attendance recorded successfully
               </h3>
-              <p className="text-xs text-emerald-100">
-                {activeSubject?.name} ({activePart === 'practical' ? 'Practical' : 'Theory'}) • {sessionDate} — {submittedSessionInfo.present} Present, {submittedSessionInfo.absent} Absent ({submittedSessionInfo.rate}% rate)
+              <p className="text-xs text-emerald-800 tabular-nums mt-0.5">
+                {activeSubject?.name} ({activePart === 'practical' ? 'Practical' : 'Theory'}) · {sessionDate} — {submittedSessionInfo.present} Present, {submittedSessionInfo.absent} Absent ({submittedSessionInfo.rate}%)
               </p>
             </div>
           </div>
@@ -568,23 +525,23 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             <button
               type="button"
               onClick={() => setIsPdfModalOpen(true)}
-              className="px-3.5 py-2 bg-emerald-800/80 hover:bg-emerald-800 border border-emerald-300/40 text-white rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 shadow-xs"
+              className="h-8 px-3 bg-white hover:bg-emerald-100 border border-emerald-200 text-emerald-800 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap"
             >
               <FileText className="w-3.5 h-3.5" />
-              <span>Download PDF Register</span>
+              <span>PDF Register</span>
             </button>
             <button
               type="button"
               onClick={() => onNavigateToReports(activeSubject?.id, activePart)}
-              className="px-4 py-2 bg-white text-emerald-900 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-colors shadow-xs flex items-center gap-1.5"
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap"
             >
-              <span>View Performance Report</span>
+              <span>View Report</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
               onClick={() => setJustSubmitted(false)}
-              className="px-3 py-2 text-xs font-semibold text-emerald-100 hover:text-white"
+              className="h-8 px-2 text-xs font-medium text-emerald-700 hover:text-emerald-900"
             >
               Dismiss
             </button>
@@ -592,29 +549,25 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
         </div>
       )}
 
-      {/* Filter and View Controls */}
-      <div className="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* Search */}
+      {/* Search, Filter & View Controls */}
+      <div className="bg-white rounded-xl p-4 border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-3">
         <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
             placeholder="Search by student name or roll..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 focus:bg-white focus:ring-2 focus:ring-emerald-500"
+            className="w-full h-9 pl-9 pr-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
           />
         </div>
 
-        {/* Status Filter Chips */}
-        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
+        <div className="flex items-center gap-1.5 w-full md:w-auto overflow-x-auto pb-1 md:pb-0 tabular-nums">
           <button
             type="button"
             onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === 'all'
-                ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            className={`h-8 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+              statusFilter === 'all' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             All ({classStudents.length})
@@ -622,10 +575,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('present')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === 'present'
-                ? 'bg-emerald-600 text-white'
-                : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            className={`h-8 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+              statusFilter === 'present' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
             }`}
           >
             Present ({stats.present})
@@ -633,10 +584,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('absent')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === 'absent'
-                ? 'bg-rose-600 text-white'
-                : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
+            className={`h-8 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+              statusFilter === 'absent' ? 'bg-rose-600 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'
             }`}
           >
             Absent ({stats.absent})
@@ -644,10 +593,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('late')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === 'late'
-                ? 'bg-amber-600 text-white'
-                : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
+            className={`h-8 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+              statusFilter === 'late' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-700 hover:bg-amber-100'
             }`}
           >
             Late ({stats.late})
@@ -655,35 +602,34 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           <button
             type="button"
             onClick={() => setStatusFilter('excused')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
-              statusFilter === 'excused'
-                ? 'bg-sky-600 text-white'
-                : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
+            className={`h-8 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+              statusFilter === 'excused' ? 'bg-sky-600 text-white' : 'bg-sky-50 text-sky-700 hover:bg-sky-100'
             }`}
           >
             Excused ({stats.excused})
           </button>
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl self-end md:self-auto shrink-0">
+        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg self-end md:self-auto shrink-0">
           <button
             type="button"
             onClick={() => setViewMode('cards')}
-            className={`p-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`p-1.5 rounded-md transition-colors ${
               viewMode === 'cards' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
             title="Card Grid View"
+            aria-label="Card Grid View"
           >
             <Grid className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => setViewMode('table')}
-            className={`p-1.5 rounded-lg text-xs font-medium transition-all ${
+            className={`p-1.5 rounded-md transition-colors ${
               viewMode === 'table' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
             title="Table List View"
+            aria-label="Table List View"
           >
             <List className="w-4 h-4" />
           </button>
@@ -692,27 +638,24 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
       {/* Roster Container */}
       {filteredStudents.length === 0 ? (
-        <div className="bg-white rounded-2xl p-12 text-center border border-slate-200">
-          <p className="text-sm font-semibold text-slate-600">No students match your filter or search.</p>
+        <div className="bg-white rounded-xl p-12 text-center border border-slate-200">
+          <p className="text-sm font-semibold text-slate-700">No students match your filter or search.</p>
           <button
             type="button"
             onClick={() => {
               setSearchQuery('');
               setStatusFilter('all');
             }}
-            className="mt-3 text-xs font-bold text-emerald-600 hover:underline"
+            className="mt-3 text-xs font-semibold text-emerald-700 hover:underline"
           >
             Clear Filters
           </button>
         </div>
       ) : viewMode === 'cards' ? (
-        /* Grid Cards View */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 tabular-nums">
           {filteredStudents.map(student => {
             const currentStatus = statuses[student.id]?.status || 'present';
             const remarks = statuses[student.id]?.remarks;
-
-            // Student attendance historical context
             const studentStats = calculateStudentAttendanceStats(student, sessions, records);
 
             const isPresent = currentStatus === 'present';
@@ -723,27 +666,21 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             return (
               <div
                 key={student.id}
-                className={`group relative bg-white rounded-2xl p-4 border transition-all duration-150 ${
+                className={`bg-white rounded-xl p-4 border transition-colors ${
                   isPresent
-                    ? 'border-emerald-200/90 hover:border-emerald-300 hover:shadow-md'
+                    ? 'border-slate-200 hover:border-slate-300'
                     : isAbsent
-                    ? 'border-rose-300 bg-rose-50/20 shadow-xs'
+                    ? 'border-rose-300 bg-rose-50/20'
                     : isLate
-                    ? 'border-amber-300 bg-amber-50/20 shadow-xs'
-                    : 'border-sky-300 bg-sky-50/20 shadow-xs'
+                    ? 'border-amber-300 bg-amber-50/20'
+                    : 'border-sky-300 bg-sky-50/20'
                 }`}
               >
-                {/* Header: Avatar, Name, Roll */}
                 <div className="flex items-start gap-3">
                   <div className="relative">
-                    <img
-                      src={student.avatar || `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`}
-                      alt={student.name}
-                      className="w-12 h-12 rounded-xl object-cover ring-2 ring-slate-100"
-                    />
-                    {/* Status Badge Pin */}
-                    <div
-                      className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-xs ${
+                    <Avatar src={student.avatar} name={student.name} size="lg" />
+                    <span
+                      className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white border border-white ${
                         isPresent
                           ? 'bg-emerald-600'
                           : isAbsent
@@ -754,21 +691,21 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                       }`}
                     >
                       {currentStatus[0].toUpperCase()}
-                    </div>
+                    </span>
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-bold font-mono px-2 py-0.5 rounded bg-slate-100 text-slate-700">
+                      <span className="text-[11px] font-mono font-semibold text-slate-600">
                         {student.rollNumber}
                       </span>
                       {studentStats.isAtRisk && (
-                        <span className="inline-flex items-center gap-0.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 border border-rose-200">
-                          <AlertTriangle className="w-2.5 h-2.5" /> &lt;75%
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                          &lt;75%
                         </span>
                       )}
                       {!studentStats.isAtRisk && studentStats.currentStreak >= 3 && (
-                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-amber-700">
                           <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
                           {studentStats.currentStreak}
                         </span>
@@ -777,8 +714,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                     <h4 className="text-xs font-bold text-slate-900 truncate mt-1">
                       {student.name}
                     </h4>
-                    <p className="text-[10px] text-slate-500 truncate">
-                      Avg: {studentStats.attendancePercentage}% ({studentStats.present}/{studentStats.totalSessions})
+                    <p className="text-[11px] text-slate-500 truncate">
+                      Avg {studentStats.attendancePercentage}% ({studentStats.present}/{studentStats.totalSessions})
                     </p>
                   </div>
                 </div>
@@ -788,84 +725,78 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'present')}
-                    className={`py-1.5 rounded-lg text-xs font-black transition-all flex flex-col items-center justify-center ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isPresent
-                        ? 'bg-emerald-600 text-white shadow-xs ring-2 ring-emerald-500/30'
+                        ? 'bg-emerald-600 text-white'
                         : 'bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700'
                     }`}
-                    title="Mark Present with 1-click"
                   >
                     <span>P</span>
-                    <span className="text-[8px] font-medium opacity-80">Present</span>
+                    <span className="text-[9px] font-normal opacity-80">Present</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'absent')}
-                    className={`py-1.5 rounded-lg text-xs font-black transition-all flex flex-col items-center justify-center ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isAbsent
-                        ? 'bg-rose-600 text-white shadow-xs ring-2 ring-rose-500/30'
+                        ? 'bg-rose-600 text-white'
                         : 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700'
                     }`}
-                    title="Mark Absent with 1-click"
                   >
                     <span>A</span>
-                    <span className="text-[8px] font-medium opacity-80">Absent</span>
+                    <span className="text-[9px] font-normal opacity-80">Absent</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'late')}
-                    className={`py-1.5 rounded-lg text-xs font-black transition-all flex flex-col items-center justify-center ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isLate
-                        ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-500/30'
+                        ? 'bg-amber-600 text-white'
                         : 'bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700'
                     }`}
-                    title="Mark Late with 1-click"
                   >
                     <span>L</span>
-                    <span className="text-[8px] font-medium opacity-80">Late</span>
+                    <span className="text-[9px] font-normal opacity-80">Late</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'excused')}
-                    className={`py-1.5 rounded-lg text-xs font-black transition-all flex flex-col items-center justify-center ${
+                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isExcused
-                        ? 'bg-sky-600 text-white shadow-xs ring-2 ring-sky-500/30'
+                        ? 'bg-sky-600 text-white'
                         : 'bg-slate-100 hover:bg-sky-50 text-slate-600 hover:text-sky-700'
                     }`}
-                    title="Mark Excused with 1-click"
                   >
                     <span>E</span>
-                    <span className="text-[8px] font-medium opacity-80">Excused</span>
+                    <span className="text-[9px] font-normal opacity-80">Excused</span>
                   </button>
                 </div>
 
-                {/* Remarks trigger / badge */}
-                <div className="mt-2.5 flex items-center justify-between text-[10px]">
+                <div className="mt-2.5 flex items-center justify-between text-[11px]">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveRemarkStudent(student);
                       setRemarkInput(remarks || '');
                     }}
-                    className={`inline-flex items-center gap-1 font-medium transition-colors ${
-                      remarks ? 'text-amber-700 hover:text-amber-800 font-semibold' : 'text-slate-400 hover:text-slate-700'
+                    className={`inline-flex items-center gap-1 transition-colors ${
+                      remarks ? 'text-amber-700 font-medium' : 'text-slate-400 hover:text-slate-700'
                     }`}
                   >
                     <MessageSquare className="w-3 h-3" />
-                    <span>{remarks ? `Note: "${remarks.slice(0, 16)}..."` : '+ Add note / reason'}</span>
+                    <span>{remarks ? `Note: ${remarks.slice(0, 18)}` : '+ Add note'}</span>
                   </button>
 
-                  {/* Quick Card Click Tip */}
                   <button
                     type="button"
                     onClick={() => cycleStatus(student.id)}
-                    className="text-slate-400 hover:text-slate-600 font-mono text-[9px]"
+                    className="text-slate-400 hover:text-slate-600 font-mono text-[10px]"
                     title="Click to cycle status"
                   >
-                    cycle ↺
+                    cycle
                   </button>
                 </div>
               </div>
@@ -873,11 +804,10 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           })}
         </div>
       ) : (
-        /* Fast Compact Table View */
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-bold text-[10px]">
+              <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider font-semibold text-[11px]">
                 <tr>
                   <th className="py-3 px-4">Roll</th>
                   <th className="py-3 px-4">Student</th>
@@ -895,42 +825,38 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   return (
                     <tr
                       key={student.id}
-                      className={`hover:bg-slate-50/80 transition-colors ${
+                      className={`hover:bg-slate-50 transition-colors ${
                         currentStatus === 'absent' ? 'bg-rose-50/30' : ''
                       }`}
                     >
-                      <td className="py-3 px-4 font-mono font-bold text-slate-700">
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-700">
                         {student.rollNumber}
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2.5">
-                          <img
-                            src={student.avatar}
-                            alt={student.name}
-                            className="w-7 h-7 rounded-lg object-cover"
-                          />
+                          <Avatar src={student.avatar} name={student.name} size="sm" />
                           <div>
-                            <span className="font-bold text-slate-900 block">{student.name}</span>
-                            <span className="text-[10px] text-slate-500">{student.email}</span>
+                            <span className="font-semibold text-slate-900 block">{student.name}</span>
+                            <span className="text-[11px] text-slate-400">{student.email}</span>
                           </div>
                         </div>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`font-bold ${
+                            className={`font-semibold ${
                               studentStats.isAtRisk
                                 ? 'text-rose-600'
                                 : studentStats.attendancePercentage >= 90
-                                ? 'text-emerald-600'
+                                ? 'text-emerald-700'
                                 : 'text-slate-700'
                             }`}
                           >
                             {studentStats.attendancePercentage}%
                           </span>
                           {studentStats.isAtRisk && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded font-black bg-rose-100 text-rose-700">
-                              AT RISK
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+                              At Risk
                             </span>
                           )}
                         </div>
@@ -940,9 +866,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                           <button
                             type="button"
                             onClick={() => setStudentStatus(student.id, 'present')}
-                            className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                            className={`w-8 h-7 rounded-md text-xs font-semibold transition-colors ${
                               currentStatus === 'present'
-                                ? 'bg-emerald-600 text-white shadow-2xs'
+                                ? 'bg-emerald-600 text-white'
                                 : 'bg-slate-100 hover:bg-emerald-50 text-slate-600'
                             }`}
                           >
@@ -951,9 +877,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                           <button
                             type="button"
                             onClick={() => setStudentStatus(student.id, 'absent')}
-                            className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                            className={`w-8 h-7 rounded-md text-xs font-semibold transition-colors ${
                               currentStatus === 'absent'
-                                ? 'bg-rose-600 text-white shadow-2xs'
+                                ? 'bg-rose-600 text-white'
                                 : 'bg-slate-100 hover:bg-rose-50 text-slate-600'
                             }`}
                           >
@@ -962,9 +888,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                           <button
                             type="button"
                             onClick={() => setStudentStatus(student.id, 'late')}
-                            className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                            className={`w-8 h-7 rounded-md text-xs font-semibold transition-colors ${
                               currentStatus === 'late'
-                                ? 'bg-amber-600 text-white shadow-2xs'
+                                ? 'bg-amber-600 text-white'
                                 : 'bg-slate-100 hover:bg-amber-50 text-slate-600'
                             }`}
                           >
@@ -973,9 +899,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                           <button
                             type="button"
                             onClick={() => setStudentStatus(student.id, 'excused')}
-                            className={`px-3 py-1 rounded-md text-xs font-bold transition-all ${
+                            className={`w-8 h-7 rounded-md text-xs font-semibold transition-colors ${
                               currentStatus === 'excused'
-                                ? 'bg-sky-600 text-white shadow-2xs'
+                                ? 'bg-sky-600 text-white'
                                 : 'bg-slate-100 hover:bg-sky-50 text-slate-600'
                             }`}
                           >
@@ -990,9 +916,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                             setActiveRemarkStudent(student);
                             setRemarkInput(remarks || '');
                           }}
-                          className="text-xs text-slate-500 hover:text-slate-800 underline truncate max-w-[140px] block"
+                          className="text-xs text-slate-500 hover:text-slate-900 underline truncate max-w-[140px] block"
                         >
-                          {remarks || '+ Note'}
+                          {remarks || '+ Add note'}
                         </button>
                       </td>
                     </tr>
@@ -1006,20 +932,16 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
       {/* Remark / Absence Reason Modal */}
       {activeRemarkStudent && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <img
-                  src={activeRemarkStudent.avatar}
-                  alt={activeRemarkStudent.name}
-                  className="w-8 h-8 rounded-lg object-cover"
-                />
+                <Avatar src={activeRemarkStudent.avatar} name={activeRemarkStudent.name} size="md" />
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    Attendance Note: {activeRemarkStudent.name}
+                    Attendance Note · {activeRemarkStudent.name}
                   </h3>
-                  <p className="text-[10px] text-slate-500 font-mono">
+                  <p className="text-[11px] text-slate-500 font-mono">
                     Roll: {activeRemarkStudent.rollNumber}
                   </p>
                 </div>
@@ -1027,33 +949,33 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               <button
                 type="button"
                 onClick={() => setActiveRemarkStudent(null)}
-                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-md"
+                aria-label="Close modal"
               >
-                ✕
+                <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="mt-4 space-y-3">
               <label className="block text-xs font-semibold text-slate-700">
-                Reason for Absence, Lateness, or Excusal:
+                Reason for absence, lateness, or excusal
               </label>
               <textarea
                 rows={3}
                 value={remarkInput}
                 onChange={e => setRemarkInput(e.target.value)}
-                placeholder="e.g. Medical doctor appointment, varsity soccer game, bus transit delay..."
-                className="w-full p-3 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                placeholder="e.g. Medical appointment, transit delay..."
+                className="w-full p-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
               />
 
-              {/* Quick suggestion chips */}
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {['Illness / Fever', 'Doctor Appointment', 'Bus Delay', 'Family Emergency', 'School Event'].map(
+                {['Illness / Fever', 'Doctor Appointment', 'Bus Delay', 'Family Emergency', 'Institute Event'].map(
                   preset => (
                     <button
                       key={preset}
                       type="button"
                       onClick={() => setRemarkInput(preset)}
-                      className="text-[10px] px-2 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700"
+                      className="text-[11px] px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-md text-slate-700 transition-colors"
                     >
                       {preset}
                     </button>
@@ -1075,7 +997,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   }));
                   setActiveRemarkStudent(null);
                 }}
-                className="px-3 py-1.5 text-xs text-slate-500 hover:text-rose-600 font-semibold"
+                className="px-3 py-1.5 text-xs text-slate-500 hover:text-rose-600 font-medium"
               >
                 Clear Note
               </button>
@@ -1091,7 +1013,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   }));
                   setActiveRemarkStudent(null);
                 }}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs"
+                className="h-9 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors"
               >
                 Save Note
               </button>
@@ -1100,7 +1022,6 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
         </div>
       )}
 
-      {/* PDF Attendance Register Download Modal */}
       {isPdfModalOpen && activeSubject && activeClass && (
         <DownloadRegisterModal
           isOpen={isPdfModalOpen}

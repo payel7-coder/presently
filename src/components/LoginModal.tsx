@@ -6,7 +6,6 @@ import {
   Mail,
   X,
   AlertCircle,
-  Database
 } from 'lucide-react';
 
 interface LoginModalProps {
@@ -48,43 +47,37 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-slate-200/90 my-8 animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
+      <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl border border-slate-200 my-8">
         <div className="flex items-start justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-600/20">
-              <LogIn className="w-6 h-6" />
+            <div className="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0">
+              <LogIn className="w-4 h-4" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                  Account Sign In
-                </h2>
-                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  <Database className="w-3 h-3" /> Firebase Realtime
-                </span>
-              </div>
+              <h2 className="text-base font-bold text-slate-900 tracking-tight">
+                Switch Account
+              </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                BTEB Probidhan 2022 Attendance System Authentication
+                BTEB Probidhan 2022 Institutional Authentication
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100"
+            aria-label="Close modal"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Mode Tabs */}
-        <div className="mt-4 flex rounded-xl bg-slate-100 p-1 text-xs font-bold">
+        <div className="mt-4 flex rounded-lg bg-slate-100 p-1 text-xs font-semibold">
           <button
             type="button"
             onClick={() => { setMode('email-login'); setErrorMsg(null); }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              mode === 'email-login' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            className={`flex-1 py-1.5 rounded-md transition-colors ${
+              mode === 'email-login' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             Sign In
@@ -92,8 +85,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           <button
             type="button"
             onClick={() => { setMode('register'); setErrorMsg(null); }}
-            className={`flex-1 py-2 rounded-lg transition-all ${
-              mode === 'register' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+            className={`flex-1 py-1.5 rounded-md transition-colors ${
+              mode === 'register' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
           >
             Register
@@ -101,95 +94,87 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {errorMsg && (
-          <div className="mt-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
+          <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{errorMsg}</span>
           </div>
         )}
 
-        {/* Email & Password Login / Register Form */}
-        {(mode === 'email-login' || mode === 'register') && (
-          <form onSubmit={handleEmailSubmit} className="mt-5 space-y-3.5">
-            {mode === 'register' && (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Engr. Asif Mahmud"
-                    value={name}
-                    onChange={e => setName(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                    System Role
-                  </label>
-                  <select
-                    value={role}
-                    onChange={e => setRole(e.target.value as any)}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800"
-                  >
-                    <option value="teacher">Teacher (Attendance & Reports)</option>
-                    <option value="admin">Administrator (Full Access & Student Import)</option>
-                  </select>
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Institutional Email
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        <form onSubmit={handleEmailSubmit} className="mt-5 space-y-3.5">
+          {mode === 'register' && (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Full Name
+                </label>
                 <input
-                  type="email"
+                  type="text"
                   required
-                  placeholder="faculty@polytechnic.bteb.gov.bd"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
+                  placeholder="e.g. Engr. Asif Mahmud"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  className="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
                 />
               </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="password"
-                  required
-                  minLength={6}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl text-xs text-slate-800 focus:ring-2 focus:ring-emerald-500"
-                />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  System Role
+                </label>
+                <select
+                  value={role}
+                  onChange={e => setRole(e.target.value as any)}
+                  className="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs font-medium text-slate-900"
+                >
+                  <option value="teacher">Teacher (Attendance &amp; Reports)</option>
+                  <option value="admin">Administrator (Full Access &amp; Student Import)</option>
+                </select>
               </div>
+            </>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Institutional Email
+            </label>
+            <div className="relative">
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="email"
+                required
+                placeholder="faculty@polytechnic.bteb.gov.bd"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+              />
             </div>
+          </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full mt-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors flex items-center justify-center gap-2"
-            >
-              <span>{mode === 'email-login' ? 'Sign In with Firebase' : 'Create BTEB Account'}</span>
-            </button>
-          </form>
-        )}
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Password
+            </label>
+            <div className="relative">
+              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="password"
+                required
+                minLength={6}
+                placeholder="Enter password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+              />
+            </div>
+          </div>
 
-        <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-          <span>Backend: Firebase Realtime Firestore</span>
-          <span>Access Control: RBAC (Admin-only Import)</span>
-        </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-2 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center"
+          >
+            <span>{loading ? 'Authenticating...' : mode === 'email-login' ? 'Sign In' : 'Create Account'}</span>
+          </button>
+        </form>
       </div>
     </div>
   );

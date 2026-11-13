@@ -137,18 +137,18 @@ function AttendanceApp() {
       />
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500 no-print">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-800">Presently Attendance System</span>
-            <span className="text-slate-300">•</span>
-            <span className="text-emerald-700 font-semibold">BTEB Curricula 2022 (Probidhan-22)</span>
-            <span className="text-slate-300">•</span>
-            <span>Realtime Firebase Firestore</span>
+      <footer className="bg-white border-t border-slate-200 py-5 text-xs text-slate-500 no-print">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-semibold text-slate-800">Presently</span>
+            <span className="text-slate-300">·</span>
+            <span>BTEB Probidhan 2022</span>
+            <span className="text-slate-300">·</span>
+            <span>Diploma in Computer Science &amp; Technology (85)</span>
           </div>
-          <div className="flex items-center gap-1.5 text-slate-400">
-            <span>Bangladesh Technical Education Board • Diploma in Engineering</span>
-          </div>
+          <span className="text-slate-400">
+            Bangladesh Technical Education Board
+          </span>
         </div>
       </footer>
     </div>
