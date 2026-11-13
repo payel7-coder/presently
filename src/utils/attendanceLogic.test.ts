@@ -10,8 +10,9 @@ import {
   validateSubjectPartAssignment,
   getCurrentWeekBounds,
   calculateWeeklyStudentAttendanceSummary,
+  getRoleBasedVisibilityScope,
 } from './attendanceLogic';
-import { Student, AttendanceSession, AttendanceRecord, SubjectAssignment } from '../types/attendance';
+import { ClassGroup, Student, AttendanceSession, AttendanceRecord, Subject, SubjectAssignment, User } from '../types/attendance';
 
 test('parseStudentCSV successfully parses valid CSV rows', () => {
   const sampleCSV = `Roll Number, Name, Email, Gender, Phone
@@ -496,4 +497,80 @@ test('calculateWeeklyStudentAttendanceSummary computes per-student weekly averag
   assert.equal(emptyWeek.studentPoints.length, 0);
   assert.equal(emptyWeek.weeklyAveragePercentage, 0);
 });
+
+test('getRoleBasedVisibilityScope shows all subjects to admin and only assigned subjects/parts to teachers', () => {
+  const adminUser: User = {
+    id: 'adm-1',
+    name: 'Admin',
+    email: 'admin@polytechnic.edu.bd',
+    role: 'admin',
+    department: 'Administration',
+    employeeId: 'ADM-01',
+    avatar: '',
+  };
+  const teacherA: User = {
+    id: 'tch-a',
+    name: 'Teacher A',
+    email: 'a@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'TCH-01',
+    avatar: '',
+  };
+  const teacherNoAssignments: User = {
+    id: 'tch-empty',
+    name: 'Teacher Empty',
+    email: 'empty@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'TCH-02',
+    avatar: '',
+  };
+
+  const classes: ClassGroup[] = [
+    { id: 'c1', name: '1st Semester', section: 'CST', department: 'CST', semester: '1st', academicYear: '2026', roomNumber: '101', technology: 'CST (85)' },
+    { id: 'c4', name: '4th Semester', section: 'CST', department: 'CST', semester: '4th', academicYear: '2026', roomNumber: '401', technology: 'CST (85)' },
+  ];
+  const subjects: Subject[] = [
+    { id: 'sub-1', code: '21011', name: 'Engineering Drawing', description: '', color: 'emerald', classId: 'c1', credits: 2, semester: '1st', curriculum: 'BTEB Probidhan 2022', technology: 'CST (85)' },
+    { id: 'sub-2', code: '28542', name: 'Data Structure & Algorithm', description: '', color: 'emerald', classId: 'c4', credits: 3, semester: '4th', curriculum: 'BTEB Probidhan 2022', technology: 'CST (85)' },
+    { id: 'sub-3', code: '28544', name: 'Microprocessor & Interfacing', description: '', color: 'emerald', classId: 'c4', credits: 3, semester: '4th', curriculum: 'BTEB Probidhan 2022', technology: 'CST (85)' },
+  ];
+  const assignments: SubjectAssignment[] = [
+    { id: 'a1', subjectId: 'sub-2', classId: 'c4', teacherId: 'tch-a', part: 'theory', academicYear: '2026', assignedAt: '2026-09-01' },
+    { id: 'a2', subjectId: 'sub-2', classId: 'c4', teacherId: 'tch-b', part: 'practical', academicYear: '2026', assignedAt: '2026-09-01' },
+    { id: 'a3', subjectId: 'sub-1', classId: 'c1', teacherId: 'tch-b', part: 'theory', academicYear: '2026', assignedAt: '2026-09-01' },
+  ];
+  const sessions: AttendanceSession[] = [
+    { id: 'sess-a-theory', subjectId: 'sub-2', classId: 'c4', teacherId: 'tch-a', part: 'theory', date: '2026-11-13', totalStudents: 1, presentCount: 1, absentCount: 0, lateCount: 0, excusedCount: 0, createdAt: '', isSubmitted: true },
+    { id: 'sess-b-practical', subjectId: 'sub-2', classId: 'c4', teacherId: 'tch-b', part: 'practical', date: '2026-11-13', totalStudents: 1, presentCount: 1, absentCount: 0, lateCount: 0, excusedCount: 0, createdAt: '', isSubmitted: true },
+    { id: 'sess-b-sub1', subjectId: 'sub-1', classId: 'c1', teacherId: 'tch-b', part: 'theory', date: '2026-11-13', totalStudents: 1, presentCount: 1, absentCount: 0, lateCount: 0, excusedCount: 0, createdAt: '', isSubmitted: true },
+  ];
+  const students: Student[] = [
+    { id: 'stu-1', rollNumber: '101', name: 'First Sem Student', email: 's1@s.edu', gender: 'Male', classId: 'c1', status: 'active' },
+    { id: 'stu-4', rollNumber: '401', name: 'Fourth Sem Student', email: 's4@s.edu', gender: 'Female', classId: 'c4', status: 'active' },
+  ];
+
+  // Admin sees everything
+  const adminScope = getRoleBasedVisibilityScope({ currentUser: adminUser, subjects, classes, assignments, sessions, students });
+  assert.equal(adminScope.visibleSubjects.length, 3);
+  assert.equal(adminScope.visibleClasses.length, 2);
+  assert.equal(adminScope.visibleSessions.length, 3);
+  assert.equal(adminScope.visibleStudents.length, 2);
+
+  // Teacher A sees only sub-2 (and only its Theory sessions, not Teacher B's Practical or sub-1)
+  const teacherScope = getRoleBasedVisibilityScope({ currentUser: teacherA, subjects, classes, assignments, sessions, students });
+  assert.deepEqual(teacherScope.visibleSubjects.map(s => s.id), ['sub-2']);
+  assert.deepEqual(teacherScope.visibleClasses.map(c => c.id), ['c4']);
+  assert.deepEqual(teacherScope.visibleSessions.map(s => s.id), ['sess-a-theory']);
+  assert.deepEqual(teacherScope.visibleStudents.map(s => s.id), ['stu-4']);
+
+  // Unassigned teacher sees zero subjects/classes/sessions/students
+  const emptyScope = getRoleBasedVisibilityScope({ currentUser: teacherNoAssignments, subjects, classes, assignments, sessions, students });
+  assert.equal(emptyScope.visibleSubjects.length, 0);
+  assert.equal(emptyScope.visibleClasses.length, 0);
+  assert.equal(emptyScope.visibleSessions.length, 0);
+  assert.equal(emptyScope.visibleStudents.length, 0);
+});
+
 

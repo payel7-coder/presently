@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
 import { Student } from '../types/attendance';
+import { getRoleBasedVisibilityScope } from '../utils/attendanceLogic';
 import {
   Users,
   Search,
@@ -21,10 +22,33 @@ interface ClassRosterViewProps {
 }
 
 export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImport }) => {
-  const { classes, students, addStudent, deleteStudent, currentUser } = useAttendance();
+  const { classes, subjects, assignments, sessions, students, addStudent, deleteStudent, currentUser, isAdmin } = useAttendance();
 
-  const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '');
+  const visibleClasses = useMemo(
+    () =>
+      getRoleBasedVisibilityScope({
+        currentUser,
+        subjects,
+        classes,
+        assignments,
+        sessions,
+        students,
+      }).visibleClasses,
+    [currentUser, subjects, classes, assignments, sessions, students]
+  );
+
+  const [selectedClassId, setSelectedClassId] = useState<string>(visibleClasses[0]?.id || '');
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (visibleClasses.length === 0) {
+      if (selectedClassId !== '') setSelectedClassId('');
+      return;
+    }
+    if (!visibleClasses.some(c => c.id === selectedClassId)) {
+      setSelectedClassId(visibleClasses[0].id);
+    }
+  }, [visibleClasses, selectedClassId]);
 
   // Add Student Modal
   const [showAddModal, setShowAddModal] = useState(false);
@@ -36,7 +60,7 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
   const [newPhone, setNewPhone] = useState('');
   const [newParentEmail, setNewParentEmail] = useState('');
 
-  const currentClass = classes.find(c => c.id === selectedClassId);
+  const currentClass = visibleClasses.find(c => c.id === selectedClassId);
 
   const classStudents = students.filter(s => s.classId === selectedClassId);
 
@@ -124,41 +148,52 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
       </div>
 
       {/* Class Group Selector Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1">
-        {classes.map(c => {
-          const isSelected = c.id === selectedClassId;
-          const count = students.filter(s => s.classId === c.id).length;
+      {!isAdmin && visibleClasses.length === 0 ? (
+        <div className="bg-white rounded-2xl p-10 text-center border border-slate-200">
+          <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-slate-800">No Assigned Subject Batches Yet</h3>
+          <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+            Once the administrator assigns BTEB subjects to your account, the corresponding semester student rosters will appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+          {visibleClasses.map(c => {
+            const isSelected = c.id === selectedClassId;
+            const count = students.filter(s => s.classId === c.id).length;
 
-          return (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setSelectedClassId(c.id)}
-              className={`px-4 py-2.5 rounded-xl text-left border transition-all shrink-0 ${
-                isSelected
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/10'
-                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-bold tracking-tight">{c.name}</span>
-                <span
-                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                    isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {count} Students
-                </span>
-              </div>
-              <p className="text-[11px] opacity-80 truncate max-w-[160px] mt-0.5">
-                {c.section}
-              </p>
-            </button>
-          );
-        })}
-      </div>
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setSelectedClassId(c.id)}
+                className={`px-4 py-2.5 rounded-xl text-left border transition-all shrink-0 ${
+                  isSelected
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/10'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold tracking-tight">{c.name}</span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                      isSelected ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {count} Students
+                  </span>
+                </div>
+                <p className="text-[11px] opacity-80 truncate max-w-[160px] mt-0.5">
+                  {c.section}
+                </p>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Search and Table */}
+      {(isAdmin || visibleClasses.length > 0) && (
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="relative w-full sm:w-72">
@@ -182,7 +217,9 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
             <Users className="w-10 h-10 text-slate-300 mx-auto mb-2" />
             <p className="text-sm font-bold text-slate-700">No students found</p>
             <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Use "Bulk CSV Import" to load a complete class list or click "Add Single Student".
+              {isAdmin
+                ? 'Use "Bulk CSV Import" to load a complete class list or click "Add Single Student".'
+                : 'No students have been enrolled in this class batch yet.'}
             </p>
           </div>
         ) : (
@@ -262,6 +299,7 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
           </div>
         )}
       </div>
+      )}
 
       {/* Add Student Modal */}
       {showAddModal && (

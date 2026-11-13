@@ -1,4 +1,15 @@
-import { AttendanceRecord, AttendanceSession, CSVParseResult, Student, StudentAttendanceStats, SubjectAssignment, SubjectPart } from '../types/attendance';
+import {
+  AttendanceRecord,
+  AttendanceSession,
+  ClassGroup,
+  CSVParseResult,
+  Student,
+  StudentAttendanceStats,
+  Subject,
+  SubjectAssignment,
+  SubjectPart,
+  User,
+} from '../types/attendance';
 
 /**
  * Parses raw CSV string into student records with line-by-line validation.
@@ -631,4 +642,73 @@ export function calculateWeeklyStudentAttendanceSummary(
   };
 }
 
+export interface RoleVisibilityScope {
+  visibleSubjects: Subject[];
+  visibleClasses: ClassGroup[];
+  visibleAssignments: SubjectAssignment[];
+  visibleSessions: AttendanceSession[];
+  visibleStudents: Student[];
+  assignedPartKeys: Set<string>;
+}
+
+/**
+ * Computes role-based visibility scope:
+ * - Admin sees all subjects, classes, assignments, sessions, and students.
+ * - Teacher sees only their assigned subjects, corresponding classes, and sessions matching their assigned (subjectId, part).
+ */
+export function getRoleBasedVisibilityScope(params: {
+  currentUser: User | null;
+  subjects: Subject[];
+  classes: ClassGroup[];
+  assignments: SubjectAssignment[];
+  sessions: AttendanceSession[];
+  students: Student[];
+}): RoleVisibilityScope {
+  const { currentUser, subjects, classes, assignments, sessions, students } = params;
+
+  if (!currentUser) {
+    return {
+      visibleSubjects: [],
+      visibleClasses: [],
+      visibleAssignments: [],
+      visibleSessions: [],
+      visibleStudents: [],
+      assignedPartKeys: new Set<string>(),
+    };
+  }
+
+  if (currentUser.role === 'admin') {
+    const allPartKeys = new Set<string>();
+    assignments.forEach(a => {
+      allPartKeys.add(`${a.subjectId}::${a.part || 'theory'}`);
+    });
+    return {
+      visibleSubjects: subjects,
+      visibleClasses: classes,
+      visibleAssignments: assignments,
+      visibleSessions: sessions,
+      visibleStudents: students,
+      assignedPartKeys: allPartKeys,
+    };
+  }
+
+  // Teacher role: strictly scoped to assignments for this teacher
+  const teacherAssignments = assignments.filter(a => a.teacherId === currentUser.id);
+  const assignedSubjectIds = new Set(teacherAssignments.map(a => a.subjectId));
+  const assignedClassIds = new Set(teacherAssignments.map(a => a.classId));
+  const assignedPartKeys = new Set(
+    teacherAssignments.map(a => `${a.subjectId}::${a.part || 'theory'}`)
+  );
+
+  return {
+    visibleSubjects: subjects.filter(s => assignedSubjectIds.has(s.id)),
+    visibleClasses: classes.filter(c => assignedClassIds.has(c.id)),
+    visibleAssignments: teacherAssignments,
+    visibleSessions: sessions.filter(s =>
+      assignedPartKeys.has(`${s.subjectId}::${s.part || 'theory'}`)
+    ),
+    visibleStudents: students.filter(stu => assignedClassIds.has(stu.classId)),
+    assignedPartKeys,
+  };
+}
 

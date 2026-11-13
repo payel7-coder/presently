@@ -25,6 +25,7 @@ import {
   calculateStudentAttendanceStats,
   calculateWeeklyStudentAttendanceSummary,
   exportAttendanceToCSV,
+  getRoleBasedVisibilityScope,
   WeeklyStudentAttendancePoint,
 } from '../utils/attendanceLogic';
 import {
@@ -52,7 +53,25 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   initialPart,
   onOpenBulkImport,
 }) => {
-  const { subjects, classes, students, sessions, records, currentUser } = useAttendance();
+  const { subjects, classes, assignments, students, sessions, records, currentUser, isAdmin } = useAttendance();
+
+  const roleScope = useMemo(
+    () =>
+      getRoleBasedVisibilityScope({
+        currentUser,
+        subjects,
+        classes,
+        assignments,
+        sessions,
+        students,
+      }),
+    [currentUser, subjects, classes, assignments, sessions, students]
+  );
+
+  const visibleSubjects = roleScope.visibleSubjects;
+  const visibleClasses = roleScope.visibleClasses;
+  const visibleSessions = roleScope.visibleSessions;
+  const visibleStudents = roleScope.visibleStudents;
 
   // Filters
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId || 'all');
@@ -60,6 +79,22 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [riskOnlyFilter, setRiskOnlyFilter] = useState<boolean>(false);
+
+  // Sync filters when user or role scope changes
+  React.useEffect(() => {
+    if (selectedSubjectId !== 'all' && !visibleSubjects.some(s => s.id === selectedSubjectId)) {
+      setSelectedSubjectId('all');
+    }
+    if (selectedClassId !== 'all' && !visibleClasses.some(c => c.id === selectedClassId)) {
+      setSelectedClassId('all');
+    }
+  }, [visibleSubjects, visibleClasses, selectedSubjectId, selectedClassId]);
+
+  React.useEffect(() => {
+    setSelectedSubjectId(initialSubjectId || 'all');
+    setSelectedPartFilter(initialPart || 'all');
+    setSelectedClassId('all');
+  }, [currentUser?.id, initialSubjectId, initialPart]);
 
   // Drilldown modal for student history
   const [drilldownStudent, setDrilldownStudent] = useState<Student | null>(null);
@@ -72,39 +107,41 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup } | null>(null);
 
   const handleOpenPdfRegister = () => {
-    let targetSub = subjects.find(s => s.id === selectedSubjectId);
-    if (!targetSub && subjects.length > 0) {
-      targetSub = subjects[0];
+    let targetSub = visibleSubjects.find(s => s.id === selectedSubjectId);
+    if (!targetSub && visibleSubjects.length > 0) {
+      targetSub = visibleSubjects[0];
     }
     if (targetSub) {
-      const cls = classes.find(c => c.id === targetSub.classId) || classes[0];
-      setPdfModalSubject({ subject: targetSub, classGroup: cls });
+      const cls = visibleClasses.find(c => c.id === targetSub.classId) || classes.find(c => c.id === targetSub.classId) || visibleClasses[0] || classes[0];
+      if (cls) {
+        setPdfModalSubject({ subject: targetSub, classGroup: cls });
+      }
     }
   };
 
-  // Filtered Sessions
+  // Filtered Sessions (strictly scoped to role-visible sessions)
   const filteredSessions = useMemo(() => {
-    return sessions.filter(s => {
+    return visibleSessions.filter(s => {
       const matchSubject = selectedSubjectId === 'all' || s.subjectId === selectedSubjectId;
       const matchClass = selectedClassId === 'all' || s.classId === selectedClassId;
       const matchPart = selectedPartFilter === 'all' || (s.part || 'theory') === selectedPartFilter;
       return matchSubject && matchClass && matchPart;
     });
-  }, [sessions, selectedSubjectId, selectedClassId, selectedPartFilter]);
+  }, [visibleSessions, selectedSubjectId, selectedClassId, selectedPartFilter]);
 
   // Overall metrics
   const summary = useMemo(() => {
     return calculateSessionSummary(filteredSessions);
   }, [filteredSessions]);
 
-  // Filtered Students
+  // Filtered Students (strictly scoped to role-visible students & classes)
   const filteredStudents = useMemo(() => {
-    return students.filter(stu => {
+    return visibleStudents.filter(stu => {
       const matchClass = selectedClassId === 'all' || stu.classId === selectedClassId;
       // If subject is selected, student must belong to class of that subject
       let matchSubject = true;
       if (selectedSubjectId !== 'all') {
-        const sub = subjects.find(s => s.id === selectedSubjectId);
+        const sub = visibleSubjects.find(s => s.id === selectedSubjectId);
         if (sub) {
           matchSubject = stu.classId === sub.classId;
         }
@@ -115,7 +152,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
 
       return matchClass && matchSubject && matchSearch;
     });
-  }, [students, selectedClassId, selectedSubjectId, searchStudent, subjects]);
+  }, [visibleStudents, selectedClassId, selectedSubjectId, searchStudent, visibleSubjects]);
 
   // Compute student stats for each
   const studentStatsList = useMemo(() => {
@@ -154,12 +191,16 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const handleExportCSV = () => {
     const activeSubjectName =
       selectedSubjectId === 'all'
-        ? 'All Subjects'
-        : subjects.find(s => s.id === selectedSubjectId)?.name || 'Subject';
+        ? isAdmin
+          ? 'All Subjects'
+          : 'My Assigned Subjects'
+        : visibleSubjects.find(s => s.id === selectedSubjectId)?.name || 'Subject';
     const activeClassName =
       selectedClassId === 'all'
-        ? 'All Classes'
-        : classes.find(c => c.id === selectedClassId)?.name || 'Class';
+        ? isAdmin
+          ? 'All Classes'
+          : 'Assigned Classes'
+        : visibleClasses.find(c => c.id === selectedClassId)?.name || 'Class';
 
     const csvContent = exportAttendanceToCSV(
       filteredSessions,
@@ -213,7 +254,8 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           <button
             type="button"
             onClick={handleOpenPdfRegister}
-            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+            disabled={visibleSubjects.length === 0}
+            className="flex items-center gap-1.5 px-4 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-all shadow-xs"
             title="Download official BTEB PDF attendance register"
           >
             <FileText className="w-4 h-4" />
@@ -259,15 +301,20 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           {/* Subject Filter */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
-              Filter by Subject
+              {isAdmin ? 'Filter by Subject (All)' : 'My Assigned Subjects'}
             </label>
             <select
+              aria-label="Filter by Subject"
               value={selectedSubjectId}
               onChange={e => setSelectedSubjectId(e.target.value)}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="all">All Subjects ({subjects.length})</option>
-              {subjects.map(s => (
+              <option value="all">
+                {isAdmin
+                  ? `All Subjects (${visibleSubjects.length})`
+                  : `All Assigned Subjects (${visibleSubjects.length})`}
+              </option>
+              {visibleSubjects.map(s => (
                 <option key={s.id} value={s.id}>
                   {s.code}: {s.name}
                 </option>
@@ -281,6 +328,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
               Course Part
             </label>
             <select
+              aria-label="Filter by Course Part"
               value={selectedPartFilter}
               onChange={e => setSelectedPartFilter(e.target.value as 'all' | SubjectPart)}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
@@ -297,12 +345,17 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
               Filter by Class Group
             </label>
             <select
+              aria-label="Filter by Class Group"
               value={selectedClassId}
               onChange={e => setSelectedClassId(e.target.value)}
               className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
             >
-              <option value="all">All Classes ({classes.length})</option>
-              {classes.map(c => (
+              <option value="all">
+                {isAdmin
+                  ? `All Classes (${visibleClasses.length})`
+                  : `Assigned Classes (${visibleClasses.length})`}
+              </option>
+              {visibleClasses.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.name} - {c.section}
                 </option>
@@ -339,6 +392,22 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           />
         </div>
       </div>
+
+      {/* Teacher Unassigned Notice */}
+      {!isAdmin && visibleSubjects.length === 0 && (
+        <div
+          data-testid="teacher-no-assigned-subjects"
+          className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-3 text-amber-900"
+        >
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-sm font-bold">No Assigned Subjects Yet</h3>
+            <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+              Only subjects assigned to you by the administrator are visible here. Once your Theory or Practical subjects are allocated, your attendance reports and charts will populate automatically.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -899,14 +968,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {sessions
+                    {visibleSessions
                       .filter(s => records.some(r => r.sessionId === s.id && r.studentId === drilldownStudent.id))
                       .sort((a, b) => b.date.localeCompare(a.date))
                       .map(session => {
                         const rec = records.find(
                           r => r.sessionId === session.id && r.studentId === drilldownStudent.id
                         );
-                        const sub = subjects.find(s => s.id === session.subjectId);
+                        const sub = visibleSubjects.find(s => s.id === session.subjectId) || subjects.find(s => s.id === session.subjectId);
                         const status = rec?.status || 'present';
 
                         return (
@@ -1018,8 +1087,8 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           subject={pdfModalSubject.subject}
           classGroup={pdfModalSubject.classGroup}
           teacher={currentUser}
-          students={students}
-          sessions={sessions}
+          students={visibleStudents}
+          sessions={visibleSessions}
           records={records}
           defaultPart={selectedPartFilter === 'all' ? undefined : selectedPartFilter}
         />
