@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   FileText,
   Download,
@@ -13,7 +13,7 @@ import {
   Award,
   AlertCircle
 } from 'lucide-react';
-import { Subject, ClassGroup, Student, AttendanceSession, AttendanceRecord, User } from '../types/attendance';
+import { Subject, ClassGroup, Student, AttendanceSession, AttendanceRecord, User, SubjectPart } from '../types/attendance';
 import { downloadAttendanceRegisterPDF, generateAttendanceRegisterPDF } from '../utils/pdfAttendanceRegister';
 
 interface DownloadRegisterModalProps {
@@ -25,6 +25,7 @@ interface DownloadRegisterModalProps {
   students: Student[];
   sessions: AttendanceSession[];
   records: AttendanceRecord[];
+  defaultPart?: SubjectPart;
 }
 
 export const DownloadRegisterModal: React.FC<DownloadRegisterModalProps> = ({
@@ -36,17 +37,25 @@ export const DownloadRegisterModal: React.FC<DownloadRegisterModalProps> = ({
   students,
   sessions,
   records,
+  defaultPart,
 }) => {
   const [registerType, setRegisterType] = useState<'recorded' | 'blank'>('recorded');
+  const [selectedPart, setSelectedPart] = useState<'all' | SubjectPart>(defaultPart || 'all');
   const [dateFilter, setDateFilter] = useState<'all' | 'month' | 'custom'>('all');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
 
+  useEffect(() => {
+    setSelectedPart(defaultPart || 'all');
+  }, [defaultPart, isOpen]);
+
   if (!isOpen || !subject || !classGroup) return null;
 
-  const subjectSessions = sessions.filter(s => s.subjectId === subject.id);
+  const subjectSessions = sessions.filter(
+    s => s.subjectId === subject.id && (selectedPart === 'all' || (s.part || 'theory') === selectedPart)
+  );
   const classStudents = students.filter(s => s.classId === classGroup.id && s.status === 'active');
 
   // Compute stats preview
@@ -102,6 +111,7 @@ export const DownloadRegisterModal: React.FC<DownloadRegisterModalProps> = ({
           isBlankTemplate: registerType === 'blank',
           startDate: effStart || undefined,
           endDate: effEnd || undefined,
+          part: selectedPart === 'all' ? undefined : selectedPart,
         });
 
         setIsGenerating(false);
@@ -124,11 +134,11 @@ export const DownloadRegisterModal: React.FC<DownloadRegisterModalProps> = ({
         sessions,
         records,
         isBlankTemplate: registerType === 'blank',
+        part: selectedPart === 'all' ? undefined : selectedPart,
       });
       const blobUrl = doc.output('bloburl');
       const printWindow = window.open(blobUrl, '_blank');
       if (!printWindow) {
-        // If popup blocked, save directly
         doc.save(`BTEB_${subject.code}_Register.pdf`);
       }
     } catch (e) {
@@ -265,6 +275,33 @@ export const DownloadRegisterModal: React.FC<DownloadRegisterModalProps> = ({
                   </p>
                 </div>
               </label>
+            </div>
+          </div>
+
+          {/* Subject Part Filter */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wider">
+              Subject Part (Theory / Practical)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {(['theory', 'practical', 'all'] as const).map(partOpt => (
+                <button
+                  key={partOpt}
+                  type="button"
+                  onClick={() => setSelectedPart(partOpt)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                    selectedPart === partOpt
+                      ? 'bg-indigo-600 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {partOpt === 'theory'
+                    ? 'Theory Part Only'
+                    : partOpt === 'practical'
+                    ? 'Practical Part Only'
+                    : 'All Parts Combined'}
+                </button>
+              ))}
             </div>
           </div>
 

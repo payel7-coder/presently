@@ -7,15 +7,14 @@ import {
   Student,
   Subject,
   SubjectAssignment,
+  SubjectPart,
   User,
 } from '../types/attendance';
 import {
   BTEB_CLASSES,
   BTEB_CURRICULUM_2022_SUBJECTS,
-  BTEB_FACULTY_USERS,
-  BTEB_INITIAL_ASSIGNMENTS,
-  BTEB_INITIAL_STUDENTS,
 } from '../data/btebCurriculum';
+import { validateSubjectPartAssignment } from '../utils/attendanceLogic';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -30,8 +29,16 @@ import {
   signInWithEmailAndPassword,
   signOut,
   createUserWithEmailAndPassword,
-  onAuthStateChanged,
 } from 'firebase/auth';
+
+interface NewTeacherInput {
+  name: string;
+  email: string;
+  department?: string;
+  employeeId?: string;
+  title?: string;
+  dailyClassTarget?: number;
+}
 
 interface AttendanceContextType {
   currentUser: User | null;
@@ -62,7 +69,9 @@ interface AttendanceContextType {
   setDailyClassTarget: (target: number) => Promise<void>;
 
   // Admin actions (Restricted)
-  assignSubjectToTeacher: (subjectId: string, teacherId: string, classId: string) => Promise<void>;
+  addTeacher: (teacher: NewTeacherInput) => Promise<User>;
+  deleteTeacher: (teacherId: string) => Promise<void>;
+  assignSubjectToTeacher: (subjectId: string, teacherId: string, classId: string, part: SubjectPart) => Promise<void>;
   unassignSubject: (assignmentId: string) => Promise<void>;
   createSubject: (subject: Omit<Subject, 'id'>) => Promise<Subject>;
   bulkImportStudents: (classId: string, newStudents: Omit<Student, 'id'>[]) => Promise<number>;
@@ -77,6 +86,7 @@ interface AttendanceContextType {
       subjectId: string;
       classId: string;
       teacherId: string;
+      part?: SubjectPart;
       date: string;
       timeSlot?: string;
       topic?: string;
@@ -84,11 +94,18 @@ interface AttendanceContextType {
     studentStatuses: Record<string, { status: AttendanceStatus; remarks?: string }>
   ) => Promise<AttendanceSession>;
 
-  getSessionByDate: (subjectId: string, date: string) => AttendanceSession | undefined;
+  getSessionByDate: (subjectId: string, date: string, part?: SubjectPart) => AttendanceSession | undefined;
   getSessionRecords: (sessionId: string) => AttendanceRecord[];
   resetToDefaultBTEBData: () => Promise<void>;
   clearAllDemoData: () => Promise<void>;
 }
+
+const DEMO_USER_IDS = new Set([
+  'teacher-tanvir',
+  'teacher-nusrat',
+  'teacher-hasan',
+  'admin-principal',
+]);
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
@@ -111,10 +128,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
 
-  const [users, setUsers] = useState<User[]>(BTEB_FACULTY_USERS);
+  const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>(BTEB_CLASSES);
   const [subjects, setSubjects] = useState<Subject[]>(BTEB_CURRICULUM_2022_SUBJECTS);
-  const [assignments, setAssignments] = useState<SubjectAssignment[]>(BTEB_INITIAL_ASSIGNMENTS);
+  const [assignments, setAssignments] = useState<SubjectAssignment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -129,7 +146,30 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, [currentUser]);
 
-  // Real-time Firestore Listeners
+  // Helper to initialize Firestore with BTEB 2022 classes & subjects only (no demo faculty/students)
+  const seedInitialFirestore = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'classes'));
+      if (snap.empty) {
+        const batch = writeBatch(db);
+
+        BTEB_CLASSES.forEach(c => {
+          batch.set(doc(db, 'classes', c.id), c);
+        });
+
+        BTEB_CURRICULUM_2022_SUBJECTS.forEach(s => {
+          batch.set(doc(db, 'subjects', s.id), s);
+        });
+
+        await batch.commit();
+        setIsFirebaseLive(true);
+      }
+    } catch (e) {
+      console.warn('Seeding initial Firestore skipped or handled locally:', e);
+    }
+  };
+
+  // Real-time Firestore Listeners (Firestore is the single source of truth, including empty states)
   useEffect(() => {
     let unsubClasses: () => void;
     let unsubSubjects: () => void;
@@ -144,7 +184,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       unsubClasses = onSnapshot(collection(db, 'classes'), snapshot => {
         if (!snapshot.empty) {
           const list: ClassGroup[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
+          snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
           setClasses(list);
           setIsFirebaseLive(true);
         } else {
@@ -156,7 +196,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       unsubSubjects = onSnapshot(collection(db, 'subjects'), snapshot => {
         if (!snapshot.empty) {
           const list: Subject[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
+          snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
           setSubjects(list);
           setIsFirebaseLive(true);
         }
@@ -164,57 +204,44 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       // 3. Assignments listener
       unsubAssignments = onSnapshot(collection(db, 'assignments'), snapshot => {
-        if (!snapshot.empty) {
-          const list: SubjectAssignment[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
-          setAssignments(list);
-        }
+        const list: SubjectAssignment[] = [];
+        snapshot.forEach(d => {
+          const data = d.data() as any;
+          list.push({
+            id: d.id,
+            ...data,
+            part: data.part === 'practical' ? 'practical' : 'theory',
+          });
+        });
+        setAssignments(list);
       }, err => console.warn('Assignments listener fallback:', err));
 
       // 4. Students listener
       unsubStudents = onSnapshot(collection(db, 'students'), snapshot => {
-        if (!snapshot.empty) {
-          const list: Student[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
-          setStudents(list);
-        }
+        const list: Student[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setStudents(list);
       }, err => console.warn('Students listener fallback:', err));
 
       // 5. Sessions listener
       unsubSessions = onSnapshot(collection(db, 'sessions'), snapshot => {
-        if (!snapshot.empty) {
-          const list: AttendanceSession[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
-          setSessions(list);
-        }
+        const list: AttendanceSession[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setSessions(list);
       }, err => console.warn('Sessions listener fallback:', err));
 
       // 6. Records listener
       unsubRecords = onSnapshot(collection(db, 'records'), snapshot => {
-        if (!snapshot.empty) {
-          const list: AttendanceRecord[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
-          setRecords(list);
-        }
+        const list: AttendanceRecord[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setRecords(list);
       }, err => console.warn('Records listener fallback:', err));
 
-      // 7. Users listener
+      // 7. Users listener (no hardcoded demo teachers merged)
       unsubUsers = onSnapshot(collection(db, 'users'), snapshot => {
-        if (!snapshot.empty) {
-          const list: User[] = [];
-          snapshot.forEach(doc => list.push({ id: doc.id, ...(doc.data() as any) }));
-          // Merge with BTEB_FACULTY_USERS so pre-configured institutional faculty accounts are always present
-          const merged = [...BTEB_FACULTY_USERS];
-          list.forEach(u => {
-            const idx = merged.findIndex(m => m.id === u.id || m.email.toLowerCase() === u.email.toLowerCase());
-            if (idx >= 0) {
-              merged[idx] = { ...merged[idx], ...u };
-            } else {
-              merged.push(u);
-            }
-          });
-          setUsers(merged);
-        }
+        const list: User[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setUsers(list);
       }, err => console.warn('Users listener fallback:', err));
 
     } catch (e) {
@@ -232,41 +259,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
-  // Helper to initialize Firestore with BTEB 2022 dataset if empty
-  const seedInitialFirestore = async () => {
-    try {
-      const snap = await getDocs(collection(db, 'classes'));
-      if (snap.empty) {
-        const batch = writeBatch(db);
-
-        // Seed users
-        BTEB_FACULTY_USERS.forEach(u => {
-          batch.set(doc(db, 'users', u.id), u);
-        });
-
-        // Seed classes
-        BTEB_CLASSES.forEach(c => {
-          batch.set(doc(db, 'classes', c.id), c);
-        });
-
-        // Seed BTEB subjects
-        BTEB_CURRICULUM_2022_SUBJECTS.forEach(s => {
-          batch.set(doc(db, 'subjects', s.id), s);
-        });
-
-        // Seed initial assignments
-        BTEB_INITIAL_ASSIGNMENTS.forEach(a => {
-          batch.set(doc(db, 'assignments', a.id), a);
-        });
-
-        await batch.commit();
-        setIsFirebaseLive(true);
-      }
-    } catch (e) {
-      console.warn('Seeding initial Firestore skipped or handled locally:', e);
-    }
-  };
-
   const setCurrentUser = (user: User | null) => {
     setCurrentUserState(user);
     if (user) {
@@ -276,9 +268,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  const isAuthenticated = currentUser !== null;
+  const isAuthenticated = Boolean(currentUser);
   const isAdmin = currentUser?.role === 'admin';
-  const canImportStudents = Boolean(isAdmin); // STRICT RULE: Student import ONLY accessible to admin!
+  const canImportStudents = Boolean(isAdmin);
 
   const teachers = users.filter(u => u.role === 'teacher');
 
@@ -289,7 +281,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         const subject = subjects.find(s => s.id === assignment.subjectId);
         const classGroup = classes.find(c => c.id === assignment.classId);
         if (subject && classGroup) {
-          return { subject, classGroup, assignment };
+          return {
+            subject,
+            classGroup,
+            assignment: {
+              ...assignment,
+              part: assignment.part || 'theory',
+            },
+          };
         }
         return null;
       })
@@ -347,28 +346,54 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const buildInstitutionalProfile = (cleanEmail: string, uid: string): User => {
+    const isDesignatedAdmin =
+      cleanEmail === 'payelahmed70@gmail.com' ||
+      cleanEmail.includes('admin') ||
+      cleanEmail.includes('principal');
+    const role: 'admin' | 'teacher' = isDesignatedAdmin ? 'admin' : 'teacher';
+
+    if (cleanEmail === 'payelahmed70@gmail.com') {
+      return {
+        id: uid,
+        name: 'Engr. Payel Ahmed',
+        email: cleanEmail,
+        role: 'admin',
+        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+        department: 'Polytechnic Administration & Academic Affairs',
+        employeeId: 'BTEB-DIR-70',
+        title: 'Academic Director & BTEB Coordinator',
+      };
+    }
+
+    return {
+      id: uid,
+      name: cleanEmail.split('@')[0],
+      email: cleanEmail,
+      role,
+      avatar: role === 'admin'
+        ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      department: 'Computer Science & Technology',
+      employeeId: role === 'admin' ? `BTEB-ADM-${uid.slice(-4)}` : `BTEB-TCH-${uid.slice(-4)}`,
+      title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
+      dailyClassTarget: 4,
+    };
+  };
+
   const loginWithEmail = async (email: string, pass: string): Promise<User> => {
     const cleanEmail = email.trim().toLowerCase();
-    const matched = users.find(u => u.email.toLowerCase() === cleanEmail) ||
-                    BTEB_FACULTY_USERS.find(u => u.email.toLowerCase() === cleanEmail);
+    const matched = users.find(u => u.email.toLowerCase() === cleanEmail);
 
     try {
       const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
       const userProfile: User = matched
         ? { ...matched, id: res.user.uid || matched.id }
-        : {
-            id: res.user.uid,
-            name: email.split('@')[0],
-            email: cleanEmail,
-            role: cleanEmail.includes('admin') || cleanEmail.includes('principal') || cleanEmail === 'payelahmed70@gmail.com' ? 'admin' : 'teacher',
-            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-            department: 'Computer Science & Technology',
-            employeeId: `EMP-${res.user.uid.slice(0, 5)}`,
-            title: cleanEmail.includes('admin') || cleanEmail.includes('principal') || cleanEmail === 'payelahmed70@gmail.com' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
-          };
+        : buildInstitutionalProfile(cleanEmail, res.user.uid);
 
       setCurrentUserState(userProfile);
       localStorage.setItem('presently_active_user', JSON.stringify(userProfile));
+      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), userProfile]);
 
       try {
         const cleanUser: any = { ...userProfile };
@@ -381,7 +406,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (firebaseErr: any) {
       console.warn('Firebase auth attempt handled with institutional fallback:', firebaseErr?.code);
 
-      // If matched demo account or pre-configured faculty
       if (matched) {
         setCurrentUserState(matched);
         localStorage.setItem('presently_active_user', JSON.stringify(matched));
@@ -395,23 +419,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return matched;
       }
 
-      // If unregistered email provided, provision institutional user
-      const role = cleanEmail.includes('admin') || cleanEmail.includes('principal') || cleanEmail === 'payelahmed70@gmail.com' ? 'admin' : 'teacher';
-      const fallbackUser: User = {
-        id: `user-${Date.now()}`,
-        name: email.split('@')[0],
-        email: cleanEmail,
-        role,
-        avatar: role === 'admin'
-          ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        department: 'Computer Science & Technology',
-        employeeId: `BTEB-${Math.floor(1000 + Math.random() * 9000)}`,
-        title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
-      };
+      const fallbackId = cleanEmail === 'payelahmed70@gmail.com' ? 'admin-payel' : `user-${Date.now()}`;
+      const fallbackUser = buildInstitutionalProfile(cleanEmail, fallbackId);
 
       setCurrentUserState(fallbackUser);
       localStorage.setItem('presently_active_user', JSON.stringify(fallbackUser));
+      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), fallbackUser]);
       try {
         const cleanUser: any = { ...fallbackUser };
         Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
@@ -443,6 +456,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         department: 'Computer Science & Technology',
         employeeId: role === 'admin' ? `ADM-${Date.now().toString().slice(-4)}` : `BTEB-${Date.now().toString().slice(-4)}`,
         title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
+        dailyClassTarget: 4,
       };
 
       setCurrentUserState(newUser);
@@ -461,7 +475,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (e.code === 'auth/email-already-in-use') {
         return loginWithEmail(cleanEmail, pass);
       }
-      // If Firebase Auth operation is restricted, provision institutional account directly into Firestore
       const newUser: User = {
         id: `user-${Date.now()}`,
         name: name.trim(),
@@ -473,6 +486,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         department: 'Computer Science & Technology',
         employeeId: role === 'admin' ? `ADM-${Date.now().toString().slice(-4)}` : `BTEB-${Date.now().toString().slice(-4)}`,
         title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
+        dailyClassTarget: 4,
       };
 
       setCurrentUserState(newUser);
@@ -500,25 +514,110 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setCurrentUserState(null);
   };
 
-  // Admin: Assign Subject to Teacher (with Firestore real-time persistence)
-  const assignSubjectToTeacher = async (subjectId: string, teacherId: string, classId: string) => {
-    const classGroup = classes.find(c => c.id === classId);
+  // Admin: Add / Remove Real Faculty Teachers
+  const addTeacher = async (teacherInput: NewTeacherInput): Promise<User> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrator can add faculty members.');
+    }
+
+    const cleanEmail = teacherInput.email.trim().toLowerCase();
+    const cleanName = teacherInput.name.trim();
+    if (!cleanName || !cleanEmail) {
+      throw new Error('Teacher full name and institutional email are required.');
+    }
+
+    const existing = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (existing) {
+      throw new Error(`A faculty account with email "${cleanEmail}" already exists.`);
+    }
+
+    const newTeacher: User = {
+      id: `tch-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      name: cleanName,
+      email: cleanEmail,
+      role: 'teacher',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      department: teacherInput.department?.trim() || 'Computer Science & Technology',
+      employeeId: teacherInput.employeeId?.trim() || `BTEB-TCH-${Date.now().toString().slice(-4)}`,
+      title: teacherInput.title?.trim() || 'Instructor (Computer Technology)',
+      dailyClassTarget: teacherInput.dailyClassTarget || 4,
+    };
+
+    setUsers(prev => [...prev, newTeacher]);
+
+    try {
+      const cleanUser: any = { ...newTeacher };
+      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+      await setDoc(doc(db, 'users', newTeacher.id), cleanUser);
+    } catch (e) {
+      console.warn('Firestore addTeacher error:', e);
+    }
+
+    return newTeacher;
+  };
+
+  const deleteTeacher = async (teacherId: string): Promise<void> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrator can remove faculty members.');
+    }
+
+    const teacherAssignments = assignments.filter(a => a.teacherId === teacherId);
+    setUsers(prev => prev.filter(u => u.id !== teacherId));
+    setAssignments(prev => prev.filter(a => a.teacherId !== teacherId));
+
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'users', teacherId));
+      teacherAssignments.forEach(a => {
+        batch.delete(doc(db, 'assignments', a.id));
+      });
+      await batch.commit();
+    } catch (e) {
+      console.warn('Firestore deleteTeacher error:', e);
+    }
+  };
+
+  // Admin: Assign Subject Part (Theory or Practical) to Teacher — enforces different teachers per part
+  const assignSubjectToTeacher = async (
+    subjectId: string,
+    teacherId: string,
+    classId: string,
+    part: SubjectPart = 'theory'
+  ) => {
+    const validation = validateSubjectPartAssignment(assignments, subjectId, classId, part, teacherId);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid subject part assignment.');
+    }
+
+    const deterministicId = `bteb-asg-${subjectId}-${classId}-${part}`;
     const newAsg: SubjectAssignment = {
-      id: `bteb-asg-${Date.now()}`,
+      id: deterministicId,
       subjectId,
       teacherId,
       classId,
+      part,
       academicYear: '2026-2027',
       assignedAt: new Date().toISOString().split('T')[0],
     };
 
+    const replacedAssignments = assignments.filter(
+      a => a.subjectId === subjectId && a.classId === classId && (a.part || 'theory') === part && a.id !== deterministicId
+    );
+
     setAssignments(prev => {
-      const filtered = prev.filter(a => !(a.subjectId === subjectId && a.classId === classId));
+      const filtered = prev.filter(
+        a => !(a.subjectId === subjectId && a.classId === classId && (a.part || 'theory') === part)
+      );
       return [...filtered, newAsg];
     });
 
     try {
-      await setDoc(doc(db, 'assignments', newAsg.id), newAsg);
+      const batch = writeBatch(db);
+      replacedAssignments.forEach(oldAsg => {
+        batch.delete(doc(db, 'assignments', oldAsg.id));
+      });
+      batch.set(doc(db, 'assignments', newAsg.id), newAsg);
+      await batch.commit();
     } catch (e) {
       console.warn('Firestore assignment sync error:', e);
     }
@@ -638,18 +737,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       subjectId: string;
       classId: string;
       teacherId: string;
+      part?: SubjectPart;
       date: string;
       timeSlot?: string;
       topic?: string;
     },
     studentStatuses: Record<string, { status: AttendanceStatus; remarks?: string }>
   ) => {
-    // Strict attendance validation: Tomorrow or future dates cannot be recorded!
     const todayStr = new Date().toISOString().split('T')[0];
     if (sessionDetails.date > todayStr) {
       throw new Error(`Validation Error: Attendance cannot be taken for tomorrow or future dates (${sessionDetails.date}). Please select today (${todayStr}) or a previous class date.`);
     }
 
+    const resolvedPart: SubjectPart = sessionDetails.part || 'theory';
     const classStudents = getClassStudents(sessionDetails.classId);
     let pCount = 0;
     let aCount = 0;
@@ -665,15 +765,17 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       else if (status === 'excused') eCount++;
     });
 
-    const sessionId = sessionDetails.id || `bteb-sess-${Date.now()}`;
+    const sessionId = sessionDetails.id || `bteb-sess-${resolvedPart}-${Date.now()}`;
+    const partLabel = resolvedPart === 'practical' ? 'Practical' : 'Theory';
     const newSession: AttendanceSession = {
       id: sessionId,
       subjectId: sessionDetails.subjectId,
       classId: sessionDetails.classId,
       teacherId: sessionDetails.teacherId,
+      part: resolvedPart,
       date: sessionDetails.date,
-      timeSlot: sessionDetails.timeSlot || 'Regular Session',
-      topic: sessionDetails.topic || 'BTEB Curriculum Lecture & Practical',
+      timeSlot: sessionDetails.timeSlot || `${partLabel} Session`,
+      topic: sessionDetails.topic || `BTEB ${partLabel} Class`,
       totalStudents: classStudents.length,
       presentCount: pCount,
       absentCount: aCount,
@@ -708,7 +810,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       return [...filtered, ...newRecords];
     });
 
-    // Sync to Firestore Realtime
     try {
       const batch = writeBatch(db);
       batch.set(doc(db, 'sessions', newSession.id), newSession);
@@ -725,7 +826,12 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return newSession;
   };
 
-  const getSessionByDate = (subjectId: string, date: string) => {
+  const getSessionByDate = (subjectId: string, date: string, part?: SubjectPart) => {
+    if (part) {
+      return sessions.find(
+        s => s.subjectId === subjectId && s.date === date && (s.part || 'theory') === part
+      );
+    }
     return sessions.find(s => s.subjectId === subjectId && s.date === date);
   };
 
@@ -736,7 +842,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const resetToDefaultBTEBData = async () => {
     setSubjects(BTEB_CURRICULUM_2022_SUBJECTS);
     setClasses(BTEB_CLASSES);
-    setAssignments(BTEB_INITIAL_ASSIGNMENTS);
+    setAssignments([]);
     setStudents([]);
     setSessions([]);
     setRecords([]);
@@ -747,14 +853,31 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setSessions([]);
     setRecords([]);
     setStudents([]);
+    setAssignments([]);
+    setUsers(prev => prev.filter(u => !DEMO_USER_IDS.has(u.id)));
 
     try {
-      const collectionsToWipe = ['sessions', 'records', 'students'];
+      const collectionsToWipe = ['sessions', 'records', 'students', 'assignments'];
       for (const col of collectionsToWipe) {
         const snap = await getDocs(collection(db, col));
         if (!snap.empty) {
           const batch = writeBatch(db);
           snap.forEach(d => batch.delete(doc(db, col, d.id)));
+          await batch.commit();
+        }
+      }
+
+      const userSnap = await getDocs(collection(db, 'users'));
+      if (!userSnap.empty) {
+        const batch = writeBatch(db);
+        let hasDemoUser = false;
+        userSnap.forEach(d => {
+          if (DEMO_USER_IDS.has(d.id)) {
+            batch.delete(doc(db, 'users', d.id));
+            hasDemoUser = true;
+          }
+        });
+        if (hasDemoUser) {
           await batch.commit();
         }
       }
@@ -776,7 +899,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         students,
         sessions,
         records,
-        isAuthenticated: true,
+        isAuthenticated,
         isAdmin,
         canImportStudents,
         loginWithPreset,
@@ -788,6 +911,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         getClassStudents,
         getSubjectsBySemester,
         setDailyClassTarget,
+        addTeacher,
+        deleteTeacher,
         assignSubjectToTeacher,
         unassignSubject,
         createSubject,

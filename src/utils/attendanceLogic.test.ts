@@ -7,8 +7,9 @@ import {
   exportAttendanceToCSV,
   isValidAttendanceDate,
   calculateDailyClassTargetProgress,
+  validateSubjectPartAssignment,
 } from './attendanceLogic';
-import { Student, AttendanceSession, AttendanceRecord } from '../types/attendance';
+import { Student, AttendanceSession, AttendanceRecord, SubjectAssignment } from '../types/attendance';
 
 test('parseStudentCSV successfully parses valid CSV rows', () => {
   const sampleCSV = `Roll Number, Name, Email, Gender, Phone
@@ -237,7 +238,7 @@ test('isValidAttendanceDate validates that tomorrow and future dates cannot be s
 });
 
 test('calculateDailyClassTargetProgress accurately computes daily progress, percentage and status', () => {
-  const teacherId = 'teacher-tanvir';
+  const teacherId = 'teacher-1';
   const testDate = '2026-11-10';
 
   const sampleSessions: AttendanceSession[] = [
@@ -353,4 +354,81 @@ test('calculateDailyClassTargetProgress accurately computes daily progress, perc
   assert.equal(res5.target, 1);
   assert.equal(res5.isCompleted, true);
 });
+
+test('validateSubjectPartAssignment enforces different teachers for Theory and Practical parts of same subject', () => {
+  const existingAssignments: SubjectAssignment[] = [
+    {
+      id: 'asg-1',
+      subjectId: 'bteb-28542',
+      classId: 'class-cst-4',
+      teacherId: 'teacher-a',
+      part: 'theory',
+      academicYear: '2026-2027',
+      assignedAt: '2026-09-01',
+    },
+  ];
+
+  // Rejects assigning the same teacher to Practical part of the same subject & class
+  const sameTeacherPractical = validateSubjectPartAssignment(
+    existingAssignments,
+    'bteb-28542',
+    'class-cst-4',
+    'practical',
+    'teacher-a'
+  );
+  assert.equal(sameTeacherPractical.valid, false);
+  assert.ok(sameTeacherPractical.error?.includes('different teachers'));
+
+  // Allows assigning a different teacher to Practical part of the same subject & class
+  const diffTeacherPractical = validateSubjectPartAssignment(
+    existingAssignments,
+    'bteb-28542',
+    'class-cst-4',
+    'practical',
+    'teacher-b'
+  );
+  assert.equal(diffTeacherPractical.valid, true);
+
+  // Allows reassigning Theory part to the same teacher (updating/keeping Theory)
+  const reassignTheory = validateSubjectPartAssignment(
+    existingAssignments,
+    'bteb-28542',
+    'class-cst-4',
+    'theory',
+    'teacher-a'
+  );
+  assert.equal(reassignTheory.valid, true);
+
+  // Allows the same teacher to take Practical of a DIFFERENT subject or DIFFERENT class
+  const diffSubjectPractical = validateSubjectPartAssignment(
+    existingAssignments,
+    'bteb-28544',
+    'class-cst-4',
+    'practical',
+    'teacher-a'
+  );
+  assert.equal(diffSubjectPractical.valid, true);
+
+  // Also checks reverse direction: Practical exists -> Theory cannot have same teacher
+  const practicalFirst: SubjectAssignment[] = [
+    {
+      id: 'asg-2',
+      subjectId: 'bteb-28544',
+      classId: 'class-cst-4',
+      teacherId: 'teacher-b',
+      part: 'practical',
+      academicYear: '2026-2027',
+      assignedAt: '2026-09-01',
+    },
+  ];
+  const sameTeacherTheory = validateSubjectPartAssignment(
+    practicalFirst,
+    'bteb-28544',
+    'class-cst-4',
+    'theory',
+    'teacher-b'
+  );
+  assert.equal(sameTeacherTheory.valid, false);
+});
+
 

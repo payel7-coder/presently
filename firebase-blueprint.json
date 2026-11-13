@@ -46,16 +46,17 @@
     },
     "SubjectAssignment": {
       "title": "SubjectAssignment",
-      "description": "Teacher course allocation by admin",
+      "description": "Teacher course allocation by admin (Theory and Practical parts assigned to different teachers)",
       "type": "object",
       "properties": {
         "subjectId": { "type": "string", "description": "Subject reference" },
         "teacherId": { "type": "string", "description": "Teacher user ID" },
         "classId": { "type": "string", "description": "Class reference" },
+        "part": { "type": "string", "enum": ["theory", "practical"], "description": "Course part (theory or practical)" },
         "semester": { "type": "string", "description": "Semester" },
         "academicYear": { "type": "string", "description": "Academic Session" }
       },
-      "required": ["subjectId", "teacherId", "classId"]
+      "required": ["subjectId", "teacherId", "classId", "part"]
     },
     "Student": {
       "title": "Student",
@@ -83,6 +84,7 @@
         "subjectId": { "type": "string", "description": "Subject ID" },
         "classId": { "type": "string", "description": "Class ID" },
         "teacherId": { "type": "string", "description": "Teacher UID" },
+        "part": { "type": "string", "enum": ["theory", "practical"], "description": "Subject part (theory or practical)" },
         "date": { "type": "string", "description": "Session date YYYY-MM-DD" },
         "timeSlot": { "type": "string", "description": "Session period" },
         "totalStudents": { "type": "number", "description": "Total students" },

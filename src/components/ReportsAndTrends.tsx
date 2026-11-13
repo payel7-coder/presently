@@ -25,22 +25,25 @@ import {
   calculateStudentAttendanceStats,
   exportAttendanceToCSV,
 } from '../utils/attendanceLogic';
-import { Student, AttendanceSession, Subject, ClassGroup } from '../types/attendance';
+import { Student, AttendanceSession, Subject, ClassGroup, SubjectPart } from '../types/attendance';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
 
 interface ReportsAndTrendsProps {
   initialSubjectId?: string;
+  initialPart?: SubjectPart;
   onOpenBulkImport: () => void;
 }
 
 export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   initialSubjectId,
+  initialPart,
   onOpenBulkImport,
 }) => {
   const { subjects, classes, students, sessions, records, currentUser } = useAttendance();
 
   // Filters
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>(initialSubjectId || 'all');
+  const [selectedPartFilter, setSelectedPartFilter] = useState<'all' | SubjectPart>(initialPart || 'all');
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [riskOnlyFilter, setRiskOnlyFilter] = useState<boolean>(false);
@@ -71,9 +74,10 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
     return sessions.filter(s => {
       const matchSubject = selectedSubjectId === 'all' || s.subjectId === selectedSubjectId;
       const matchClass = selectedClassId === 'all' || s.classId === selectedClassId;
-      return matchSubject && matchClass;
+      const matchPart = selectedPartFilter === 'all' || (s.part || 'theory') === selectedPartFilter;
+      return matchSubject && matchClass && matchPart;
     });
-  }, [sessions, selectedSubjectId, selectedClassId]);
+  }, [sessions, selectedSubjectId, selectedClassId, selectedPartFilter]);
 
   // Overall metrics
   const summary = useMemo(() => {
@@ -253,6 +257,22 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
             </select>
           </div>
 
+          {/* Subject Part Filter */}
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+              Course Part
+            </label>
+            <select
+              value={selectedPartFilter}
+              onChange={e => setSelectedPartFilter(e.target.value as 'all' | SubjectPart)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-emerald-500"
+            >
+              <option value="all">All Parts (Theory & Practical)</option>
+              <option value="theory">Theory Part Only</option>
+              <option value="practical">Practical Part Only</option>
+            </select>
+          </div>
+
           {/* Class Filter */}
           <div>
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
@@ -406,7 +426,9 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                   >
                     {/* Tooltip on hover */}
                     <div className="absolute -top-12 z-20 hidden group-hover:flex flex-col items-center bg-slate-900 text-white text-[10px] rounded-lg py-1 px-2 pointer-events-none whitespace-nowrap shadow-lg">
-                      <span className="font-bold">{rate}% Attendance</span>
+                      <span className="font-bold">
+                        {rate}% Attendance ({sess.part === 'practical' ? 'Practical' : 'Theory'})
+                      </span>
                       <span className="text-slate-400">{sess.date}</span>
                       <span className="text-emerald-300">
                         {sess.presentCount}P / {sess.absentCount}A / {sess.lateCount}L
@@ -727,7 +749,16 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                               {session.date}
                             </td>
                             <td className="py-2.5 px-3 font-medium text-slate-800">
-                              {sub?.code || 'Course'}
+                              <span>{sub?.code || 'Course'}</span>
+                              <span
+                                className={`ml-1.5 text-[9px] font-black uppercase px-1.5 py-0.5 rounded ${
+                                  session.part === 'practical'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-indigo-100 text-indigo-800'
+                                }`}
+                              >
+                                {session.part === 'practical' ? 'Practical' : 'Theory'}
+                              </span>
                             </td>
                             <td className="py-2.5 px-3">
                               <span
@@ -824,6 +855,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           students={students}
           sessions={sessions}
           records={records}
+          defaultPart={selectedPartFilter === 'all' ? undefined : selectedPartFilter}
         />
       )}
     </div>

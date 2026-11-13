@@ -1,6 +1,6 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Subject, ClassGroup, Student, AttendanceSession, AttendanceRecord, User } from '../types/attendance';
+import { Subject, ClassGroup, Student, AttendanceSession, AttendanceRecord, User, SubjectPart } from '../types/attendance';
 
 export interface PDFRegisterOptions {
   subject: Subject;
@@ -12,6 +12,7 @@ export interface PDFRegisterOptions {
   isBlankTemplate?: boolean;
   startDate?: string;
   endDate?: string;
+  part?: SubjectPart;
 }
 
 export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPDF {
@@ -25,10 +26,14 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
     isBlankTemplate = false,
     startDate,
     endDate,
+    part,
   } = options;
 
-  // Filter sessions by subject and date range
+  // Filter sessions by subject, optional part, and date range
   let targetSessions = sessions.filter(s => s.subjectId === subject.id);
+  if (part) {
+    targetSessions = targetSessions.filter(s => (s.part || 'theory') === part);
+  }
   if (startDate) {
     targetSessions = targetSessions.filter(s => s.date >= startDate);
   }
@@ -85,10 +90,11 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   doc.setTextColor(15, 23, 42);
 
   // Left column
+  const partLabel = part === 'practical' ? 'Practical' : part === 'theory' ? 'Theory' : 'Theory & Practical';
   doc.setFont('helvetica', 'bold');
   doc.text('Course / Subject:', 14, 38);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${subject.name} (Code: ${subject.code}) - ${subject.credits || 3} Credits`, 45, 38);
+  doc.text(`${subject.name} [${partLabel}] (Code: ${subject.code}) - ${subject.credits || 3} Cr`, 45, 38);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Semester & Class:', 14, 44);
@@ -103,23 +109,23 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   // Right column
   const col2X = pageWidth / 2 + 10;
   doc.setFont('helvetica', 'bold');
-  doc.text('Course Teacher:', col2X, 38);
+  doc.text(part ? `${partLabel} Teacher:` : 'Course Teacher:', col2X, 38);
   doc.setFont('helvetica', 'normal');
   const teacherText = teacher ? `${teacher.name} (${teacher.employeeId || 'Faculty'})` : 'Institutional Faculty';
-  doc.text(teacherText, col2X + 28, 38);
+  doc.text(teacherText, col2X + 30, 38);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Academic Session:', col2X, 44);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${classGroup.academicYear || '2026-2027'} • Probidhan-2022`, col2X + 28, 44);
+  doc.text(`${classGroup.academicYear || '2026-2027'} • Probidhan-2022`, col2X + 30, 44);
 
   doc.setFont('helvetica', 'bold');
   doc.text('Register Type:', col2X, 50);
   doc.setFont('helvetica', 'normal');
   const regTypeText = isBlankTemplate
-    ? 'Blank Form for Classroom Log (30 Class Slots)'
-    : `Recorded Ledger (${targetSessions.length} Classes Held • ${students.length} Enrolled)`;
-  doc.text(regTypeText, col2X + 28, 50);
+    ? `Blank Form for ${partLabel} Log (22 Class Slots)`
+    : `Recorded ${partLabel} Ledger (${targetSessions.length} Classes • ${students.length} Enrolled)`;
+  doc.text(regTypeText, col2X + 30, 50);
 
   // Sort students by Roll number
   const sortedStudents = [...students].sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
@@ -366,7 +372,8 @@ export function downloadAttendanceRegisterPDF(options: PDFRegisterOptions): void
   const doc = generateAttendanceRegisterPDF(options);
   const cleanCode = options.subject.code || 'BTEB';
   const cleanName = options.subject.name.replace(/[^a-zA-Z0-9]/g, '_');
+  const partSuffix = options.part ? `_${options.part === 'practical' ? 'Practical' : 'Theory'}` : '';
   const typePrefix = options.isBlankTemplate ? 'Blank_Register' : 'Attendance_Ledger';
-  const fileName = `BTEB_${typePrefix}_${cleanCode}_${cleanName}.pdf`;
+  const fileName = `BTEB_${typePrefix}_${cleanCode}_${cleanName}${partSuffix}.pdf`;
   doc.save(fileName);
 }

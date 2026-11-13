@@ -1,5 +1,7 @@
 export type UserRole = 'admin' | 'teacher';
 
+export type SubjectPart = 'theory' | 'practical';
+
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
 export interface User {
@@ -43,6 +45,7 @@ export interface SubjectAssignment {
   subjectId: string;
   teacherId: string;
   classId: string;
+  part: SubjectPart; // 'theory' | 'practical' — different teachers handle theory and practical
   academicYear: string;
   assignedAt: string;
 }
@@ -77,6 +80,7 @@ export interface AttendanceSession {
   subjectId: string;
   classId: string;
   teacherId: string;
+  part?: SubjectPart; // 'theory' | 'practical'
   date: string; // YYYY-MM-DD
   timeSlot?: string; // Optional period label
   topic?: string;

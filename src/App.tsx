@@ -9,6 +9,7 @@ import { ClassRosterView } from './components/ClassRosterView';
 import { BulkImportModal } from './components/BulkImportModal';
 import { LoginModal } from './components/LoginModal';
 import { AuthScreen } from './components/AuthScreen';
+import { SubjectPart } from './types/attendance';
 
 function AttendanceApp() {
   const { currentUser, setCurrentUser, users } = useAttendance();
@@ -18,22 +19,20 @@ function AttendanceApp() {
     return currentUser?.role === 'admin' ? 'admin-assignments' : 'my-subjects';
   });
 
-  // Automatically switch tab if currentUser role changes
+  // Reset navigation tab and selected subject when user changes or logs out
   React.useEffect(() => {
-    if (!currentUser) return;
-    if (currentUser.role === 'admin') {
-      if (activeTab === 'my-subjects' || activeTab === 'take-attendance' || activeTab === 'roster') {
-        setActiveTab('admin-assignments');
-      }
-    } else {
-      if (activeTab === 'admin-assignments' || activeTab === 'admin-classes') {
-        setActiveTab('my-subjects');
-      }
+    setActiveSubjectId(undefined);
+    setActiveSubjectPart(undefined);
+    if (!currentUser) {
+      setActiveTab('my-subjects');
+      return;
     }
-  }, [currentUser?.role]);
+    setActiveTab(currentUser.role === 'admin' ? 'admin-assignments' : 'my-subjects');
+  }, [currentUser?.id, currentUser?.role]);
 
-  // Selected subject when transitioning into studio or reports
+  // Selected subject & part when transitioning into studio or reports
   const [activeSubjectId, setActiveSubjectId] = useState<string | undefined>(undefined);
+  const [activeSubjectPart, setActiveSubjectPart] = useState<SubjectPart | undefined>(undefined);
 
   // Bulk import modal
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
@@ -47,13 +46,15 @@ function AttendanceApp() {
     return <AuthScreen />;
   }
 
-  const handleStartAttendance = (subjectId?: string) => {
+  const handleStartAttendance = (subjectId?: string, part?: SubjectPart) => {
     setActiveSubjectId(subjectId);
+    setActiveSubjectPart(part);
     setActiveTab('take-attendance');
   };
 
-  const handleViewReports = (subjectId?: string) => {
+  const handleViewReports = (subjectId?: string, part?: SubjectPart) => {
     setActiveSubjectId(subjectId);
+    setActiveSubjectPart(part);
     setActiveTab('reports');
   };
 
@@ -86,12 +87,14 @@ function AttendanceApp() {
             {activeTab === 'take-attendance' && (
               <AttendanceStudio
                 initialSubjectId={activeSubjectId}
+                initialPart={activeSubjectPart}
                 onNavigateToReports={handleViewReports}
               />
             )}
             {activeTab === 'reports' && (
               <ReportsAndTrends
                 initialSubjectId={activeSubjectId}
+                initialPart={activeSubjectPart}
                 onOpenBulkImport={() => handleOpenBulkImport()}
               />
             )}
@@ -111,6 +114,7 @@ function AttendanceApp() {
             {activeTab === 'reports' && (
               <ReportsAndTrends
                 initialSubjectId={activeSubjectId}
+                initialPart={activeSubjectPart}
                 onOpenBulkImport={() => handleOpenBulkImport()}
               />
             )}

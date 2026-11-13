@@ -28,13 +28,13 @@ const mockClass: ClassGroup = {
 };
 
 const mockTeacher: User = {
-  id: 'tch-tanvir',
-  name: 'Engr. Tanvir Ahmed',
-  email: 'tanvir.cst@polytechnic.bteb.gov.bd',
+  id: 'tch-1',
+  name: 'Engr. Test Instructor',
+  email: 'instructor@polytechnic.bteb.gov.bd',
   role: 'teacher',
   department: 'Computer Science & Technology',
   employeeId: 'BTEB-TCH-102',
-  title: 'Head of Department (Computer Technology)',
+  title: 'Instructor (Computer Technology)',
   avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
 };
 
@@ -76,9 +76,10 @@ const mockSessions: AttendanceSession[] = [
     id: 'sess-1',
     subjectId: 'sub-28542',
     classId: 'class-cst-4',
+    part: 'theory',
     date: '2026-03-01',
     timeSlot: '09:00 - 10:00 AM',
-    teacherId: 'tch-tanvir',
+    teacherId: 'tch-1',
     totalStudents: 3,
     presentCount: 3,
     absentCount: 0,
@@ -91,9 +92,10 @@ const mockSessions: AttendanceSession[] = [
     id: 'sess-2',
     subjectId: 'sub-28542',
     classId: 'class-cst-4',
+    part: 'theory',
     date: '2026-03-03',
     timeSlot: '09:00 - 10:00 AM',
-    teacherId: 'tch-tanvir',
+    teacherId: 'tch-1',
     totalStudents: 3,
     presentCount: 2,
     absentCount: 1,
@@ -106,9 +108,10 @@ const mockSessions: AttendanceSession[] = [
     id: 'sess-3',
     subjectId: 'sub-28542',
     classId: 'class-cst-4',
+    part: 'practical',
     date: '2026-03-05',
     timeSlot: '09:00 - 10:00 AM',
-    teacherId: 'tch-tanvir',
+    teacherId: 'tch-2',
     totalStudents: 3,
     presentCount: 2,
     absentCount: 0,
@@ -191,4 +194,31 @@ test('generateAttendanceRegisterPDF filters sessions by date range', () => {
   assert.ok(doc, 'Document should be generated with date filtering');
   const pdfOutput = doc.output();
   assert.ok(pdfOutput.includes('%PDF-'));
+});
+
+test('generateAttendanceRegisterPDF filters sessions by subject part (Theory vs Practical)', () => {
+  const theoryDoc = generateAttendanceRegisterPDF({
+    subject: mockSubject,
+    classGroup: mockClass,
+    teacher: mockTeacher,
+    students: mockStudents,
+    sessions: mockSessions,
+    records: mockRecords,
+    part: 'theory',
+  });
+  const practicalDoc = generateAttendanceRegisterPDF({
+    subject: mockSubject,
+    classGroup: mockClass,
+    teacher: mockTeacher,
+    students: mockStudents,
+    sessions: mockSessions,
+    records: mockRecords,
+    part: 'practical',
+  });
+
+  const theoryOut = theoryDoc.output();
+  const practicalOut = practicalDoc.output();
+  assert.ok(theoryOut.includes('%PDF-'));
+  assert.ok(practicalOut.includes('%PDF-'));
+  assert.notEqual(theoryOut, practicalOut, 'Theory and Practical PDF outputs should differ');
 });

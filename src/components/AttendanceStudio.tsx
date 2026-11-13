@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
-import { AttendanceStatus, Student } from '../types/attendance';
+import { AttendanceStatus, Student, SubjectPart } from '../types/attendance';
 import {
   CheckCircle2,
   XCircle,
@@ -30,11 +30,13 @@ import { DownloadRegisterModal } from './DownloadRegisterModal';
 
 interface AttendanceStudioProps {
   initialSubjectId?: string;
-  onNavigateToReports: (subjectId?: string) => void;
+  initialPart?: SubjectPart;
+  onNavigateToReports: (subjectId?: string, part?: SubjectPart) => void;
 }
 
 export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   initialSubjectId,
+  initialPart,
   onNavigateToReports,
 }) => {
   const {
@@ -51,20 +53,40 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
   const assignedSubjects = currentUser ? getTeacherSubjects(currentUser.id) : [];
 
-  // Selected subject
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string>(() => {
-    if (initialSubjectId && assignedSubjects.some(item => item.subject.id === initialSubjectId)) {
-      return initialSubjectId;
+  const findInitialAssignmentId = () => {
+    if (initialSubjectId) {
+      const exactMatch = assignedSubjects.find(
+        item =>
+          item.subject.id === initialSubjectId &&
+          (!initialPart || (item.assignment.part || 'theory') === initialPart)
+      );
+      if (exactMatch) return exactMatch.assignment.id;
+      const subjectMatch = assignedSubjects.find(item => item.subject.id === initialSubjectId);
+      if (subjectMatch) return subjectMatch.assignment.id;
     }
-    return assignedSubjects.length > 0 ? assignedSubjects[0].subject.id : '';
-  });
+    return assignedSubjects.length > 0 ? assignedSubjects[0].assignment.id : '';
+  };
 
-  // If assignedSubjects changes or initialSubjectId updates
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState<string>(findInitialAssignmentId);
+
+  // Sync if assignedSubjects or initial props change
   useEffect(() => {
-    if (assignedSubjects.length > 0 && !assignedSubjects.some(item => item.subject.id === selectedSubjectId)) {
-      setSelectedSubjectId(assignedSubjects[0].subject.id);
+    if (assignedSubjects.length === 0) return;
+    if (initialSubjectId) {
+      const target = assignedSubjects.find(
+        item =>
+          item.subject.id === initialSubjectId &&
+          (!initialPart || (item.assignment.part || 'theory') === initialPart)
+      );
+      if (target) {
+        setSelectedAssignmentId(target.assignment.id);
+        return;
+      }
     }
-  }, [assignedSubjects, selectedSubjectId]);
+    if (!assignedSubjects.some(item => item.assignment.id === selectedAssignmentId)) {
+      setSelectedAssignmentId(assignedSubjects[0].assignment.id);
+    }
+  }, [assignedSubjects, initialSubjectId, initialPart, selectedAssignmentId]);
 
   // Date & validation (tomorrow / future dates are strictly prohibited)
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -74,10 +96,12 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   const isFutureDate = sessionDate > today;
   const [topic, setTopic] = useState<string>('');
 
-  // Active Subject details
-  const activeAssignment = assignedSubjects.find(item => item.subject.id === selectedSubjectId);
+  // Active Subject & Part details
+  const activeAssignment = assignedSubjects.find(item => item.assignment.id === selectedAssignmentId);
   const activeSubject = activeAssignment?.subject;
   const activeClass = activeAssignment?.classGroup;
+  const activePart: SubjectPart = activeAssignment?.assignment.part || 'theory';
+  const activeSubjectId = activeSubject?.id || '';
 
   // Students in class
   const classStudents = useMemo(() => {
@@ -110,11 +134,11 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   // PDF Register Modal
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
-  // Initialize or load existing records when subject or date changes
+  // Initialize or load existing records when subject, part, or date changes
   useEffect(() => {
-    if (!selectedSubjectId || !sessionDate || classStudents.length === 0) return;
+    if (!activeSubjectId || !sessionDate || classStudents.length === 0) return;
 
-    const existing = getSessionByDate(selectedSubjectId, sessionDate);
+    const existing = getSessionByDate(activeSubjectId, sessionDate, activePart);
     if (existing) {
       setExistingSessionId(existing.id);
       setTopic(existing.topic || '');
@@ -130,6 +154,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
       setStatuses(initialMap);
     } else {
       setExistingSessionId(null);
+      setTopic('');
       // Default all to 'present' for fast 1-click experience!
       const initialMap: Record<string, { status: AttendanceStatus; remarks?: string }> = {};
       classStudents.forEach(stu => {
@@ -137,7 +162,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
       });
       setStatuses(initialMap);
     }
-  }, [selectedSubjectId, sessionDate, classStudents.length]);
+  }, [activeSubjectId, activePart, sessionDate, classStudents.length]);
 
   // Single-Click handlers
   const setStudentStatus = (studentId: string, status: AttendanceStatus) => {
@@ -203,19 +228,20 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     if (!activeSubject || !activeClass) return;
 
     if (isFutureDate) {
-      alert(`Attendance cannot be taken for future dates (${sessionDate}). Please select today (${today}) or an earlier date.`);
       return;
     }
 
     try {
+      const partLabel = activePart === 'practical' ? 'Practical' : 'Theory';
       const saved = await saveAttendanceSession(
         {
           id: existingSessionId || undefined,
           subjectId: activeSubject.id,
           classId: activeClass.id,
           teacherId: currentUser?.id || '',
+          part: activePart,
           date: sessionDate,
-          topic: topic || `${activeSubject.name} Lecture`,
+          topic: topic || `${activeSubject.name} (${partLabel})`,
         },
         statuses
       );
@@ -258,6 +284,15 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800">
                 <Sparkles className="w-3.5 h-3.5" /> 1-Click Roll Call Mode
               </span>
+              <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider ${
+                  activePart === 'practical'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-indigo-600 text-white'
+                }`}
+              >
+                {activePart === 'practical' ? 'Practical Session' : 'Theory Session'}
+              </span>
               {existingSessionId && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold bg-sky-100 text-sky-800">
                   <FileCheck className="w-3.5 h-3.5" /> Editing Existing Session
@@ -268,20 +303,21 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               Take Student Attendance
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select class, click status badges or use bulk 1-click tools, and save instantly.
+              Select course part, click status badges or use bulk 1-click tools, and save instantly.
             </p>
           </div>
 
-          {/* Quick Subject Tabs */}
+          {/* Quick Subject & Part Tabs */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
-            {assignedSubjects.map(({ subject, classGroup }) => {
-              const isSelected = subject.id === selectedSubjectId;
+            {assignedSubjects.map(({ subject, classGroup, assignment }) => {
+              const part: SubjectPart = assignment.part || 'theory';
+              const isSelected = assignment.id === selectedAssignmentId;
               return (
                 <button
-                  key={subject.id}
+                  key={assignment.id}
                   type="button"
                   onClick={() => {
-                    setSelectedSubjectId(subject.id);
+                    setSelectedAssignmentId(assignment.id);
                     setJustSubmitted(false);
                   }}
                   className={`px-4 py-2.5 rounded-xl text-left border transition-all shrink-0 ${
@@ -290,15 +326,26 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                       : 'bg-slate-50 hover:bg-white text-slate-700 border-slate-200 hover:border-slate-300'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-extrabold uppercase tracking-wide">
                       {subject.code}
+                    </span>
+                    <span
+                      className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        isSelected
+                          ? 'bg-white/20 text-white'
+                          : part === 'practical'
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'bg-indigo-100 text-indigo-800'
+                      }`}
+                    >
+                      {part === 'practical' ? 'Practical' : 'Theory'}
                     </span>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${isSelected ? 'bg-emerald-700 text-emerald-100' : 'bg-slate-200 text-slate-700'}`}>
                       {classGroup.name}
                     </span>
                   </div>
-                  <p className="text-xs font-medium truncate max-w-[170px] mt-0.5">
+                  <p className="text-xs font-medium truncate max-w-[190px] mt-0.5">
                     {subject.name}
                   </p>
                 </button>
@@ -513,7 +560,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                 Attendance Successfully Recorded!
               </h3>
               <p className="text-xs text-emerald-100">
-                {activeSubject?.name} • {sessionDate} — {submittedSessionInfo.present} Present, {submittedSessionInfo.absent} Absent ({submittedSessionInfo.rate}% rate)
+                {activeSubject?.name} ({activePart === 'practical' ? 'Practical' : 'Theory'}) • {sessionDate} — {submittedSessionInfo.present} Present, {submittedSessionInfo.absent} Absent ({submittedSessionInfo.rate}% rate)
               </p>
             </div>
           </div>
@@ -528,7 +575,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => onNavigateToReports(activeSubject?.id)}
+              onClick={() => onNavigateToReports(activeSubject?.id, activePart)}
               className="px-4 py-2 bg-white text-emerald-900 rounded-xl text-xs font-bold hover:bg-emerald-50 transition-colors shadow-xs flex items-center gap-1.5"
             >
               <span>View Performance Report</span>
@@ -1064,6 +1111,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           students={students}
           sessions={sessions}
           records={records}
+          defaultPart={activePart}
         />
       )}
     </div>

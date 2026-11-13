@@ -23,11 +23,11 @@ import {
 } from 'lucide-react';
 import { calculateSessionSummary, calculateDailyClassTargetProgress } from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
-import { Subject, ClassGroup } from '../types/attendance';
+import { Subject, ClassGroup, SubjectPart } from '../types/attendance';
 
 interface TeacherDashboardProps {
-  onStartAttendance: (subjectId: string) => void;
-  onViewReports: (subjectId: string) => void;
+  onStartAttendance: (subjectId: string, part?: SubjectPart) => void;
+  onViewReports: (subjectId: string, part?: SubjectPart) => void;
   onOpenBulkImport: () => void;
 }
 
@@ -47,7 +47,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     setDailyClassTarget,
   } = useAttendance();
 
-  const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup } | null>(null);
+  const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup; part: SubjectPart } | null>(null);
 
   // Daily target state & custom input
   const dailyTarget = currentUser?.dailyClassTarget || 4;
@@ -67,9 +67,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     today
   );
 
-  // Find next pending subject for today
-  const pendingAssignments = teacherAssignments.filter(({ subject }) => !getSessionByDate(subject.id, today));
-  const nextPendingSubject = pendingAssignments.length > 0 ? pendingAssignments[0].subject : null;
+  // Find next pending subject+part for today
+  const pendingAssignments = teacherAssignments.filter(
+    ({ subject, assignment }) => !getSessionByDate(subject.id, today, assignment.part || 'theory')
+  );
+  const nextPendingItem = pendingAssignments.length > 0 ? pendingAssignments[0] : null;
+  const nextPendingSubject = nextPendingItem ? nextPendingItem.subject : null;
+  const nextPendingPart: SubjectPart = nextPendingItem ? (nextPendingItem.assignment.part || 'theory') : 'theory';
 
   const handleUpdateTarget = async (newTarget: number) => {
     const clamped = Math.max(1, Math.min(20, Math.round(newTarget || 1)));
@@ -83,14 +87,18 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const ringCircumference = 2 * Math.PI * ringRadius;
   const strokeDashoffset = ringCircumference - (ringCircumference * Math.min(targetProgress.percentage, 100)) / 100;
 
-  // Calculate teacher's overall stats
-  const teacherSubjectIds = new Set(teacherAssignments.map(item => item.subject.id));
-  const teacherSessions = sessions.filter(s => teacherSubjectIds.has(s.subjectId));
+  // Calculate teacher's overall stats (for sessions belonging to this teacher's assigned subject+parts)
+  const teacherSessions = sessions.filter(s =>
+    teacherAssignments.some(
+      a => a.subject.id === s.subjectId && (a.assignment.part || 'theory') === (s.part || 'theory')
+    )
+  );
   const sessionSummary = calculateSessionSummary(teacherSessions);
 
-  // Total unique students taught
-  const totalStudents = teacherAssignments.reduce((acc, curr) => {
-    return acc + getClassStudents(curr.classGroup.id).length;
+  // Total students across assigned class groups (unique classes)
+  const uniqueClassIds = new Set(teacherAssignments.map(a => a.classGroup.id));
+  const totalStudents = Array.from(uniqueClassIds).reduce((acc, classId) => {
+    return acc + getClassStudents(classId).length;
   }, 0);
 
   return (
@@ -126,7 +134,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           {teacherAssignments.length > 0 && (
             <button
               type="button"
-              onClick={() => onStartAttendance(teacherAssignments[0].subject.id)}
+              onClick={() => onStartAttendance(teacherAssignments[0].subject.id, teacherAssignments[0].assignment.part || 'theory')}
               className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black rounded-xl text-xs tracking-wide shadow-lg shadow-emerald-500/25 transition-all active:scale-95 shrink-0"
             >
               <Sparkles className="w-4 h-4 text-slate-950" />
@@ -430,6 +438,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 <div className="flex flex-wrap gap-2">
                   {targetProgress.conductedSessions.map((session) => {
                     const match = teacherAssignments.find(a => a.subject.id === session.subjectId);
+                    const sPart = session.part === 'practical' ? 'Practical' : 'Theory';
                     return (
                       <span
                         key={session.id}
@@ -437,6 +446,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       >
                         <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
                         <span>{match ? match.subject.code : 'Class'}</span>
+                        <span className="text-[10px] uppercase px-1.5 py-0.2 rounded bg-white text-emerald-700 border border-emerald-200">
+                          {sPart}
+                        </span>
                         <span className="text-emerald-600 font-medium">({session.presentCount}/{session.totalStudents} Present)</span>
                       </span>
                     );
@@ -458,11 +470,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     {nextPendingSubject.name}
                   </p>
                   <p className="text-[11px] text-slate-500 font-mono mb-3">
-                    Code: {nextPendingSubject.code}
+                    Code: {nextPendingSubject.code} • {nextPendingPart === 'practical' ? 'Practical' : 'Theory'}
                   </p>
                   <button
                     type="button"
-                    onClick={() => onStartAttendance(nextPendingSubject.id)}
+                    onClick={() => onStartAttendance(nextPendingSubject.id, nextPendingPart)}
                     className="w-full py-2.5 px-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                   >
                     <Sparkles className="w-4 h-4" />
@@ -489,7 +501,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   {teacherAssignments.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => onStartAttendance(teacherAssignments[0].subject.id)}
+                      onClick={() => onStartAttendance(teacherAssignments[0].subject.id, teacherAssignments[0].assignment.part || 'theory')}
                       className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center justify-center gap-2 transition-all"
                     >
                       <span>Start Class 1</span>
@@ -613,24 +625,38 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {teacherAssignments.map(({ subject, classGroup }) => {
+            {teacherAssignments.map(({ subject, classGroup, assignment }) => {
+              const part: SubjectPart = assignment.part || 'theory';
               const classStudents = getClassStudents(classGroup.id);
-              const todaySession = getSessionByDate(subject.id, today);
-              const subjectSessions = sessions.filter(s => s.subjectId === subject.id);
-              const subjectStats = calculateSessionSummary(subjectSessions);
+              const todaySession = getSessionByDate(subject.id, today, part);
+              const partSessions = sessions.filter(
+                s => s.subjectId === subject.id && (s.part || 'theory') === part
+              );
+              const subjectStats = calculateSessionSummary(partSessions);
 
               return (
                 <div
-                  key={subject.id}
+                  key={assignment.id}
                   className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:border-emerald-300 hover:shadow-md transition-all flex flex-col justify-between"
                 >
                   <div>
                     {/* Top pill bar */}
                     <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className="text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-mono">
-                        {subject.code}
-                      </span>
-                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-extrabold uppercase px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-mono">
+                          {subject.code}
+                        </span>
+                        <span
+                          className={`text-[10px] font-black uppercase px-2 py-1 rounded-lg ${
+                            part === 'practical'
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                              : 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          }`}
+                        >
+                          {part === 'practical' ? 'Practical' : 'Theory'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md truncate">
                         {classGroup.name} • {classGroup.section}
                       </span>
                     </div>
@@ -651,7 +677,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         </span>
                       </div>
                       <div className="bg-slate-50 p-2.5 rounded-xl">
-                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Avg Rate</span>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase block">Avg Rate ({part})</span>
                         <span className="font-extrabold text-emerald-700 text-sm">
                           {subjectStats.averageAttendanceRate}%
                         </span>
@@ -660,7 +686,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
 
                     {/* Today's Status indicator */}
                     <div className="mt-3 flex items-center justify-between px-3 py-2 rounded-xl text-xs bg-slate-50/70 border border-slate-100">
-                      <span className="text-slate-500 font-medium">Today's Roll Call:</span>
+                      <span className="text-slate-500 font-medium">Today's {part === 'practical' ? 'Practical' : 'Theory'}:</span>
                       {todaySession ? (
                         <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
@@ -679,7 +705,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   <div className="mt-5 pt-3 flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => onStartAttendance(subject.id)}
+                      onClick={() => onStartAttendance(subject.id, part)}
                       className="flex-1 min-w-[120px] flex items-center justify-center gap-2 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-xs transition-colors"
                     >
                       <span>Take Attendance</span>
@@ -687,16 +713,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPdfModalSubject({ subject, classGroup })}
+                      onClick={() => setPdfModalSubject({ subject, classGroup, part })}
                       className="flex items-center gap-1.5 py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/80 rounded-xl text-xs font-bold transition-colors"
-                      title="Download official BTEB PDF attendance register for this subject"
+                      title="Download official BTEB PDF attendance register for this subject part"
                     >
                       <FileText className="w-3.5 h-3.5 text-emerald-700" />
                       <span>PDF Register</span>
                     </button>
                     <button
                       type="button"
-                      onClick={() => onViewReports(subject.id)}
+                      onClick={() => onViewReports(subject.id, part)}
                       className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
                       title="View reports & student performance trends"
                     >
@@ -721,6 +747,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           students={students}
           sessions={sessions}
           records={records}
+          defaultPart={pdfModalSubject.part}
         />
       )}
     </div>

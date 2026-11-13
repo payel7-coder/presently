@@ -1,4 +1,4 @@
-import { AttendanceRecord, AttendanceSession, CSVParseResult, Student, StudentAttendanceStats } from '../types/attendance';
+import { AttendanceRecord, AttendanceSession, CSVParseResult, Student, StudentAttendanceStats, SubjectAssignment, SubjectPart } from '../types/attendance';
 
 /**
  * Parses raw CSV string into student records with line-by-line validation.
@@ -445,3 +445,35 @@ export function calculateDailyClassTargetProgress(
     conductedSessions,
   };
 }
+
+/**
+ * Validates that Theory and Practical parts of the same subject+class are taught by different teachers.
+ */
+export function validateSubjectPartAssignment(
+  assignments: SubjectAssignment[],
+  subjectId: string,
+  classId: string,
+  part: SubjectPart,
+  teacherId: string
+): { valid: boolean; error?: string } {
+  if (!subjectId || !classId || !teacherId) {
+    return { valid: false, error: 'Teacher, course, and class group are all required.' };
+  }
+
+  const oppositePart: SubjectPart = part === 'theory' ? 'practical' : 'theory';
+  const oppositeAssignment = assignments.find(
+    a => a.subjectId === subjectId && a.classId === classId && (a.part || 'theory') === oppositePart
+  );
+
+  if (oppositeAssignment && oppositeAssignment.teacherId === teacherId) {
+    const partLabel = part === 'theory' ? 'Theory' : 'Practical';
+    const oppositeLabel = oppositePart === 'theory' ? 'Theory' : 'Practical';
+    return {
+      valid: false,
+      error: `Theory and Practical parts of the same subject must be taken by different teachers. This teacher is already assigned to the ${oppositeLabel} part, so another teacher must take the ${partLabel} part.`,
+    };
+  }
+
+  return { valid: true };
+}
+

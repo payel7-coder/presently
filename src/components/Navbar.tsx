@@ -56,69 +56,69 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/70">
                   BTEB 2022
                 </span>
-                <span className="hidden xl:inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200">
+                <span className="hidden 2xl:inline-flex items-center gap-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-cyan-50 text-cyan-800 border border-cyan-200">
                   <Database className="w-2.5 h-2.5 text-cyan-600" />
                   Firebase Realtime
                 </span>
               </div>
-              <p className="text-xs text-slate-500 hidden sm:block">
+              <p className="text-xs text-slate-500 hidden 2xl:block">
                 Diploma in Computer Science & Technology • 1-Click Roll Call
               </p>
             </div>
           </div>
 
           {/* Navigation Items */}
-          <nav className="hidden md:flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60">
+          <nav className="hidden md:flex items-center gap-0.5 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60">
             {isTeacher ? (
               <>
                 <button
                   type="button"
                   onClick={() => setActiveTab('my-subjects')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'my-subjects'
                       ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <BookOpen className="w-4 h-4 text-emerald-600" />
-                  My BTEB Subjects
+                  <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>My BTEB Subjects</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('take-attendance')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'take-attendance'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <UserCheck className="w-4 h-4" />
-                  Take Attendance
-                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
+                  <UserCheck className="w-4 h-4 shrink-0" />
+                  <span>Take Attendance</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse shrink-0" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('reports')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'reports'
                       ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <BarChart3 className="w-4 h-4 text-cyan-600" />
-                  Reports & Trends
+                  <BarChart3 className="w-4 h-4 text-cyan-600 shrink-0" />
+                  <span>Reports & Trends</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('roster')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'roster'
                       ? 'bg-white text-emerald-800 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <Users className="w-4 h-4 text-slate-600" />
-                  Student Directory
+                  <Users className="w-4 h-4 text-slate-600 shrink-0" />
+                  <span>Student Directory</span>
                 </button>
               </>
             ) : (
@@ -126,75 +126,67 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <button
                   type="button"
                   onClick={() => setActiveTab('admin-assignments')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'admin-assignments'
                       ? 'bg-indigo-600 text-white shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <School className="w-4 h-4" />
-                  BTEB Subject Allocation
+                  <School className="w-4 h-4 shrink-0" />
+                  <span>BTEB Subject Allocation</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('admin-classes')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'admin-classes'
                       ? 'bg-white text-indigo-900 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <Users className="w-4 h-4 text-indigo-600" />
-                  Semester Batches & Students
+                  <Users className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Semester Batches & Students</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('reports')}
-                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all ${
                     activeTab === 'reports'
                       ? 'bg-white text-indigo-900 shadow-xs border border-slate-200/60'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
                   }`}
                 >
-                  <BarChart3 className="w-4 h-4 text-cyan-600" />
-                  Academic Reports
+                  <BarChart3 className="w-4 h-4 text-cyan-600 shrink-0" />
+                  <span>Academic Reports</span>
                 </button>
               </>
             )}
           </nav>
 
           {/* Right Action Bar */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Student Import Button - STRICTLY RESTRICTED TO ADMIN */}
-            {canImportStudents ? (
+            {canImportStudents && (
               <button
                 type="button"
                 onClick={onOpenBulkImport}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors shadow-2xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors shadow-2xs whitespace-nowrap"
                 title="Admin Access: Bulk Import Student CSV"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Import CSV (Admin)</span>
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Import CSV</span>
               </button>
-            ) : (
-              <div
-                className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-400 bg-slate-100 rounded-lg border border-slate-200 cursor-not-allowed"
-                title="Student import is restricted to Administrator role"
-              >
-                <Lock className="w-3.5 h-3.5 text-slate-400" />
-                <span>Import CSV (Admin Only)</span>
-              </div>
             )}
 
             {/* Quick Login / Role Switch CTA */}
             <button
               type="button"
               onClick={onOpenLoginModal}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-2xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors shadow-2xs whitespace-nowrap"
               title="Sign in with Firebase Auth or switch account"
             >
-              <LogIn className="w-3.5 h-3.5 text-slate-600" />
-              <span className="hidden sm:inline">Login / Switch</span>
+              <LogIn className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              <span className="hidden sm:inline">Switch</span>
             </button>
 
             {/* Sign Out Button */}
@@ -203,10 +195,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               onClick={async () => {
                 await logout();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-lg transition-colors shadow-2xs"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-lg transition-colors shadow-2xs whitespace-nowrap"
               title="Sign out of current account"
             >
-              <LogOut className="w-3.5 h-3.5 text-rose-500" />
+              <LogOut className="w-3.5 h-3.5 text-rose-500 shrink-0" />
               <span className="hidden sm:inline">Sign Out</span>
             </button>
 
@@ -224,13 +216,13 @@ export const Navbar: React.FC<NavbarProps> = ({
                   alt={currentUser.name}
                   className="w-8 h-8 rounded-lg object-cover ring-2 ring-emerald-500/20"
                 />
-                <div className="hidden sm:block">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-slate-800 leading-tight">
+                <div className="hidden sm:block max-w-[140px]">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-bold text-slate-800 leading-tight truncate">
                       {currentUser.name}
                     </span>
                     <span
-                      className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded ${
+                      className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded shrink-0 ${
                         currentUser.role === 'admin'
                           ? 'bg-indigo-100 text-indigo-800'
                           : 'bg-emerald-100 text-emerald-800'
@@ -239,11 +231,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {currentUser.role}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-500 truncate max-w-[130px]">
+                  <p className="text-[10px] text-slate-500 truncate">
                     {currentUser.title || currentUser.department}
                   </p>
                 </div>
-                <ChevronDown className="w-4 h-4 text-slate-400" />
+                <ChevronDown className="w-4 h-4 text-slate-400 shrink-0" />
               </button>
 
               {/* Dropdown Menu */}
@@ -318,7 +310,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Reset to Official BTEB 2022 Curricula?
             </h3>
             <p className="text-xs text-slate-500 mb-5 leading-relaxed">
-              This will re-seed all 8 semesters of BTEB Diploma in Computer Science and Technology subjects, faculty, and classes in Firebase Firestore.
+              This will re-seed all 8 semesters of BTEB Diploma in Computer Science and Technology subjects and classes in Firebase Firestore.
             </p>
             <div className="flex items-center justify-end gap-2">
               <button
