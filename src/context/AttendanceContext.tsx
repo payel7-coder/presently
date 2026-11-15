@@ -1,10 +1,13 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
+  AssignmentSubmissionStatus,
   AttendanceRecord,
   AttendanceSession,
   AttendanceStatus,
   ClassGroup,
+  CourseworkAssignment,
   Student,
+  StudentAssignmentEvaluation,
   Subject,
   SubjectAssignment,
   SubjectPart,
@@ -22,6 +25,10 @@ import {
   getApprovedTeachers,
   isPrimaryAdminEmail,
 } from '../utils/attendanceLogic';
+import {
+  validateCourseworkInput,
+  validateEvaluationScore,
+} from '../utils/courseworkLogic';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -64,6 +71,8 @@ interface AttendanceContextType {
   students: Student[];
   sessions: AttendanceSession[];
   records: AttendanceRecord[];
+  courseworkAssignments: CourseworkAssignment[];
+  studentEvaluations: StudentAssignmentEvaluation[];
 
   // Permissions & Auth
   isAuthenticated: boolean;
@@ -111,6 +120,29 @@ interface AttendanceContextType {
 
   getSessionByDate: (subjectId: string, date: string, part?: SubjectPart) => AttendanceSession | undefined;
   getSessionRecords: (sessionId: string) => AttendanceRecord[];
+
+  // Coursework & Student Evaluation actions
+  createCourseworkAssignment: (input: {
+    title: string;
+    description?: string;
+    subjectId: string;
+    classId: string;
+    part: SubjectPart;
+    assignedDate: string;
+    dueDate: string;
+    maxMarks: number;
+  }) => Promise<CourseworkAssignment>;
+  deleteCourseworkAssignment: (courseworkId: string) => Promise<void>;
+  saveStudentEvaluations: (
+    courseworkId: string,
+    entries: Array<{
+      studentId: string;
+      status: AssignmentSubmissionStatus;
+      marksObtained?: number | null;
+      feedback?: string;
+    }>
+  ) => Promise<void>;
+
   resetToDefaultBTEBData: () => Promise<void>;
   clearAllDemoData: () => Promise<void>;
 }
@@ -154,6 +186,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [students, setStudents] = useState<Student[]>([]);
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [courseworkAssignments, setCourseworkAssignments] = useState<CourseworkAssignment[]>([]);
+  const [studentEvaluations, setStudentEvaluations] = useState<StudentAssignmentEvaluation[]>([]);
   const [isFirebaseLive, setIsFirebaseLive] = useState(false);
 
   // Sync active user to localStorage
@@ -197,6 +231,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     let unsubSessions: () => void;
     let unsubRecords: () => void;
     let unsubUsers: () => void;
+    let unsubCoursework: () => void;
+    let unsubEvaluations: () => void;
 
     try {
       // 1. Classes listener
@@ -263,6 +299,34 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setUsers(list);
       }, err => console.warn('Users listener fallback:', err));
 
+      // 8. Coursework assignments listener
+      unsubCoursework = onSnapshot(collection(db, 'courseworkAssignments'), snapshot => {
+        const list: CourseworkAssignment[] = [];
+        snapshot.forEach(d => {
+          const data = d.data() as any;
+          list.push({
+            id: d.id,
+            ...data,
+            part: data.part === 'practical' ? 'practical' : 'theory',
+          });
+        });
+        setCourseworkAssignments(list);
+      }, err => console.warn('Coursework listener fallback:', err));
+
+      // 9. Student evaluations listener
+      unsubEvaluations = onSnapshot(collection(db, 'studentEvaluations'), snapshot => {
+        const list: StudentAssignmentEvaluation[] = [];
+        snapshot.forEach(d => {
+          const data = d.data() as any;
+          list.push({
+            id: d.id,
+            ...data,
+            part: data.part === 'practical' ? 'practical' : 'theory',
+          });
+        });
+        setStudentEvaluations(list);
+      }, err => console.warn('Evaluations listener fallback:', err));
+
     } catch (e) {
       console.error('Error mounting Firestore real-time listeners:', e);
     }
@@ -275,6 +339,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       unsubSessions?.();
       unsubRecords?.();
       unsubUsers?.();
+      unsubCoursework?.();
+      unsubEvaluations?.();
     };
   }, []);
 
@@ -1024,6 +1090,201 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return records.filter(r => r.sessionId === sessionId);
   };
 
+  // Coursework & Student Evaluation actions
+  const createCourseworkAssignment = async (input: {
+    title: string;
+    description?: string;
+    subjectId: string;
+    classId: string;
+    part: SubjectPart;
+    assignedDate: string;
+    dueDate: string;
+    maxMarks: number;
+  }): Promise<CourseworkAssignment> => {
+    if (!currentUser) {
+      throw new Error('Authentication required to create coursework assignments.');
+    }
+
+    if (!isAdmin) {
+      const hasAssignment = assignments.some(
+        a =>
+          a.teacherId === currentUser.id &&
+          a.subjectId === input.subjectId &&
+          a.classId === input.classId &&
+          (a.part || 'theory') === input.part
+      );
+      if (!hasAssignment) {
+        throw new Error('Access Denied: You can only create assignments for your assigned subject parts.');
+      }
+    }
+
+    const validation = validateCourseworkInput(input);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid coursework assignment details.');
+    }
+
+    const newCoursework: CourseworkAssignment = {
+      id: `cw-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      title: input.title.trim(),
+      ...(input.description?.trim() ? { description: input.description.trim() } : {}),
+      subjectId: input.subjectId,
+      classId: input.classId,
+      part: input.part,
+      teacherId: currentUser.id,
+      assignedDate: input.assignedDate,
+      dueDate: input.dueDate,
+      maxMarks: Number(input.maxMarks),
+      createdAt: new Date().toISOString(),
+    };
+
+    setCourseworkAssignments(prev => [newCoursework, ...prev]);
+
+    try {
+      const cleanDoc: Record<string, unknown> = { ...newCoursework };
+      Object.keys(cleanDoc).forEach(k => cleanDoc[k] === undefined && delete cleanDoc[k]);
+      await setDoc(doc(db, 'courseworkAssignments', newCoursework.id), cleanDoc);
+    } catch (e) {
+      console.warn('Firestore createCourseworkAssignment sync:', e);
+    }
+
+    return newCoursework;
+  };
+
+  const deleteCourseworkAssignment = async (courseworkId: string): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('Authentication required.');
+    }
+
+    const target = courseworkAssignments.find(cw => cw.id === courseworkId);
+    if (!target) return;
+
+    if (!isAdmin) {
+      const hasAccess =
+        target.teacherId === currentUser.id ||
+        assignments.some(
+          a =>
+            a.teacherId === currentUser.id &&
+            a.subjectId === target.subjectId &&
+            (a.part || 'theory') === target.part
+        );
+      if (!hasAccess) {
+        throw new Error('Access Denied: You cannot delete an assignment from an unassigned course.');
+      }
+    }
+
+    const matchingEvaluations = studentEvaluations.filter(ev => ev.courseworkId === courseworkId);
+    setCourseworkAssignments(prev => prev.filter(cw => cw.id !== courseworkId));
+    setStudentEvaluations(prev => prev.filter(ev => ev.courseworkId !== courseworkId));
+
+    try {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'courseworkAssignments', courseworkId));
+      matchingEvaluations.forEach(ev => {
+        batch.delete(doc(db, 'studentEvaluations', ev.id));
+      });
+      await batch.commit();
+    } catch (e) {
+      console.warn('Firestore deleteCourseworkAssignment sync:', e);
+    }
+  };
+
+  const saveStudentEvaluations = async (
+    courseworkId: string,
+    entries: Array<{
+      studentId: string;
+      status: AssignmentSubmissionStatus;
+      marksObtained?: number | null;
+      feedback?: string;
+    }>
+  ): Promise<void> => {
+    if (!currentUser) {
+      throw new Error('Authentication required to evaluate students.');
+    }
+
+    const coursework = courseworkAssignments.find(cw => cw.id === courseworkId);
+    if (!coursework) {
+      throw new Error('Selected assignment no longer exists.');
+    }
+
+    if (!isAdmin) {
+      const hasAccess =
+        coursework.teacherId === currentUser.id ||
+        assignments.some(
+          a =>
+            a.teacherId === currentUser.id &&
+            a.subjectId === coursework.subjectId &&
+            (a.part || 'theory') === coursework.part
+        );
+      if (!hasAccess) {
+        throw new Error('Access Denied: You can only evaluate students in your assigned courses.');
+      }
+    }
+
+    for (const entry of entries) {
+      const check = validateEvaluationScore(entry.marksObtained, coursework.maxMarks);
+      if (!check.valid) {
+        throw new Error(check.error || 'Invalid evaluation marks.');
+      }
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedEvaluations: StudentAssignmentEvaluation[] = entries.map(entry => {
+      const evalId = `eval-${courseworkId}-${entry.studentId}`;
+      const existingEval = studentEvaluations.find(ev => ev.id === evalId);
+      const hasNumericMark =
+        entry.marksObtained !== null &&
+        entry.marksObtained !== undefined &&
+        Number.isFinite(Number(entry.marksObtained));
+      const trimmedFeedback = entry.feedback?.trim();
+
+      const resolvedSubmittedAt =
+        entry.status === 'submitted' || entry.status === 'late' || entry.status === 'graded'
+          ? existingEval?.submittedAt || nowIso
+          : undefined;
+
+      const docObj: StudentAssignmentEvaluation = {
+        id: evalId,
+        courseworkId,
+        studentId: entry.studentId,
+        subjectId: coursework.subjectId,
+        classId: coursework.classId,
+        part: coursework.part,
+        status: entry.status,
+        marksObtained: hasNumericMark ? Number(entry.marksObtained) : null,
+        evaluatedBy: currentUser.email || currentUser.name,
+        evaluatedAt: nowIso,
+      };
+      if (resolvedSubmittedAt) {
+        docObj.submittedAt = resolvedSubmittedAt;
+      }
+      if (trimmedFeedback) {
+        docObj.feedback = trimmedFeedback;
+      }
+      return docObj;
+    });
+
+    const updatedIds = new Set(updatedEvaluations.map(ev => ev.id));
+    setStudentEvaluations(prev => [
+      ...prev.filter(ev => !updatedIds.has(ev.id)),
+      ...updatedEvaluations,
+    ]);
+
+    try {
+      for (let i = 0; i < updatedEvaluations.length; i += 400) {
+        const chunk = updatedEvaluations.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(ev => {
+          const cleanEv: Record<string, unknown> = { ...ev };
+          Object.keys(cleanEv).forEach(k => cleanEv[k] === undefined && delete cleanEv[k]);
+          batch.set(doc(db, 'studentEvaluations', ev.id), cleanEv);
+        });
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Firestore saveStudentEvaluations sync:', e);
+    }
+  };
+
   const resetToDefaultBTEBData = async () => {
     setSubjects(BTEB_CURRICULUM_2022_SUBJECTS);
     setClasses(BTEB_CLASSES);
@@ -1031,6 +1292,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setStudents([]);
     setSessions([]);
     setRecords([]);
+    setCourseworkAssignments([]);
+    setStudentEvaluations([]);
     await seedInitialFirestore();
   };
 
@@ -1039,10 +1302,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setRecords([]);
     setStudents([]);
     setAssignments([]);
+    setCourseworkAssignments([]);
+    setStudentEvaluations([]);
     setUsers(prev => prev.filter(u => !DEMO_USER_IDS.has(u.id)));
 
     try {
-      const collectionsToWipe = ['sessions', 'records', 'students', 'assignments'];
+      const collectionsToWipe = [
+        'sessions',
+        'records',
+        'students',
+        'assignments',
+        'courseworkAssignments',
+        'studentEvaluations',
+      ];
       for (const col of collectionsToWipe) {
         const snap = await getDocs(collection(db, col));
         if (!snap.empty) {
@@ -1085,6 +1357,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         students,
         sessions,
         records,
+        courseworkAssignments,
+        studentEvaluations,
         isAuthenticated,
         isAdmin,
         canImportStudents,
@@ -1111,6 +1385,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         saveAttendanceSession,
         getSessionByDate,
         getSessionRecords,
+        createCourseworkAssignment,
+        deleteCourseworkAssignment,
+        saveStudentEvaluations,
         resetToDefaultBTEBData,
         clearAllDemoData,
       }}

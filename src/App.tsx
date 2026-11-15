@@ -9,6 +9,7 @@ import { ClassRosterView } from './components/ClassRosterView';
 import { BulkImportModal } from './components/BulkImportModal';
 import { LoginModal } from './components/LoginModal';
 import { AuthScreen } from './components/AuthScreen';
+import { StudentAssignmentsTracker } from './components/StudentAssignmentsTracker';
 import { SubjectPart } from './types/attendance';
 
 function AttendanceApp() {
@@ -58,6 +59,12 @@ function AttendanceApp() {
     setActiveTab('reports');
   };
 
+  const handleOpenAssignments = (subjectId?: string, part?: SubjectPart) => {
+    setActiveSubjectId(subjectId);
+    setActiveSubjectPart(part);
+    setActiveTab('assignments');
+  };
+
   const handleOpenBulkImport = (classId?: string) => {
     setImportTargetClassId(classId);
     setIsBulkImportOpen(true);
@@ -81,6 +88,7 @@ function AttendanceApp() {
               <TeacherDashboard
                 onStartAttendance={handleStartAttendance}
                 onViewReports={handleViewReports}
+                onOpenAssignments={handleOpenAssignments}
                 onOpenBulkImport={() => handleOpenBulkImport()}
               />
             )}
@@ -89,6 +97,12 @@ function AttendanceApp() {
                 initialSubjectId={activeSubjectId}
                 initialPart={activeSubjectPart}
                 onNavigateToReports={handleViewReports}
+              />
+            )}
+            {activeTab === 'assignments' && (
+              <StudentAssignmentsTracker
+                initialSubjectId={activeSubjectId}
+                initialPart={activeSubjectPart}
               />
             )}
             {activeTab === 'reports' && (
@@ -110,6 +124,12 @@ function AttendanceApp() {
             )}
             {activeTab === 'admin-classes' && (
               <ClassRosterView onOpenBulkImport={handleOpenBulkImport} />
+            )}
+            {activeTab === 'assignments' && (
+              <StudentAssignmentsTracker
+                initialSubjectId={activeSubjectId}
+                initialPart={activeSubjectPart}
+              />
             )}
             {activeTab === 'reports' && (
               <ReportsAndTrends

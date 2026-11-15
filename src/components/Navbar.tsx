@@ -13,6 +13,7 @@ import {
   LogIn,
   LogOut,
   ChevronDown,
+  ClipboardList,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -53,13 +54,15 @@ export const Navbar: React.FC<NavbarProps> = ({
     ? [
         { id: 'my-subjects', label: 'My BTEB Subjects', icon: BookOpen },
         { id: 'take-attendance', label: 'Take Attendance', icon: UserCheck },
+        { id: 'assignments', label: 'Assignments', icon: ClipboardList },
         { id: 'reports', label: 'Reports & Trends', icon: BarChart3 },
         { id: 'roster', label: 'Student Directory', icon: Users },
       ]
     : [
-        { id: 'admin-assignments', label: 'BTEB Subject Allocation', icon: School },
-        { id: 'admin-classes', label: 'Semester Batches & Students', icon: Users },
-        { id: 'reports', label: 'Academic Reports', icon: BarChart3 },
+        { id: 'admin-assignments', label: 'Subject Allocation', icon: School },
+        { id: 'admin-classes', label: 'Batches & Students', icon: Users },
+        { id: 'assignments', label: 'Assignments', icon: ClipboardList },
+        { id: 'reports', label: 'Reports', icon: BarChart3 },
       ];
 
   return (
@@ -153,16 +156,16 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
 
             {/* Account Profile Dropdown */}
-            <div className="relative" ref={dropdownRef}>
+            <div className="relative shrink-0" ref={dropdownRef}>
               <button
                 type="button"
                 onClick={() => setShowUserDropdown(!showUserDropdown)}
-                className="flex items-center gap-2 h-9 pl-1.5 pr-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-colors text-left"
+                className="flex items-center gap-2 h-9 pl-1.5 pr-2.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-colors text-left shrink-0"
                 aria-expanded={showUserDropdown}
                 aria-haspopup="true"
               >
                 <Avatar src={currentUser.avatar} name={currentUser.name} size="xs" />
-                <div className="hidden sm:flex items-center gap-1.5 max-w-[160px]">
+                <div className="hidden sm:flex items-center gap-1.5 max-w-[140px]">
                   <span className="text-xs font-semibold text-slate-800 truncate">
                     {currentUser.name}
                   </span>

@@ -111,6 +111,43 @@
         "markedAt": { "type": "string", "description": "Timestamp" }
       },
       "required": ["sessionId", "studentId", "status"]
+    },
+    "CourseworkAssignment": {
+      "title": "CourseworkAssignment",
+      "description": "Coursework or lab assignment created by a teacher for a subject part",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Assignment title", "maxLength": 160 },
+        "description": { "type": "string", "description": "Assignment instructions or rubric", "maxLength": 1000 },
+        "subjectId": { "type": "string", "description": "Subject ID" },
+        "classId": { "type": "string", "description": "Class batch ID" },
+        "part": { "type": "string", "enum": ["theory", "practical"], "description": "Subject part" },
+        "teacherId": { "type": "string", "description": "Creator teacher ID" },
+        "assignedDate": { "type": "string", "description": "Assigned date YYYY-MM-DD" },
+        "dueDate": { "type": "string", "description": "Due date YYYY-MM-DD" },
+        "maxMarks": { "type": "number", "description": "Maximum marks for evaluation" },
+        "createdAt": { "type": "string", "description": "ISO creation timestamp" }
+      },
+      "required": ["title", "subjectId", "classId", "part", "teacherId", "assignedDate", "dueDate", "maxMarks"]
+    },
+    "StudentAssignmentEvaluation": {
+      "title": "StudentAssignmentEvaluation",
+      "description": "Per-student submission tracking and teacher evaluation marks/feedback for an assignment",
+      "type": "object",
+      "properties": {
+        "courseworkId": { "type": "string", "description": "Parent coursework assignment ID" },
+        "studentId": { "type": "string", "description": "Student ID" },
+        "subjectId": { "type": "string", "description": "Subject ID" },
+        "classId": { "type": "string", "description": "Class batch ID" },
+        "part": { "type": "string", "enum": ["theory", "practical"], "description": "Subject part" },
+        "status": { "type": "string", "enum": ["pending", "submitted", "late", "graded", "missing"], "description": "Submission and grading state" },
+        "marksObtained": { "type": "number", "description": "Score awarded by teacher" },
+        "submittedAt": { "type": "string", "description": "Submission timestamp or date" },
+        "feedback": { "type": "string", "description": "Teacher evaluation notes", "maxLength": 500 },
+        "evaluatedBy": { "type": "string", "description": "Evaluating teacher name or ID" },
+        "evaluatedAt": { "type": "string", "description": "ISO evaluation timestamp" }
+      },
+      "required": ["courseworkId", "studentId", "subjectId", "classId", "part", "status"]
     }
   },
   "firestore": {
@@ -141,6 +178,14 @@
     "/records/{recordId}": {
       "schema": "AttendanceRecord",
       "description": "Detailed student attendance marks"
+    },
+    "/courseworkAssignments/{courseworkId}": {
+      "schema": "CourseworkAssignment",
+      "description": "Student coursework assignments created by faculty"
+    },
+    "/studentEvaluations/{evaluationId}": {
+      "schema": "StudentAssignmentEvaluation",
+      "description": "Individual student assignment submission statuses, marks, and teacher evaluations"
     }
   }
 }

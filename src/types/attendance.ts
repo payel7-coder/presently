@@ -121,3 +121,35 @@ export interface CSVParseResult {
   totalParsed: number;
   validCount: number;
 }
+
+export type AssignmentSubmissionStatus = 'pending' | 'submitted' | 'late' | 'graded' | 'missing';
+
+export interface CourseworkAssignment {
+  id: string;
+  title: string;
+  description?: string;
+  subjectId: string;
+  classId: string;
+  part: SubjectPart;
+  teacherId: string;
+  assignedDate: string; // YYYY-MM-DD
+  dueDate: string; // YYYY-MM-DD
+  maxMarks: number;
+  createdAt: string;
+}
+
+export interface StudentAssignmentEvaluation {
+  id: string;
+  courseworkId: string;
+  studentId: string;
+  subjectId: string;
+  classId: string;
+  part: SubjectPart;
+  status: AssignmentSubmissionStatus;
+  marksObtained?: number | null;
+  submittedAt?: string;
+  feedback?: string;
+  evaluatedBy?: string;
+  evaluatedAt?: string;
+}
+

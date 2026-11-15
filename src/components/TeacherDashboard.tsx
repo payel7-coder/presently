@@ -18,6 +18,7 @@ import {
   Check,
   Settings2,
   ClipboardCheck,
+  ClipboardList,
   UserX
 } from 'lucide-react';
 import { calculateSessionSummary, calculateDailyClassTargetProgress } from '../utils/attendanceLogic';
@@ -28,12 +29,14 @@ import { Subject, ClassGroup, SubjectPart } from '../types/attendance';
 interface TeacherDashboardProps {
   onStartAttendance: (subjectId: string, part?: SubjectPart) => void;
   onViewReports: (subjectId: string, part?: SubjectPart) => void;
+  onOpenAssignments?: (subjectId?: string, part?: SubjectPart) => void;
   onOpenBulkImport: () => void;
 }
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onStartAttendance,
   onViewReports,
+  onOpenAssignments,
   onOpenBulkImport,
 }) => {
   const {
@@ -494,6 +497,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {teacherAssignments.length > 0 && onOpenAssignments && (
+              <button
+                type="button"
+                onClick={() => onOpenAssignments()}
+                className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors whitespace-nowrap"
+                title="Track and grade student coursework assignments"
+              >
+                <ClipboardList className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Student Assignments</span>
+              </button>
+            )}
             {teacherAssignments.length > 0 && (
               <button
                 type="button"
@@ -617,6 +631,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       <span>Take Attendance</span>
                       <ArrowRight className="w-3.5 h-3.5" />
                     </button>
+                    {onOpenAssignments && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenAssignments(subject.id, part)}
+                        className="h-9 w-9 inline-flex items-center justify-center bg-white hover:bg-slate-50 text-slate-600 border border-slate-200 rounded-lg transition-colors shrink-0"
+                        title="Manage coursework assignments & student evaluations"
+                        aria-label={`Assignments for ${subject.name} (${part})`}
+                      >
+                        <ClipboardList className="w-4 h-4" />
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setPdfModalSubject({ subject, classGroup, part })}
