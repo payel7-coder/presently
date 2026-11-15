@@ -12,6 +12,7 @@ import {
   Mail,
   Flame,
   FileText,
+  UserX,
   X
 } from 'lucide-react';
 import {
@@ -35,6 +36,7 @@ import {
 } from 'recharts';
 import { Student, Subject, ClassGroup, SubjectPart } from '../types/attendance';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
+import { DownloadAbsentListModal } from './DownloadAbsentListModal';
 
 interface ReportsAndTrendsProps {
   initialSubjectId?: string;
@@ -46,7 +48,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   initialSubjectId,
   initialPart,
 }) => {
-  const { subjects, classes, assignments, students, sessions, records, currentUser, isAdmin } = useAttendance();
+  const { subjects, classes, assignments, students, sessions, records, users, currentUser, isAdmin } = useAttendance();
 
   const roleScope = useMemo(
     () =>
@@ -91,6 +93,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const [parentNoticeStudent, setParentNoticeStudent] = useState<Student | null>(null);
   const [noticeSentBanner, setNoticeSentBanner] = useState<string | null>(null);
   const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup } | null>(null);
+  const [isAbsentListModalOpen, setIsAbsentListModalOpen] = useState<boolean>(false);
 
   const handleOpenPdfRegister = () => {
     let targetSub = visibleSubjects.find(s => s.id === selectedSubjectId);
@@ -236,6 +239,16 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           >
             <FileText className="w-3.5 h-3.5" />
             <span>Download PDF Register</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAbsentListModalOpen(true)}
+            disabled={visibleSubjects.length === 0}
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+            title="Download subject and date-wise student absent list PDF"
+          >
+            <UserX className="w-3.5 h-3.5" />
+            <span>Absent List PDF</span>
           </button>
           <button
             type="button"
@@ -1036,6 +1049,24 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           sessions={visibleSessions}
           records={records}
           defaultPart={selectedPartFilter === 'all' ? undefined : selectedPartFilter}
+        />
+      )}
+
+      {isAbsentListModalOpen && (
+        <DownloadAbsentListModal
+          isOpen={isAbsentListModalOpen}
+          onClose={() => setIsAbsentListModalOpen(false)}
+          subjects={visibleSubjects}
+          classes={visibleClasses}
+          students={visibleStudents}
+          sessions={visibleSessions}
+          records={records}
+          teachers={users}
+          requestedBy={currentUser}
+          defaultSubjectId={selectedSubjectId}
+          defaultPart={selectedPartFilter}
+          defaultClassId={selectedClassId}
+          isAdmin={isAdmin}
         />
       )}
     </div>

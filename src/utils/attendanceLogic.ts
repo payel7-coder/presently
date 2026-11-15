@@ -712,3 +712,220 @@ export function getRoleBasedVisibilityScope(params: {
   };
 }
 
+export interface AbsentListFilterOptions {
+  subjectId?: string; // 'all' or specific subject ID
+  part?: 'all' | SubjectPart;
+  classId?: string; // 'all' or specific class ID
+  date?: string; // Exact YYYY-MM-DD match
+  startDate?: string; // Inclusive start YYYY-MM-DD
+  endDate?: string; // Inclusive end YYYY-MM-DD
+}
+
+export interface AbsentStudentEntry {
+  recordId: string;
+  sessionId: string;
+  date: string;
+  subjectId: string;
+  subjectCode: string;
+  subjectName: string;
+  part: SubjectPart;
+  classId: string;
+  className: string;
+  classSection: string;
+  teacherId: string;
+  teacherName: string;
+  studentId: string;
+  rollNumber: string;
+  registrationNumber: string;
+  studentName: string;
+  studentEmail: string;
+  parentContact: string;
+  remarks: string;
+  topic: string;
+}
+
+export interface AbsentSessionSummary {
+  sessionId: string;
+  date: string;
+  subjectId: string;
+  subjectCode: string;
+  subjectName: string;
+  part: SubjectPart;
+  className: string;
+  teacherName: string;
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+}
+
+export interface SubjectDateAbsentListResult {
+  entries: AbsentStudentEntry[];
+  sessionSummaries: AbsentSessionSummary[];
+  totalMatchingSessions: number;
+  sessionsWithAbsences: number;
+  totalAbsentMarks: number;
+  uniqueAbsentStudents: number;
+  dateScopeLabel: string;
+}
+
+/**
+ * Builds a structured subject-wise and date-wise list of absent students
+ * from attendance sessions and records.
+ */
+export function buildSubjectDateAbsentList(params: {
+  subjects: Subject[];
+  classes: ClassGroup[];
+  students: Student[];
+  sessions: AttendanceSession[];
+  records: AttendanceRecord[];
+  teachers?: User[];
+  filters?: AbsentListFilterOptions;
+}): SubjectDateAbsentListResult {
+  const {
+    subjects,
+    classes,
+    students,
+    sessions,
+    records,
+    teachers = [],
+    filters = {},
+  } = params;
+
+  const {
+    subjectId = 'all',
+    part = 'all',
+    classId = 'all',
+    date,
+    startDate,
+    endDate,
+  } = filters;
+
+  const subjectMap = new Map(subjects.map(s => [s.id, s]));
+  const classMap = new Map(classes.map(c => [c.id, c]));
+  const studentMap = new Map(students.map(stu => [stu.id, stu]));
+  const teacherMap = new Map(teachers.map(t => [t.id, t]));
+
+  const matchingSessions = sessions
+    .filter(sess => {
+      const sessPart: SubjectPart = sess.part || 'theory';
+      if (subjectId !== 'all' && sess.subjectId !== subjectId) return false;
+      if (part !== 'all' && sessPart !== part) return false;
+      if (classId !== 'all' && sess.classId !== classId) return false;
+      if (date) {
+        if (sess.date !== date) return false;
+      } else {
+        if (startDate && sess.date < startDate) return false;
+        if (endDate && sess.date > endDate) return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const dateCmp = a.date.localeCompare(b.date);
+      if (dateCmp !== 0) return dateCmp;
+      const subA = subjectMap.get(a.subjectId)?.code || '';
+      const subB = subjectMap.get(b.subjectId)?.code || '';
+      const subCmp = subA.localeCompare(subB);
+      if (subCmp !== 0) return subCmp;
+      const partA = a.part || 'theory';
+      const partB = b.part || 'theory';
+      return partA.localeCompare(partB);
+    });
+
+  const entries: AbsentStudentEntry[] = [];
+  const sessionSummaries: AbsentSessionSummary[] = [];
+  const uniqueAbsentIds = new Set<string>();
+  let sessionsWithAbsences = 0;
+
+  matchingSessions.forEach(sess => {
+    const sub = subjectMap.get(sess.subjectId);
+    const cls = classMap.get(sess.classId);
+    const tch = teacherMap.get(sess.teacherId);
+    const sessPart: SubjectPart = sess.part || 'theory';
+
+    const absentRecords = records.filter(
+      r => r.sessionId === sess.id && r.status === 'absent'
+    );
+
+    const sessionAbsentEntries: AbsentStudentEntry[] = [];
+
+    absentRecords.forEach(rec => {
+      const stu = studentMap.get(rec.studentId);
+      if (!stu) return;
+
+      uniqueAbsentIds.add(stu.id);
+      sessionAbsentEntries.push({
+        recordId: rec.id,
+        sessionId: sess.id,
+        date: sess.date,
+        subjectId: sess.subjectId,
+        subjectCode: sub?.code || 'N/A',
+        subjectName: sub?.name || 'Unknown Course',
+        part: sessPart,
+        classId: sess.classId,
+        className: cls?.name || 'Unknown Class',
+        classSection: cls?.section || '',
+        teacherId: sess.teacherId,
+        teacherName: tch?.name || 'Faculty',
+        studentId: stu.id,
+        rollNumber: stu.rollNumber,
+        registrationNumber: stu.registrationNumber || '-',
+        studentName: stu.name,
+        studentEmail: stu.email,
+        parentContact: stu.parentContact || stu.phone || stu.parentEmail || '-',
+        remarks: rec.remarks || '',
+        topic: sess.topic || '',
+      });
+    });
+
+    sessionAbsentEntries.sort((a, b) =>
+      a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true })
+    );
+
+    if (sessionAbsentEntries.length > 0) {
+      sessionsWithAbsences++;
+    }
+
+    entries.push(...sessionAbsentEntries);
+
+    sessionSummaries.push({
+      sessionId: sess.id,
+      date: sess.date,
+      subjectId: sess.subjectId,
+      subjectCode: sub?.code || 'N/A',
+      subjectName: sub?.name || 'Unknown Course',
+      part: sessPart,
+      className: cls?.name || 'Unknown Class',
+      teacherName: tch?.name || 'Faculty',
+      totalStudents: sess.totalStudents,
+      presentCount: sess.presentCount,
+      absentCount: sessionAbsentEntries.length > 0 ? sessionAbsentEntries.length : sess.absentCount,
+      lateCount: sess.lateCount,
+      excusedCount: sess.excusedCount,
+    });
+  });
+
+  let dateScopeLabel = 'All Recorded Dates';
+  if (date) {
+    dateScopeLabel = date;
+  } else if (startDate && endDate) {
+    dateScopeLabel = `${startDate} to ${endDate}`;
+  } else if (startDate) {
+    dateScopeLabel = `From ${startDate}`;
+  } else if (endDate) {
+    dateScopeLabel = `Up to ${endDate}`;
+  }
+
+  return {
+    entries,
+    sessionSummaries,
+    totalMatchingSessions: matchingSessions.length,
+    sessionsWithAbsences,
+    totalAbsentMarks: entries.length,
+    uniqueAbsentStudents: uniqueAbsentIds.size,
+    dateScopeLabel,
+  };
+}
+
+

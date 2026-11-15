@@ -17,10 +17,12 @@ import {
   Minus,
   Check,
   Settings2,
-  ClipboardCheck
+  ClipboardCheck,
+  UserX
 } from 'lucide-react';
 import { calculateSessionSummary, calculateDailyClassTargetProgress } from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
+import { DownloadAbsentListModal } from './DownloadAbsentListModal';
 import { Subject, ClassGroup, SubjectPart } from '../types/attendance';
 
 interface TeacherDashboardProps {
@@ -42,10 +44,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     getSessionByDate,
     students,
     records,
+    users,
     setDailyClassTarget,
   } = useAttendance();
 
   const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup; part: SubjectPart } | null>(null);
+  const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
 
   const dailyTarget = currentUser?.dailyClassTarget || 4;
   const [isEditingTarget, setIsEditingTarget] = useState(false);
@@ -489,20 +493,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               Theory and Practical allocations assigned by your department administrator.
             </p>
           </div>
-          {currentUser.role === 'admin' ? (
-            <button
-              type="button"
-              onClick={onOpenBulkImport}
-              className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors self-start sm:self-auto"
-            >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-              <span>Import Class List via CSV</span>
-            </button>
-          ) : (
-            <span className="text-xs text-slate-400 self-start sm:self-auto">
-              Student rosters are managed by administration
-            </span>
-          )}
+          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+            {teacherAssignments.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsAbsentModalOpen(true)}
+                className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors whitespace-nowrap"
+                title="Download subject and date-wise student absent list PDF"
+              >
+                <UserX className="w-3.5 h-3.5" />
+                <span>Absent List PDF</span>
+              </button>
+            )}
+            {currentUser.role === 'admin' ? (
+              <button
+                type="button"
+                onClick={onOpenBulkImport}
+                className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <span>Import Class List via CSV</span>
+              </button>
+            ) : (
+              <span className="text-xs text-slate-400">
+                Student rosters are managed by administration
+              </span>
+            )}
+          </div>
         </div>
 
         {teacherAssignments.length === 0 ? (
@@ -637,6 +654,23 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           sessions={sessions}
           records={records}
           defaultPart={pdfModalSubject.part}
+        />
+      )}
+
+      {isAbsentModalOpen && (
+        <DownloadAbsentListModal
+          isOpen={isAbsentModalOpen}
+          onClose={() => setIsAbsentModalOpen(false)}
+          subjects={Array.from(new Map(teacherAssignments.map(a => [a.subject.id, a.subject])).values())}
+          classes={Array.from(new Map(teacherAssignments.map(a => [a.classGroup.id, a.classGroup])).values())}
+          students={students}
+          sessions={teacherSessions}
+          records={records}
+          teachers={users}
+          requestedBy={currentUser}
+          defaultSubjectId="all"
+          defaultPart="all"
+          isAdmin={currentUser.role === 'admin'}
         />
       )}
     </div>

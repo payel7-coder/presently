@@ -15,11 +15,13 @@ import {
   Flame,
   ArrowRight,
   FileText,
+  UserX,
   AlertCircle,
   X
 } from 'lucide-react';
 import { calculateStudentAttendanceStats } from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
+import { DownloadAbsentListModal } from './DownloadAbsentListModal';
 
 interface AttendanceStudioProps {
   initialSubjectId?: string;
@@ -42,6 +44,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     sessions,
     records,
     students,
+    users,
   } = useAttendance();
 
   const assignedSubjects = currentUser ? getTeacherSubjects(currentUser.id) : [];
@@ -115,6 +118,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   } | null>(null);
 
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
 
   useEffect(() => {
     if (!activeSubjectId || !sessionDate || classStudents.length === 0) return;
@@ -280,6 +284,16 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               Select a course part, toggle P / A / L / E attendance marks, and commit directly to Firestore.
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsAbsentModalOpen(true)}
+            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 self-start lg:self-auto"
+            title="Download subject and date-wise student absent list PDF"
+          >
+            <UserX className="w-3.5 h-3.5" />
+            <span>Absent List PDF</span>
+          </button>
         </div>
 
         {/* Course & Part Tabs */}
@@ -529,6 +543,14 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             >
               <FileText className="w-3.5 h-3.5" />
               <span>PDF Register</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAbsentModalOpen(true)}
+              className="h-8 px-3 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-lg text-xs font-semibold transition-colors flex items-center gap-1.5 whitespace-nowrap"
+            >
+              <UserX className="w-3.5 h-3.5" />
+              <span>Absent List PDF</span>
             </button>
             <button
               type="button"
@@ -1033,6 +1055,28 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           sessions={sessions}
           records={records}
           defaultPart={activePart}
+        />
+      )}
+
+      {isAbsentModalOpen && (
+        <DownloadAbsentListModal
+          isOpen={isAbsentModalOpen}
+          onClose={() => setIsAbsentModalOpen(false)}
+          subjects={Array.from(new Map(assignedSubjects.map(a => [a.subject.id, a.subject])).values())}
+          classes={Array.from(new Map(assignedSubjects.map(a => [a.classGroup.id, a.classGroup])).values())}
+          students={students}
+          sessions={sessions.filter(s =>
+            assignedSubjects.some(
+              a => a.subject.id === s.subjectId && (a.assignment.part || 'theory') === (s.part || 'theory')
+            )
+          )}
+          records={records}
+          teachers={users}
+          requestedBy={currentUser}
+          defaultSubjectId={activeSubject?.id || 'all'}
+          defaultPart={activePart}
+          defaultDate={sessionDate}
+          isAdmin={currentUser?.role === 'admin'}
         />
       )}
     </div>
