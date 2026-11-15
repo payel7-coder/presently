@@ -11,6 +11,10 @@ import {
   getCurrentWeekBounds,
   calculateWeeklyStudentAttendanceSummary,
   getRoleBasedVisibilityScope,
+  resolveUserApprovalStatus,
+  evaluateLoginAccess,
+  getPendingUsers,
+  getApprovedTeachers,
 } from './attendanceLogic';
 import { ClassGroup, Student, AttendanceSession, AttendanceRecord, Subject, SubjectAssignment, User } from '../types/attendance';
 
@@ -572,5 +576,102 @@ test('getRoleBasedVisibilityScope shows all subjects to admin and only assigned 
   assert.equal(emptyScope.visibleSessions.length, 0);
   assert.equal(emptyScope.visibleStudents.length, 0);
 });
+
+test('approval workflow enforces pending/rejected gate while keeping legacy users and primary admin approved', () => {
+  const primaryAdmin: User = {
+    id: 'adm-main',
+    name: 'Engr. Payel Ahmed',
+    email: 'payelahmed70@gmail.com',
+    role: 'admin',
+    department: 'Admin',
+    employeeId: 'DIR-01',
+    avatar: '',
+    approvalStatus: 'pending', // Even if mis-marked, primary admin remains approved
+  };
+  const legacyTeacher: User = {
+    id: 'tch-legacy',
+    name: 'Legacy Instructor',
+    email: 'legacy@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'TCH-01',
+    avatar: '',
+  };
+  const pendingTeacher: User = {
+    id: 'tch-pending',
+    name: 'New Applicant',
+    email: 'applicant@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'BTEB-1122',
+    avatar: '',
+    approvalStatus: 'pending',
+    registeredAt: '2026-11-14T10:00:00.000Z',
+  };
+  const pendingAdmin: User = {
+    id: 'adm-pending',
+    name: 'Pending Coordinator',
+    email: 'coord@polytechnic.edu.bd',
+    role: 'admin',
+    department: 'CST',
+    employeeId: 'ADM-1122',
+    avatar: '',
+    approvalStatus: 'pending',
+    registeredAt: '2026-11-14T12:00:00.000Z',
+  };
+  const rejectedTeacher: User = {
+    id: 'tch-rejected',
+    name: 'Declined Applicant',
+    email: 'declined@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'BTEB-9999',
+    avatar: '',
+    approvalStatus: 'rejected',
+  };
+  const approvedTeacher: User = {
+    id: 'tch-approved',
+    name: 'Approved Instructor',
+    email: 'approved@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'BTEB-5555',
+    avatar: '',
+    approvalStatus: 'approved',
+  };
+
+  assert.equal(resolveUserApprovalStatus(primaryAdmin), 'approved');
+  assert.equal(resolveUserApprovalStatus(legacyTeacher), 'approved');
+  assert.equal(resolveUserApprovalStatus(pendingTeacher), 'pending');
+  assert.equal(resolveUserApprovalStatus(rejectedTeacher), 'rejected');
+
+  assert.equal(evaluateLoginAccess(primaryAdmin).allowed, true);
+  assert.equal(evaluateLoginAccess(legacyTeacher).allowed, true);
+  assert.equal(evaluateLoginAccess(approvedTeacher).allowed, true);
+
+  const pendingAccess = evaluateLoginAccess(pendingTeacher);
+  assert.equal(pendingAccess.allowed, false);
+  assert.equal(pendingAccess.status, 'pending');
+  assert.ok(pendingAccess.reason?.toLowerCase().includes('pending administrator approval'));
+
+  const rejectedAccess = evaluateLoginAccess(rejectedTeacher);
+  assert.equal(rejectedAccess.allowed, false);
+  assert.equal(rejectedAccess.status, 'rejected');
+  assert.ok(rejectedAccess.reason?.toLowerCase().includes('declined'));
+
+  const unknownAccess = evaluateLoginAccess(null);
+  assert.equal(unknownAccess.allowed, false);
+
+  const allUsers = [primaryAdmin, legacyTeacher, pendingTeacher, pendingAdmin, rejectedTeacher, approvedTeacher];
+
+  // Pending users sorted newest first (pendingAdmin before pendingTeacher)
+  const pendingList = getPendingUsers(allUsers);
+  assert.deepEqual(pendingList.map(u => u.id), ['adm-pending', 'tch-pending']);
+
+  // Approved teachers exclude pending, rejected, and admins
+  const activeTeachers = getApprovedTeachers(allUsers);
+  assert.deepEqual(activeTeachers.map(u => u.id), ['tch-legacy', 'tch-approved']);
+});
+
 
 

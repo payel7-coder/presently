@@ -9,6 +9,7 @@ import {
   SubjectAssignment,
   SubjectPart,
   User,
+  UserApprovalStatus,
 } from '../types/attendance';
 
 /**
@@ -927,5 +928,90 @@ export function buildSubjectDateAbsentList(params: {
     dateScopeLabel,
   };
 }
+
+export const PRIMARY_ADMIN_EMAIL = 'payelahmed70@gmail.com';
+
+export function isPrimaryAdminEmail(email?: string | null): boolean {
+  return Boolean(email && email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL);
+}
+
+/**
+ * Resolves the effective approval status of a user account.
+ * - Primary institutional admin is always approved.
+ * - Legacy user profiles created before admin-approval tracking (undefined approvalStatus) default to 'approved'.
+ */
+export function resolveUserApprovalStatus(
+  user?: Pick<User, 'email' | 'approvalStatus'> | null
+): UserApprovalStatus {
+  if (!user) return 'pending';
+  if (isPrimaryAdminEmail(user.email)) return 'approved';
+  if (
+    user.approvalStatus === 'pending' ||
+    user.approvalStatus === 'rejected' ||
+    user.approvalStatus === 'approved'
+  ) {
+    return user.approvalStatus;
+  }
+  return 'approved';
+}
+
+export interface LoginAccessEvaluation {
+  allowed: boolean;
+  status: UserApprovalStatus;
+  reason?: string;
+}
+
+/**
+ * Evaluates whether a matched user account may sign into the application workspace.
+ */
+export function evaluateLoginAccess(
+  user?: Pick<User, 'email' | 'approvalStatus'> | null
+): LoginAccessEvaluation {
+  if (!user) {
+    return {
+      allowed: false,
+      status: 'pending',
+      reason: 'No approved account found for this email. Please register and wait for administrator approval.',
+    };
+  }
+
+  const status = resolveUserApprovalStatus(user);
+  if (status === 'pending') {
+    return {
+      allowed: false,
+      status: 'pending',
+      reason: 'Your registration is pending administrator approval. Please wait until an administrator approves your account before signing in.',
+    };
+  }
+  if (status === 'rejected') {
+    return {
+      allowed: false,
+      status: 'rejected',
+      reason: 'Your registration request was declined by the administrator. Please contact your department office for assistance.',
+    };
+  }
+
+  return {
+    allowed: true,
+    status: 'approved',
+  };
+}
+
+/**
+ * Returns self-registered accounts awaiting administrator approval (newest first).
+ */
+export function getPendingUsers(users: User[]): User[] {
+  return users
+    .filter(u => resolveUserApprovalStatus(u) === 'pending')
+    .sort((a, b) => (b.registeredAt || '').localeCompare(a.registeredAt || ''));
+}
+
+/**
+ * Returns only approved teachers eligible for subject assignments and roster display.
+ */
+export function getApprovedTeachers(users: User[]): User[] {
+  return users.filter(u => u.role === 'teacher' && resolveUserApprovalStatus(u) === 'approved');
+}
+
 
 

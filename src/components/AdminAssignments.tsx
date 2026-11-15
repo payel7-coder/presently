@@ -15,7 +15,10 @@ import {
   FlaskConical,
   AlertCircle,
   Search,
-  X
+  X,
+  UserCheck,
+  Clock,
+  ShieldCheck
 } from 'lucide-react';
 
 interface AdminAssignmentsProps {
@@ -24,12 +27,16 @@ interface AdminAssignmentsProps {
 
 export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
   const {
+    users,
     teachers,
+    pendingUsers,
     subjects,
     classes,
     assignments,
     addTeacher,
     deleteTeacher,
+    approveUserRegistration,
+    rejectUserRegistration,
     assignSubjectToTeacher,
     unassignSubject,
     createSubject,
@@ -39,7 +46,8 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
 
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState<string>('all');
   const [subjectSearch, setSubjectSearch] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'matrix' | 'faculty'>('matrix');
+  const [viewMode, setViewMode] = useState<'matrix' | 'faculty' | 'approvals'>('matrix');
+  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -205,6 +213,34 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
     showSuccess('All sessions, records, students, and assignments have been cleared. Database is fresh!');
   };
 
+  const rejectedUsers = users.filter(u => u.approvalStatus === 'rejected');
+
+  const handleApproveUser = async (userId: string) => {
+    const target = users.find(u => u.id === userId);
+    setProcessingUserId(userId);
+    try {
+      await approveUserRegistration(userId);
+      showSuccess(`Approved registration for "${target?.name || target?.email || 'User'}". They can now sign in.`);
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
+  const handleRejectUser = async (userId: string, removeRecord = false) => {
+    const target = users.find(u => u.id === userId);
+    setProcessingUserId(userId);
+    try {
+      await rejectUserRegistration(userId, removeRecord);
+      showSuccess(
+        removeRecord
+          ? `Removed declined registration for "${target?.email || 'User'}".`
+          : `Declined registration request from "${target?.name || target?.email || 'User'}".`
+      );
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Editorial Header */}
@@ -282,6 +318,33 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
         </div>
       )}
 
+      {/* Pending Approvals Callout Banner */}
+      {pendingUsers.length > 0 && viewMode !== 'approvals' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-amber-100 border border-amber-200 text-amber-800 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-xs font-bold text-amber-950">
+                {pendingUsers.length} New {pendingUsers.length === 1 ? 'Registration' : 'Registrations'} Awaiting Approval
+              </h2>
+              <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
+                New faculty or administrator sign-ups cannot access the workspace until reviewed and approved by an administrator.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setViewMode('approvals')}
+            className="shrink-0 h-9 inline-flex items-center gap-1.5 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Review Requests ({pendingUsers.length})</span>
+          </button>
+        </div>
+      )}
+
       {/* Empty Faculty Onboarding Callout */}
       {teachers.length === 0 && (
         <div className="bg-white border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -294,7 +357,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                 No faculty members added yet
               </h2>
               <p className="text-xs text-slate-500 mt-0.5 max-w-2xl leading-relaxed">
-                Add faculty teachers to allocate Theory and Practical parts for each BTEB course independently. Teachers can also self-register from the sign-in page.
+                Add faculty teachers to allocate Theory and Practical parts for each BTEB course independently. Self-registered accounts appear in Pending Approvals for review.
               </p>
             </div>
           </div>
@@ -315,7 +378,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
       {/* View Mode & Semester Filter Bar */}
       <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center bg-slate-100 p-1 rounded-lg self-start tabular-nums">
+          <div className="flex flex-wrap items-center bg-slate-100 p-1 rounded-lg self-start tabular-nums gap-1">
             <button
               type="button"
               onClick={() => setViewMode('matrix')}
@@ -339,6 +402,23 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
             >
               <Users className="w-3.5 h-3.5 text-emerald-600" />
               <span>Faculty Directory &amp; Workload ({teachers.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('approvals')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+                viewMode === 'approvals'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <UserCheck className="w-3.5 h-3.5 text-amber-600" />
+              <span>Pending Approvals</span>
+              {pendingUsers.length > 0 && (
+                <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold">
+                  {pendingUsers.length}
+                </span>
+              )}
             </button>
           </div>
 
@@ -535,7 +615,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
             );
           })}
         </div>
-      ) : (
+      ) : viewMode === 'faculty' ? (
         /* VIEW 2: Faculty Directory & Workload */
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {teachers.map(teacher => {
@@ -670,6 +750,157 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
               </div>
             );
           })}
+        </div>
+      ) : (
+        /* VIEW 3: Pending Registration Approvals */
+        <div className="space-y-6">
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Pending Registration Requests ({pendingUsers.length})
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Review newly registered faculty or administrator accounts before granting workspace sign-in access.
+                </p>
+              </div>
+            </div>
+
+            {pendingUsers.length === 0 ? (
+              <div className="p-10 text-center">
+                <div className="w-11 h-11 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                  <ShieldCheck className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  All registration requests reviewed
+                </h3>
+                <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                  There are no pending accounts waiting for administrator approval right now.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {pendingUsers.map(applicant => {
+                  const isBusy = processingUserId === applicant.id;
+                  const regDate = applicant.registeredAt
+                    ? new Date(applicant.registeredAt).toLocaleString(undefined, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })
+                    : 'Recently submitted';
+
+                  return (
+                    <div
+                      key={applicant.id}
+                      className="p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
+                    >
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                        <Avatar src={applicant.avatar} name={applicant.name} size="lg" />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900 truncate">
+                              {applicant.name}
+                            </h3>
+                            <span
+                              className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${
+                                applicant.role === 'admin'
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}
+                            >
+                              {applicant.role === 'admin' ? 'Administrator' : 'Teacher'}
+                            </span>
+                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                              Pending Approval
+                            </span>
+                          </div>
+                          <p className="text-xs font-mono text-slate-600 mt-1 truncate">
+                            {applicant.email}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {applicant.department} · Requested {regDate}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleRejectUser(applicant.id, false)}
+                          className="h-9 px-3.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-semibold transition-colors disabled:opacity-50 whitespace-nowrap"
+                        >
+                          Decline
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleApproveUser(applicant.id)}
+                          className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 whitespace-nowrap"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{isBusy ? 'Processing...' : 'Approve Account'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {rejectedUsers.length > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="px-5 py-3.5 border-b border-slate-100">
+                <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  Declined Requests ({rejectedUsers.length})
+                </h3>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {rejectedUsers.map(applicant => {
+                  const isBusy = processingUserId === applicant.id;
+                  return (
+                    <div
+                      key={applicant.id}
+                      className="px-5 py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-800 truncate">
+                            {applicant.name}
+                          </span>
+                          <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
+                            Declined
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono text-slate-500 truncate mt-0.5">
+                          {applicant.email}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleApproveUser(applicant.id)}
+                          className="h-8 px-3 rounded-md border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleRejectUser(applicant.id, true)}
+                          className="h-8 px-3 rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 text-xs font-semibold transition-colors disabled:opacity-50"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

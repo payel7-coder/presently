@@ -6,6 +6,7 @@ import {
   Mail,
   X,
   AlertCircle,
+  Clock,
 } from 'lucide-react';
 
 interface LoginModalProps {
@@ -22,6 +23,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [name, setName] = useState('');
   const [role, setRole] = useState<'admin' | 'teacher'>('teacher');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
@@ -29,15 +31,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
+    setSuccessMsg(null);
     setLoading(true);
 
     try {
       if (mode === 'email-login') {
         await loginWithEmail(email.trim(), password);
+        onClose();
       } else {
-        await registerWithEmail(email.trim(), password, name.trim(), role);
+        const result = await registerWithEmail(email.trim(), password, name.trim(), role);
+        if (result.requiresApproval) {
+          setSuccessMsg(
+            `Registration submitted for ${result.user.email}. An administrator must approve this account before sign-in.`
+          );
+          setMode('email-login');
+          setPassword('');
+          setName('');
+        } else {
+          onClose();
+        }
       }
-      onClose();
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication error');
     } finally {
@@ -84,7 +97,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           </button>
           <button
             type="button"
-            onClick={() => { setMode('register'); setErrorMsg(null); }}
+            onClick={() => { setMode('register'); setErrorMsg(null); setSuccessMsg(null); }}
             className={`flex-1 py-1.5 rounded-md transition-colors ${
               mode === 'register' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
             }`}
@@ -94,9 +107,16 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {errorMsg && (
-          <div className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0" />
+          <div role="alert" className="mt-4 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
             <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {successMsg && (
+          <div role="status" className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2">
+            <Clock className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+            <span>{successMsg}</span>
           </div>
         )}
 
@@ -172,7 +192,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             disabled={loading}
             className="w-full mt-2 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center"
           >
-            <span>{loading ? 'Authenticating...' : mode === 'email-login' ? 'Sign In' : 'Create Account'}</span>
+            <span>{loading ? 'Authenticating...' : mode === 'email-login' ? 'Sign In' : 'Submit for Admin Approval'}</span>
           </button>
         </form>
       </div>

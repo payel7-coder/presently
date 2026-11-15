@@ -4,6 +4,8 @@ export type SubjectPart = 'theory' | 'practical';
 
 export type AttendanceStatus = 'present' | 'absent' | 'late' | 'excused';
 
+export type UserApprovalStatus = 'approved' | 'pending' | 'rejected';
+
 export interface User {
   id: string;
   name: string;
@@ -14,6 +16,10 @@ export interface User {
   employeeId: string;
   title?: string;
   dailyClassTarget?: number;
+  approvalStatus?: UserApprovalStatus;
+  registeredAt?: string;
+  approvedAt?: string;
+  approvedBy?: string;
 }
 
 export interface ClassGroup {

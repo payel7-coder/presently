@@ -14,7 +14,14 @@ import {
   BTEB_CLASSES,
   BTEB_CURRICULUM_2022_SUBJECTS,
 } from '../data/btebCurriculum';
-import { validateSubjectPartAssignment } from '../utils/attendanceLogic';
+import {
+  validateSubjectPartAssignment,
+  resolveUserApprovalStatus,
+  evaluateLoginAccess,
+  getPendingUsers,
+  getApprovedTeachers,
+  isPrimaryAdminEmail,
+} from '../utils/attendanceLogic';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -40,11 +47,17 @@ interface NewTeacherInput {
   dailyClassTarget?: number;
 }
 
+export interface RegisterResult {
+  user: User;
+  requiresApproval: boolean;
+}
+
 interface AttendanceContextType {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
   users: User[];
   teachers: User[];
+  pendingUsers: User[];
   classes: ClassGroup[];
   subjects: Subject[];
   assignments: SubjectAssignment[];
@@ -58,7 +71,7 @@ interface AttendanceContextType {
   canImportStudents: boolean;
   loginWithPreset: (user: User) => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<User>;
-  registerWithEmail: (email: string, pass: string, name: string, role: 'admin' | 'teacher') => Promise<User>;
+  registerWithEmail: (email: string, pass: string, name: string, role: 'admin' | 'teacher') => Promise<RegisterResult>;
   logout: () => Promise<void>;
   isFirebaseLive: boolean;
 
@@ -71,6 +84,8 @@ interface AttendanceContextType {
   // Admin actions (Restricted)
   addTeacher: (teacher: NewTeacherInput) => Promise<User>;
   deleteTeacher: (teacherId: string) => Promise<void>;
+  approveUserRegistration: (userId: string) => Promise<void>;
+  rejectUserRegistration: (userId: string, removeRecord?: boolean) => Promise<void>;
   assignSubjectToTeacher: (subjectId: string, teacherId: string, classId: string, part: SubjectPart) => Promise<void>;
   unassignSubject: (assignmentId: string) => Promise<void>;
   createSubject: (subject: Omit<Subject, 'id'>) => Promise<Subject>;
@@ -116,6 +131,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!saved) return null;
     try {
       const u: User = JSON.parse(saved);
+      if (!evaluateLoginAccess(u).allowed) {
+        localStorage.removeItem('presently_active_user');
+        return null;
+      }
       const customTarget = localStorage.getItem(`presently_daily_target_${u.id}`);
       if (customTarget) {
         u.dailyClassTarget = parseInt(customTarget, 10);
@@ -268,11 +287,25 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // Guard active session against live approval revocation or rejection
+  useEffect(() => {
+    if (!currentUser || isPrimaryAdminEmail(currentUser.email)) return;
+    const syncedUser = users.find(
+      u => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase()
+    );
+    if (syncedUser && !evaluateLoginAccess(syncedUser).allowed) {
+      localStorage.removeItem('presently_active_user');
+      setCurrentUserState(null);
+      signOut(auth).catch(() => {});
+    }
+  }, [users, currentUser]);
+
   const isAuthenticated = Boolean(currentUser);
   const isAdmin = currentUser?.role === 'admin';
   const canImportStudents = Boolean(isAdmin);
 
-  const teachers = users.filter(u => u.role === 'teacher');
+  const teachers = getApprovedTeachers(users);
+  const pendingUsers = getPendingUsers(users);
 
   const getTeacherSubjects = (teacherId: string) => {
     const teacherAssignments = assignments.filter(a => a.teacherId === teacherId);
@@ -387,15 +420,54 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   };
 
+  const findUserByEmailWithFirestore = async (cleanEmail: string): Promise<User | undefined> => {
+    const localMatch = users.find(u => u.email.toLowerCase() === cleanEmail);
+    if (localMatch) return localMatch;
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      let remoteMatch: User | undefined;
+      snap.forEach(d => {
+        const data = d.data() as any;
+        if (typeof data.email === 'string' && data.email.toLowerCase() === cleanEmail) {
+          remoteMatch = { id: d.id, ...data };
+        }
+      });
+      return remoteMatch;
+    } catch {
+      return undefined;
+    }
+  };
+
   const loginWithEmail = async (email: string, pass: string): Promise<User> => {
     const cleanEmail = email.trim().toLowerCase();
-    const matched = users.find(u => u.email.toLowerCase() === cleanEmail);
+    const matched = await findUserByEmailWithFirestore(cleanEmail);
+
+    if (matched) {
+      const access = evaluateLoginAccess(matched);
+      if (!access.allowed) {
+        try {
+          await signOut(auth);
+        } catch {
+          // Ignore signOut error when enforcing approval gate
+        }
+        throw new Error(access.reason);
+      }
+    }
 
     try {
       const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
       const userProfile: User = matched
         ? { ...matched, id: res.user.uid || matched.id }
-        : buildInstitutionalProfile(cleanEmail, res.user.uid);
+        : {
+            ...buildInstitutionalProfile(cleanEmail, res.user.uid),
+            approvalStatus: 'approved',
+          };
+
+      const access = evaluateLoginAccess(userProfile);
+      if (!access.allowed) {
+        await signOut(auth).catch(() => {});
+        throw new Error(access.reason);
+      }
 
       setCurrentUserState(userProfile);
       localStorage.setItem('presently_active_user', JSON.stringify(userProfile));
@@ -410,9 +482,21 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
       return userProfile;
     } catch (firebaseErr: any) {
+      if (
+        firebaseErr?.message &&
+        (firebaseErr.message.includes('pending administrator approval') ||
+          firebaseErr.message.includes('declined by the administrator'))
+      ) {
+        throw firebaseErr;
+      }
+
       console.warn('Firebase auth attempt handled with institutional fallback:', firebaseErr?.code);
 
       if (matched) {
+        const access = evaluateLoginAccess(matched);
+        if (!access.allowed) {
+          throw new Error(access.reason);
+        }
         setCurrentUserState(matched);
         localStorage.setItem('presently_active_user', JSON.stringify(matched));
         try {
@@ -425,8 +509,17 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return matched;
       }
 
-      const fallbackId = cleanEmail === 'payelahmed70@gmail.com' ? 'admin-payel' : `user-${Date.now()}`;
-      const fallbackUser = buildInstitutionalProfile(cleanEmail, fallbackId);
+      // Only primary institutional administrator may auto-bootstrap on fallback
+      if (!isPrimaryAdminEmail(cleanEmail)) {
+        throw new Error(
+          'No approved account found for this email. Please switch to Register to submit a registration request for administrator approval.'
+        );
+      }
+
+      const fallbackUser: User = {
+        ...buildInstitutionalProfile(cleanEmail, 'admin-payel'),
+        approvalStatus: 'approved',
+      };
 
       setCurrentUserState(fallbackUser);
       localStorage.setItem('presently_active_user', JSON.stringify(fallbackUser));
@@ -447,67 +540,83 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     pass: string,
     name: string,
     role: 'admin' | 'teacher'
-  ): Promise<User> => {
+  ): Promise<RegisterResult> => {
     const cleanEmail = email.trim().toLowerCase();
+    const existing = await findUserByEmailWithFirestore(cleanEmail);
+
+    if (existing) {
+      const existingStatus = resolveUserApprovalStatus(existing);
+      if (existingStatus === 'pending') {
+        throw new Error(
+          'An account with this email is already registered and awaiting administrator approval.'
+        );
+      }
+      if (existingStatus === 'rejected') {
+        throw new Error(
+          'A previous registration request for this email was declined. Please contact an administrator.'
+        );
+      }
+      throw new Error(
+        'An approved account with this email already exists. Please use Sign In instead.'
+      );
+    }
+
+    const isPrimary = isPrimaryAdminEmail(cleanEmail);
+    const approvalStatus = isPrimary ? 'approved' : 'pending';
+    const registeredAt = new Date().toISOString();
+
+    const buildRegisteredUser = (uid: string): User => ({
+      id: uid,
+      name: name.trim(),
+      email: cleanEmail,
+      role: isPrimary ? 'admin' : role,
+      avatar: (isPrimary || role === 'admin')
+        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      department: 'Computer Science & Technology',
+      employeeId: (isPrimary || role === 'admin') ? `ADM-${Date.now().toString().slice(-4)}` : `BTEB-${Date.now().toString().slice(-4)}`,
+      title: (isPrimary || role === 'admin') ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
+      dailyClassTarget: 4,
+      approvalStatus,
+      registeredAt,
+      ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
+    });
+
+    let newUser: User;
     try {
       const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-      const newUser: User = {
-        id: res.user.uid,
-        name: name.trim(),
-        email: cleanEmail,
-        role,
-        avatar: role === 'admin'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        department: 'Computer Science & Technology',
-        employeeId: role === 'admin' ? `ADM-${Date.now().toString().slice(-4)}` : `BTEB-${Date.now().toString().slice(-4)}`,
-        title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
-        dailyClassTarget: 4,
-      };
-
-      setCurrentUserState(newUser);
-      localStorage.setItem('presently_active_user', JSON.stringify(newUser));
-      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
-
-      try {
-        const cleanUser: any = { ...newUser };
-        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-        await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
-      } catch (e) {
-        console.warn('Firestore user write:', e);
-      }
-      return newUser;
+      newUser = buildRegisteredUser(res.user.uid);
     } catch (e: any) {
-      if (e.code === 'auth/email-already-in-use') {
-        return loginWithEmail(cleanEmail, pass);
+      if (e?.code === 'auth/email-already-in-use') {
+        throw new Error(
+          'An account with this email already exists in authentication. Please sign in or contact an administrator.'
+        );
       }
-      const newUser: User = {
-        id: `user-${Date.now()}`,
-        name: name.trim(),
-        email: cleanEmail,
-        role,
-        avatar: role === 'admin'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-        department: 'Computer Science & Technology',
-        employeeId: role === 'admin' ? `ADM-${Date.now().toString().slice(-4)}` : `BTEB-${Date.now().toString().slice(-4)}`,
-        title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
-        dailyClassTarget: 4,
-      };
-
-      setCurrentUserState(newUser);
-      localStorage.setItem('presently_active_user', JSON.stringify(newUser));
-      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
-
-      try {
-        const cleanUser: any = { ...newUser };
-        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-        await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
-      } catch (err) {
-        console.warn('Firestore user write error:', err);
-      }
-      return newUser;
+      newUser = buildRegisteredUser(`user-${Date.now()}`);
     }
+
+    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
+
+    try {
+      const cleanUser: any = { ...newUser };
+      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+      await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
+    } catch (err) {
+      console.warn('Firestore user write error:', err);
+    }
+
+    if (approvalStatus === 'pending') {
+      try {
+        await signOut(auth);
+      } catch {
+        // Ignore if not signed into Firebase Auth
+      }
+      return { user: newUser, requiresApproval: true };
+    }
+
+    setCurrentUserState(newUser);
+    localStorage.setItem('presently_active_user', JSON.stringify(newUser));
+    return { user: newUser, requiresApproval: false };
   };
 
   const logout = async () => {
@@ -537,6 +646,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       throw new Error(`A faculty account with email "${cleanEmail}" already exists.`);
     }
 
+    const now = new Date().toISOString();
     const newTeacher: User = {
       id: `tch-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
       name: cleanName,
@@ -547,6 +657,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       employeeId: teacherInput.employeeId?.trim() || `BTEB-TCH-${Date.now().toString().slice(-4)}`,
       title: teacherInput.title?.trim() || 'Instructor (Computer Technology)',
       dailyClassTarget: teacherInput.dailyClassTarget || 4,
+      approvalStatus: 'approved',
+      registeredAt: now,
+      approvedAt: now,
+      approvedBy: currentUser?.email || currentUser?.name || 'Admin',
     };
 
     setUsers(prev => [...prev, newTeacher]);
@@ -580,6 +694,71 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       await batch.commit();
     } catch (e) {
       console.warn('Firestore deleteTeacher error:', e);
+    }
+  };
+
+  const approveUserRegistration = async (userId: string): Promise<void> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrator can approve registrations.');
+    }
+
+    const approvedAt = new Date().toISOString();
+    const approvedBy = currentUser?.email || currentUser?.name || 'Admin';
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, approvalStatus: 'approved', approvedAt, approvedBy }
+          : u
+      )
+    );
+
+    try {
+      await setDoc(
+        doc(db, 'users', userId),
+        {
+          approvalStatus: 'approved',
+          approvedAt,
+          approvedBy,
+        },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore approveUserRegistration error:', e);
+    }
+  };
+
+  const rejectUserRegistration = async (userId: string, removeRecord = false): Promise<void> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrator can decline registrations.');
+    }
+
+    if (removeRecord) {
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      try {
+        await deleteDoc(doc(db, 'users', userId));
+      } catch (e) {
+        console.warn('Firestore delete rejected user error:', e);
+      }
+      return;
+    }
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId
+          ? { ...u, approvalStatus: 'rejected' }
+          : u
+      )
+    );
+
+    try {
+      await setDoc(
+        doc(db, 'users', userId),
+        { approvalStatus: 'rejected' },
+        { merge: true }
+      );
+    } catch (e) {
+      console.warn('Firestore rejectUserRegistration error:', e);
     }
   };
 
@@ -899,6 +1078,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setCurrentUser,
         users,
         teachers,
+        pendingUsers,
         classes,
         subjects,
         assignments,
@@ -919,6 +1099,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setDailyClassTarget,
         addTeacher,
         deleteTeacher,
+        approveUserRegistration,
+        rejectUserRegistration,
         assignSubjectToTeacher,
         unassignSubject,
         createSubject,

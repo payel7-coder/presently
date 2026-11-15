@@ -12,7 +12,11 @@
         "avatar": { "type": "string", "description": "Avatar image URL" },
         "department": { "type": "string", "description": "Academic department" },
         "employeeId": { "type": "string", "description": "Institutional faculty/admin ID" },
-        "dailyClassTarget": { "type": "number", "description": "Target total classes conducted per day by teacher" }
+        "dailyClassTarget": { "type": "number", "description": "Target total classes conducted per day by teacher" },
+        "approvalStatus": { "type": "string", "enum": ["approved", "pending", "rejected"], "description": "Administrator approval status for self-registered accounts" },
+        "registeredAt": { "type": "string", "description": "ISO timestamp when registration was submitted" },
+        "approvedAt": { "type": "string", "description": "ISO timestamp when administrator approved the account" },
+        "approvedBy": { "type": "string", "description": "Email or name of administrator who approved the account" }
       },
       "required": ["uid", "name", "email", "role"]
     },

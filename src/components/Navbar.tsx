@@ -28,7 +28,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenBulkImport,
   onOpenLoginModal,
 }) => {
-  const { currentUser, resetToDefaultBTEBData, canImportStudents, isAdmin, logout } =
+  const { currentUser, resetToDefaultBTEBData, canImportStudents, isAdmin, logout, pendingUsers } =
     useAttendance();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -90,6 +90,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             {navItems.map(item => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
+              const showPendingCount = isAdmin && item.id === 'admin-assignments' && pendingUsers.length > 0;
               return (
                 <button
                   key={item.id}
@@ -107,6 +108,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                     }`}
                   />
                   <span>{item.label}</span>
+                  {showPendingCount && (
+                    <span
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums ${
+                        isActive
+                          ? 'bg-amber-400 text-slate-950'
+                          : 'bg-amber-100 text-amber-800 border border-amber-200'
+                      }`}
+                      title={`${pendingUsers.length} registration(s) awaiting approval`}
+                    >
+                      {pendingUsers.length}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -234,6 +247,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         {navItems.map(item => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const showPendingCount = isAdmin && item.id === 'admin-assignments' && pendingUsers.length > 0;
           return (
             <button
               key={item.id}
@@ -247,6 +261,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-emerald-400' : 'text-slate-400'}`} />
               <span>{item.label}</span>
+              {showPendingCount && (
+                <span
+                  className={`px-1.5 py-0.2 rounded text-[10px] font-bold tabular-nums ${
+                    isActive ? 'bg-amber-400 text-slate-950' : 'bg-amber-100 text-amber-800'
+                  }`}
+                >
+                  {pendingUsers.length}
+                </span>
+              )}
             </button>
           );
         })}

@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   Database,
   AlertCircle,
-  ClipboardCheck
+  ClipboardCheck,
+  Clock
 } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
@@ -53,7 +54,15 @@ export const AuthScreen: React.FC = () => {
           setIsLoading(false);
           return;
         }
-        await registerWithEmail(email.trim(), password.trim(), name.trim(), role);
+        const result = await registerWithEmail(email.trim(), password.trim(), name.trim(), role);
+        if (result.requiresApproval) {
+          setSuccessNotice(
+            `Registration submitted for ${result.user.email} (${result.user.role === 'admin' ? 'Administrator' : 'Teacher'}). An administrator must approve your account before you can sign in.`
+          );
+          setAuthMode('signin');
+          setPassword('');
+          setName('');
+        }
       }
     } catch (err: any) {
       console.error('Authentication error:', err);
@@ -172,6 +181,7 @@ export const AuthScreen: React.FC = () => {
                   onClick={() => {
                     setAuthMode('register');
                     setErrorMessage(null);
+                    setSuccessNotice(null);
                   }}
                   className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                     authMode === 'register'
@@ -195,9 +205,12 @@ export const AuthScreen: React.FC = () => {
             )}
 
             {successNotice && (
-              <div className="mt-5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span className="font-medium">{successNotice}</span>
+              <div
+                role="status"
+                className="mt-5 p-3.5 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-start gap-2.5"
+              >
+                <Clock className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+                <span className="font-medium leading-relaxed">{successNotice}</span>
               </div>
             )}
 
@@ -314,6 +327,15 @@ export const AuthScreen: React.FC = () => {
                 </div>
               </div>
 
+              {authMode === 'register' && (
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
+                  <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                  <span>
+                    New registrations require administrator approval before your account can sign in.
+                  </span>
+                </div>
+              )}
+
               <div className="pt-2">
                 <button
                   type="submit"
@@ -325,10 +347,10 @@ export const AuthScreen: React.FC = () => {
                   }`}
                 >
                   {isLoading ? (
-                    <span>Authenticating...</span>
+                    <span>{authMode === 'signin' ? 'Signing in...' : 'Submitting request...'}</span>
                   ) : (
                     <>
-                      <span>{authMode === 'signin' ? 'Sign In to My Interface' : 'Create Account & Enter'}</span>
+                      <span>{authMode === 'signin' ? 'Sign In to My Interface' : 'Submit Registration for Approval'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
