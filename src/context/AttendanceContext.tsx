@@ -6,6 +6,11 @@ import {
   AttendanceStatus,
   ClassGroup,
   CourseworkAssignment,
+  FormFillupFeeConfig,
+  FormFillupPaymentStatus,
+  FormFillupResponsibility,
+  FormFillupResultStatus,
+  FormFillupStudentRecord,
   Student,
   StudentAssignmentEvaluation,
   Subject,
@@ -29,6 +34,17 @@ import {
   validateCourseworkInput,
   validateEvaluationScore,
 } from '../utils/courseworkLogic';
+import {
+  calculateStudentFormFillupFee,
+  canEditFormFillupFeeConfig,
+  createDefaultFeeConfig,
+  normalizeResultInput,
+  validateFeeConfig,
+} from '../utils/formFillupLogic';
+import {
+  buildUserProfileUpdatePayload,
+  UserProfileEditableInput,
+} from '../utils/userProfileLogic';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -73,6 +89,9 @@ interface AttendanceContextType {
   records: AttendanceRecord[];
   courseworkAssignments: CourseworkAssignment[];
   studentEvaluations: StudentAssignmentEvaluation[];
+  formFillupResponsibilities: FormFillupResponsibility[];
+  formFillupFeeConfigs: FormFillupFeeConfig[];
+  formFillupRecords: FormFillupStudentRecord[];
 
   // Permissions & Auth
   isAuthenticated: boolean;
@@ -89,6 +108,7 @@ interface AttendanceContextType {
   getClassStudents: (classId: string) => Student[];
   getSubjectsBySemester: (semester: string) => Subject[];
   setDailyClassTarget: (target: number) => Promise<void>;
+  updateCurrentUserProfile: (input: UserProfileEditableInput) => Promise<User>;
 
   // Admin actions (Restricted)
   addTeacher: (teacher: NewTeacherInput) => Promise<User>;
@@ -143,6 +163,28 @@ interface AttendanceContextType {
     }>
   ) => Promise<void>;
 
+  // Form Fill-up Coordinator & Fee Calculation actions
+  assignFormFillupCoordinator: (semester: string, classId: string, teacherId: string) => Promise<void>;
+  unassignFormFillupCoordinator: (responsibilityId: string) => Promise<void>;
+  saveFormFillupFeeConfig: (
+    config: Omit<FormFillupFeeConfig, 'id' | 'updatedAt' | 'updatedBy'>
+  ) => Promise<FormFillupFeeConfig>;
+  saveFormFillupRecords: (
+    semester: string,
+    classId: string,
+    entries: Array<{
+      studentId: string;
+      resultStatus: FormFillupResultStatus;
+      referredSubjectsCount: number;
+      referredSemestersCount: number;
+      practicalSubjectsCount: number;
+      applyDelayFee: boolean;
+      resultSummaryNote?: string;
+      paymentStatus: FormFillupPaymentStatus;
+    }>,
+    feeConfigOverride?: FormFillupFeeConfig
+  ) => Promise<void>;
+
   resetToDefaultBTEBData: () => Promise<void>;
   clearAllDemoData: () => Promise<void>;
 }
@@ -188,6 +230,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [courseworkAssignments, setCourseworkAssignments] = useState<CourseworkAssignment[]>([]);
   const [studentEvaluations, setStudentEvaluations] = useState<StudentAssignmentEvaluation[]>([]);
+  const [formFillupResponsibilities, setFormFillupResponsibilities] = useState<FormFillupResponsibility[]>([]);
+  const [formFillupFeeConfigs, setFormFillupFeeConfigs] = useState<FormFillupFeeConfig[]>([]);
+  const [formFillupRecords, setFormFillupRecords] = useState<FormFillupStudentRecord[]>([]);
   const [isFirebaseLive, setIsFirebaseLive] = useState(false);
 
   // Sync active user to localStorage
@@ -233,6 +278,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     let unsubUsers: () => void;
     let unsubCoursework: () => void;
     let unsubEvaluations: () => void;
+    let unsubFormResp: () => void;
+    let unsubFormFeeConfigs: () => void;
+    let unsubFormRecords: () => void;
 
     try {
       // 1. Classes listener
@@ -327,6 +375,27 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setStudentEvaluations(list);
       }, err => console.warn('Evaluations listener fallback:', err));
 
+      // 10. Form Fill-up responsibilities listener
+      unsubFormResp = onSnapshot(collection(db, 'formFillupResponsibilities'), snapshot => {
+        const list: FormFillupResponsibility[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setFormFillupResponsibilities(list);
+      }, err => console.warn('Form fill-up responsibilities listener fallback:', err));
+
+      // 11. Form Fill-up fee configs listener
+      unsubFormFeeConfigs = onSnapshot(collection(db, 'formFillupFeeConfigs'), snapshot => {
+        const list: FormFillupFeeConfig[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setFormFillupFeeConfigs(list);
+      }, err => console.warn('Form fill-up fee configs listener fallback:', err));
+
+      // 12. Form Fill-up student records listener
+      unsubFormRecords = onSnapshot(collection(db, 'formFillupRecords'), snapshot => {
+        const list: FormFillupStudentRecord[] = [];
+        snapshot.forEach(d => list.push({ id: d.id, ...(d.data() as any) }));
+        setFormFillupRecords(list);
+      }, err => console.warn('Form fill-up records listener fallback:', err));
+
     } catch (e) {
       console.error('Error mounting Firestore real-time listeners:', e);
     }
@@ -341,6 +410,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       unsubUsers?.();
       unsubCoursework?.();
       unsubEvaluations?.();
+      unsubFormResp?.();
+      unsubFormFeeConfigs?.();
+      unsubFormRecords?.();
     };
   }, []);
 
@@ -430,6 +502,40 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (e) {
       console.warn('Syncing dailyClassTarget to Firestore:', e);
     }
+  };
+
+  const updateCurrentUserProfile = async (input: UserProfileEditableInput): Promise<User> => {
+    if (!currentUser) {
+      throw new Error('You must be signed in to update your profile.');
+    }
+
+    const validation = buildUserProfileUpdatePayload(currentUser, input);
+    if (!validation.valid || !validation.updatedUser) {
+      throw new Error(validation.error || 'Please check your profile details and try again.');
+    }
+
+    const updatedUser = validation.updatedUser;
+
+    setCurrentUserState(updatedUser);
+    localStorage.setItem('presently_active_user', JSON.stringify(updatedUser));
+    if (typeof updatedUser.dailyClassTarget === 'number') {
+      localStorage.setItem(
+        `presently_daily_target_${updatedUser.id}`,
+        updatedUser.dailyClassTarget.toString()
+      );
+    }
+    setUsers(prev => prev.map(u => (u.id === updatedUser.id ? updatedUser : u)));
+
+    try {
+      const cleanUser: any = { ...updatedUser };
+      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+      await setDoc(doc(db, 'users', updatedUser.id), cleanUser);
+    } catch (e) {
+      console.warn('Syncing updated user profile to Firestore:', e);
+      throw new Error('Profile saved locally, but Cloud Firestore sync failed. Please retry.');
+    }
+
+    return updatedUser;
   };
 
   // Auth Functions
@@ -961,11 +1067,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const updateStudent = async (stu: Student) => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrators can update official student profile records.');
+    }
+    const cleanStu: any = { ...stu };
+    Object.keys(cleanStu).forEach(k => cleanStu[k] === undefined && delete cleanStu[k]);
     setStudents(prev => prev.map(s => (s.id === stu.id ? stu : s)));
     try {
-      await setDoc(doc(db, 'students', stu.id), stu);
+      await setDoc(doc(db, 'students', stu.id), cleanStu, { merge: true });
     } catch (e) {
-      console.warn(e);
+      console.warn('Firestore update student:', e);
     }
   };
 
@@ -1285,6 +1396,229 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // Form Fill-up Coordinator & Fee Calculation actions
+  const assignFormFillupCoordinator = async (
+    semester: string,
+    classId: string,
+    teacherId: string
+  ): Promise<void> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrator can assign semester form fill-up responsibility.');
+    }
+    if (!teacherId) {
+      throw new Error('Please select a teacher to assign form fill-up responsibility.');
+    }
+
+    const respId = `ff-resp-${classId}`;
+    const newResp: FormFillupResponsibility = {
+      id: respId,
+      semester,
+      classId,
+      teacherId,
+      academicYear: '2026-2027',
+      assignedAt: new Date().toISOString().split('T')[0],
+      assignedBy: currentUser?.email || currentUser?.name || 'Admin',
+    };
+
+    const replaced = formFillupResponsibilities.filter(
+      r => (r.classId === classId || r.semester === semester) && r.id !== respId
+    );
+
+    setFormFillupResponsibilities(prev => [
+      ...prev.filter(r => r.classId !== classId && r.id !== respId),
+      newResp,
+    ]);
+
+    try {
+      const batch = writeBatch(db);
+      replaced.forEach(oldItem => batch.delete(doc(db, 'formFillupResponsibilities', oldItem.id)));
+      batch.set(doc(db, 'formFillupResponsibilities', newResp.id), newResp);
+      await batch.commit();
+    } catch (e) {
+      console.warn('Firestore assignFormFillupCoordinator sync:', e);
+    }
+  };
+
+  const unassignFormFillupCoordinator = async (responsibilityId: string): Promise<void> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrator can remove form fill-up coordinator allocation.');
+    }
+
+    setFormFillupResponsibilities(prev => prev.filter(r => r.id !== responsibilityId));
+    try {
+      await deleteDoc(doc(db, 'formFillupResponsibilities', responsibilityId));
+    } catch (e) {
+      console.warn('Firestore unassignFormFillupCoordinator sync:', e);
+    }
+  };
+
+  const canManageFormFillupForClass = (classId: string): boolean => {
+    if (!currentUser) return false;
+    if (isAdmin) return true;
+    return formFillupResponsibilities.some(
+      r => r.classId === classId && r.teacherId === currentUser.id
+    );
+  };
+
+  const saveFormFillupFeeConfig = async (
+    configInput: Omit<FormFillupFeeConfig, 'id' | 'updatedAt' | 'updatedBy'>
+  ): Promise<FormFillupFeeConfig> => {
+    if (!canEditFormFillupFeeConfig(currentUser)) {
+      throw new Error('Access Denied: Only Administrators can modify examination fee rates.');
+    }
+
+    const validation = validateFeeConfig(configInput);
+    if (!validation.valid) {
+      throw new Error(validation.error || 'Invalid form fill-up fee schedule.');
+    }
+
+    const nowIso = new Date().toISOString();
+    const updatedBy = currentUser?.email || currentUser?.name || 'Admin';
+    const savedConfig: FormFillupFeeConfig = {
+      id: `ff-fee-${configInput.classId}`,
+      semester: configInput.semester,
+      classId: configInput.classId,
+      examFee: Number(configInput.examFee) || 0,
+      referredExamFeePerSubject: Number(configInput.referredExamFeePerSubject) || 0,
+      marksheetFeeRegular: Number(configInput.marksheetFeeRegular) || 0,
+      marksheetFeeReferredPerSemester: Number(configInput.marksheetFeeReferredPerSemester) || 0,
+      centerFeeRegular: Number(configInput.centerFeeRegular) || 0,
+      centerFeeReferredPerSemester: Number(configInput.centerFeeReferredPerSemester) || 0,
+      practicalFeePerSubject: Number(configInput.practicalFeePerSubject) || 0,
+      questionFee: Number(configInput.questionFee) || 0,
+      delayFee: Number(configInput.delayFee) || 0,
+      updatedAt: nowIso,
+      updatedBy,
+    };
+
+    const classRecordsToRecalculate = formFillupRecords
+      .filter(r => r.classId === savedConfig.classId)
+      .map(rec => {
+        const breakdown = calculateStudentFormFillupFee(savedConfig, {
+          resultStatus: rec.resultStatus,
+          referredSubjectsCount: rec.referredSubjectsCount,
+          referredSemestersCount: rec.referredSemestersCount,
+          practicalSubjectsCount: rec.practicalSubjectsCount,
+          applyDelayFee: rec.applyDelayFee,
+        });
+        return {
+          ...rec,
+          calculatedAmountTk: breakdown.totalAmountTk,
+          updatedAt: nowIso,
+          updatedBy,
+        };
+      });
+
+    setFormFillupFeeConfigs(prev => [
+      ...prev.filter(c => c.classId !== savedConfig.classId && c.id !== savedConfig.id),
+      savedConfig,
+    ]);
+
+    if (classRecordsToRecalculate.length > 0) {
+      const updatedRecordIds = new Set(classRecordsToRecalculate.map(r => r.id));
+      setFormFillupRecords(prev => [
+        ...prev.filter(r => !updatedRecordIds.has(r.id)),
+        ...classRecordsToRecalculate,
+      ]);
+    }
+
+    try {
+      const batch = writeBatch(db);
+      batch.set(doc(db, 'formFillupFeeConfigs', savedConfig.id), savedConfig);
+      classRecordsToRecalculate.forEach(rec => {
+        const cleanRec: Record<string, unknown> = { ...rec };
+        Object.keys(cleanRec).forEach(k => cleanRec[k] === undefined && delete cleanRec[k]);
+        batch.set(doc(db, 'formFillupRecords', rec.id), cleanRec);
+      });
+      await batch.commit();
+    } catch (e) {
+      console.warn('Firestore saveFormFillupFeeConfig sync:', e);
+    }
+
+    return savedConfig;
+  };
+
+  const saveFormFillupRecords = async (
+    semester: string,
+    classId: string,
+    entries: Array<{
+      studentId: string;
+      resultStatus: FormFillupResultStatus;
+      referredSubjectsCount: number;
+      referredSemestersCount: number;
+      practicalSubjectsCount: number;
+      applyDelayFee: boolean;
+      resultSummaryNote?: string;
+      paymentStatus: FormFillupPaymentStatus;
+    }>,
+    feeConfigOverride?: FormFillupFeeConfig
+  ): Promise<void> => {
+    if (!canManageFormFillupForClass(classId)) {
+      throw new Error('Access Denied: You are not assigned as the form fill-up coordinator for this semester.');
+    }
+
+    // Only administrators may supply an unsaved fee config override; teachers always compute from official admin-saved rates.
+    const effectiveConfig =
+      (canEditFormFillupFeeConfig(currentUser) ? feeConfigOverride : undefined) ||
+      formFillupFeeConfigs.find(c => c.classId === classId) ||
+      createDefaultFeeConfig(semester, classId);
+
+    const nowIso = new Date().toISOString();
+    const updatedRecords: FormFillupStudentRecord[] = entries.map(entry => {
+      const normalized = normalizeResultInput({
+        resultStatus: entry.resultStatus,
+        referredSubjectsCount: entry.referredSubjectsCount,
+        referredSemestersCount: entry.referredSemestersCount,
+        practicalSubjectsCount: entry.practicalSubjectsCount,
+        applyDelayFee: entry.applyDelayFee,
+      });
+
+      const breakdown = calculateStudentFormFillupFee(effectiveConfig, normalized);
+      const trimmedNote = entry.resultSummaryNote?.trim();
+
+      const recordObj: FormFillupStudentRecord = {
+        id: `ff-rec-${classId}-${entry.studentId}`,
+        semester,
+        classId,
+        studentId: entry.studentId,
+        resultStatus: normalized.resultStatus,
+        referredSubjectsCount: normalized.referredSubjectsCount,
+        referredSemestersCount: normalized.referredSemestersCount,
+        practicalSubjectsCount: normalized.practicalSubjectsCount,
+        applyDelayFee: normalized.applyDelayFee,
+        calculatedAmountTk: breakdown.totalAmountTk,
+        paymentStatus: entry.paymentStatus,
+        updatedAt: nowIso,
+        updatedBy: currentUser?.email || currentUser?.name || 'Coordinator',
+      };
+      if (trimmedNote) {
+        recordObj.resultSummaryNote = trimmedNote;
+      }
+      return recordObj;
+    });
+
+    const updatedIds = new Set(updatedRecords.map(r => r.id));
+    setFormFillupRecords(prev => [
+      ...prev.filter(r => !updatedIds.has(r.id)),
+      ...updatedRecords,
+    ]);
+
+    try {
+      for (let i = 0; i < updatedRecords.length; i += 400) {
+        const chunk = updatedRecords.slice(i, i + 400);
+        const batch = writeBatch(db);
+        chunk.forEach(rec => {
+          const cleanRec: Record<string, unknown> = { ...rec };
+          Object.keys(cleanRec).forEach(k => cleanRec[k] === undefined && delete cleanRec[k]);
+          batch.set(doc(db, 'formFillupRecords', rec.id), cleanRec);
+        });
+        await batch.commit();
+      }
+    } catch (e) {
+      console.warn('Firestore saveFormFillupRecords sync:', e);
+    }
+  };
+
   const resetToDefaultBTEBData = async () => {
     setSubjects(BTEB_CURRICULUM_2022_SUBJECTS);
     setClasses(BTEB_CLASSES);
@@ -1294,6 +1628,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setRecords([]);
     setCourseworkAssignments([]);
     setStudentEvaluations([]);
+    setFormFillupResponsibilities([]);
+    setFormFillupFeeConfigs([]);
+    setFormFillupRecords([]);
     await seedInitialFirestore();
   };
 
@@ -1304,6 +1641,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setAssignments([]);
     setCourseworkAssignments([]);
     setStudentEvaluations([]);
+    setFormFillupResponsibilities([]);
+    setFormFillupFeeConfigs([]);
+    setFormFillupRecords([]);
     setUsers(prev => prev.filter(u => !DEMO_USER_IDS.has(u.id)));
 
     try {
@@ -1314,6 +1654,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         'assignments',
         'courseworkAssignments',
         'studentEvaluations',
+        'formFillupResponsibilities',
+        'formFillupFeeConfigs',
+        'formFillupRecords',
       ];
       for (const col of collectionsToWipe) {
         const snap = await getDocs(collection(db, col));
@@ -1359,6 +1702,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         records,
         courseworkAssignments,
         studentEvaluations,
+        formFillupResponsibilities,
+        formFillupFeeConfigs,
+        formFillupRecords,
         isAuthenticated,
         isAdmin,
         canImportStudents,
@@ -1371,6 +1717,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         getClassStudents,
         getSubjectsBySemester,
         setDailyClassTarget,
+        updateCurrentUserProfile,
         addTeacher,
         deleteTeacher,
         approveUserRegistration,
@@ -1388,6 +1735,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         createCourseworkAssignment,
         deleteCourseworkAssignment,
         saveStudentEvaluations,
+        assignFormFillupCoordinator,
+        unassignFormFillupCoordinator,
+        saveFormFillupFeeConfig,
+        saveFormFillupRecords,
         resetToDefaultBTEBData,
         clearAllDemoData,
       }}

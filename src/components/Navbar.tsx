@@ -14,6 +14,8 @@ import {
   LogOut,
   ChevronDown,
   ClipboardList,
+  Receipt,
+  UserCog,
 } from 'lucide-react';
 
 interface NavbarProps {
@@ -52,16 +54,18 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const navItems = isTeacher
     ? [
-        { id: 'my-subjects', label: 'My BTEB Subjects', icon: BookOpen },
-        { id: 'take-attendance', label: 'Take Attendance', icon: UserCheck },
+        { id: 'my-subjects', label: 'My Subjects', icon: BookOpen },
+        { id: 'take-attendance', label: 'Attendance', icon: UserCheck },
         { id: 'assignments', label: 'Assignments', icon: ClipboardList },
-        { id: 'reports', label: 'Reports & Trends', icon: BarChart3 },
-        { id: 'roster', label: 'Student Directory', icon: Users },
+        { id: 'form-fillup', label: 'Form Fill-up', icon: Receipt },
+        { id: 'reports', label: 'Reports', icon: BarChart3 },
+        { id: 'roster', label: 'Students', icon: Users },
       ]
     : [
         { id: 'admin-assignments', label: 'Subject Allocation', icon: School },
         { id: 'admin-classes', label: 'Batches & Students', icon: Users },
         { id: 'assignments', label: 'Assignments', icon: ClipboardList },
+        { id: 'form-fillup', label: 'Form Fill-up', icon: Receipt },
         { id: 'reports', label: 'Reports', icon: BarChart3 },
       ];
 
@@ -197,6 +201,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </div>
 
                   <div className="p-1 space-y-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUserDropdown(false);
+                        setActiveTab('user-profile');
+                      }}
+                      className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-left text-xs font-semibold text-slate-800 hover:bg-emerald-50 hover:text-emerald-800 transition-colors"
+                    >
+                      <UserCog className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span>My Profile &amp; Settings</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {

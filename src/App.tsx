@@ -10,6 +10,9 @@ import { BulkImportModal } from './components/BulkImportModal';
 import { LoginModal } from './components/LoginModal';
 import { AuthScreen } from './components/AuthScreen';
 import { StudentAssignmentsTracker } from './components/StudentAssignmentsTracker';
+import { FormFillupManager } from './components/FormFillupManager';
+import { StudentProfileView } from './components/StudentProfileView';
+import { UserProfileView } from './components/UserProfileView';
 import { SubjectPart } from './types/attendance';
 
 function AttendanceApp() {
@@ -24,6 +27,8 @@ function AttendanceApp() {
   React.useEffect(() => {
     setActiveSubjectId(undefined);
     setActiveSubjectPart(undefined);
+    setActiveFormFillupClassId(undefined);
+    setActiveProfileStudentId(undefined);
     if (!currentUser) {
       setActiveTab('my-subjects');
       return;
@@ -34,6 +39,8 @@ function AttendanceApp() {
   // Selected subject & part when transitioning into studio or reports
   const [activeSubjectId, setActiveSubjectId] = useState<string | undefined>(undefined);
   const [activeSubjectPart, setActiveSubjectPart] = useState<SubjectPart | undefined>(undefined);
+  const [activeFormFillupClassId, setActiveFormFillupClassId] = useState<string | undefined>(undefined);
+  const [activeProfileStudentId, setActiveProfileStudentId] = useState<string | undefined>(undefined);
 
   // Bulk import modal
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
@@ -65,9 +72,19 @@ function AttendanceApp() {
     setActiveTab('assignments');
   };
 
+  const handleOpenFormFillup = (classId?: string) => {
+    setActiveFormFillupClassId(classId);
+    setActiveTab('form-fillup');
+  };
+
   const handleOpenBulkImport = (classId?: string) => {
     setImportTargetClassId(classId);
     setIsBulkImportOpen(true);
+  };
+
+  const handleOpenStudentProfile = (studentId: string) => {
+    setActiveProfileStudentId(studentId);
+    setActiveTab('student-profile');
   };
 
   return (
@@ -89,6 +106,8 @@ function AttendanceApp() {
                 onStartAttendance={handleStartAttendance}
                 onViewReports={handleViewReports}
                 onOpenAssignments={handleOpenAssignments}
+                onOpenFormFillup={handleOpenFormFillup}
+                onOpenUserProfile={() => setActiveTab('user-profile')}
                 onOpenBulkImport={() => handleOpenBulkImport()}
               />
             )}
@@ -105,6 +124,9 @@ function AttendanceApp() {
                 initialPart={activeSubjectPart}
               />
             )}
+            {activeTab === 'form-fillup' && (
+              <FormFillupManager initialClassId={activeFormFillupClassId} />
+            )}
             {activeTab === 'reports' && (
               <ReportsAndTrends
                 initialSubjectId={activeSubjectId}
@@ -113,7 +135,20 @@ function AttendanceApp() {
               />
             )}
             {activeTab === 'roster' && (
-              <ClassRosterView onOpenBulkImport={handleOpenBulkImport} />
+              <ClassRosterView
+                onOpenBulkImport={handleOpenBulkImport}
+                onViewStudentProfile={handleOpenStudentProfile}
+              />
+            )}
+            {activeTab === 'student-profile' && activeProfileStudentId && (
+              <StudentProfileView
+                studentId={activeProfileStudentId}
+                onBack={() => setActiveTab('roster')}
+                onSelectStudent={id => setActiveProfileStudentId(id)}
+              />
+            )}
+            {activeTab === 'user-profile' && (
+              <UserProfileView onBack={() => setActiveTab('my-subjects')} />
             )}
           </>
         ) : (
@@ -123,13 +158,29 @@ function AttendanceApp() {
               <AdminAssignments />
             )}
             {activeTab === 'admin-classes' && (
-              <ClassRosterView onOpenBulkImport={handleOpenBulkImport} />
+              <ClassRosterView
+                onOpenBulkImport={handleOpenBulkImport}
+                onViewStudentProfile={handleOpenStudentProfile}
+              />
+            )}
+            {activeTab === 'student-profile' && activeProfileStudentId && (
+              <StudentProfileView
+                studentId={activeProfileStudentId}
+                onBack={() => setActiveTab('admin-classes')}
+                onSelectStudent={id => setActiveProfileStudentId(id)}
+              />
+            )}
+            {activeTab === 'user-profile' && (
+              <UserProfileView onBack={() => setActiveTab('admin-assignments')} />
             )}
             {activeTab === 'assignments' && (
               <StudentAssignmentsTracker
                 initialSubjectId={activeSubjectId}
                 initialPart={activeSubjectPart}
               />
+            )}
+            {activeTab === 'form-fillup' && (
+              <FormFillupManager initialClassId={activeFormFillupClassId} />
             )}
             {activeTab === 'reports' && (
               <ReportsAndTrends

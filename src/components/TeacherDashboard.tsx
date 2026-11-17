@@ -19,7 +19,9 @@ import {
   Settings2,
   ClipboardCheck,
   ClipboardList,
-  UserX
+  UserX,
+  Receipt,
+  UserCog
 } from 'lucide-react';
 import { calculateSessionSummary, calculateDailyClassTargetProgress } from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
@@ -30,6 +32,8 @@ interface TeacherDashboardProps {
   onStartAttendance: (subjectId: string, part?: SubjectPart) => void;
   onViewReports: (subjectId: string, part?: SubjectPart) => void;
   onOpenAssignments?: (subjectId?: string, part?: SubjectPart) => void;
+  onOpenFormFillup?: (classId?: string) => void;
+  onOpenUserProfile?: () => void;
   onOpenBulkImport: () => void;
 }
 
@@ -37,6 +41,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   onStartAttendance,
   onViewReports,
   onOpenAssignments,
+  onOpenFormFillup,
+  onOpenUserProfile,
   onOpenBulkImport,
 }) => {
   const {
@@ -48,6 +54,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     students,
     records,
     users,
+    classes,
+    formFillupResponsibilities,
     setDailyClassTarget,
   } = useAttendance();
 
@@ -100,6 +108,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     return acc + getClassStudents(classId).length;
   }, 0);
 
+  const teacherFormFillupResponsibilities = formFillupResponsibilities.filter(
+    r => r.teacherId === currentUser.id
+  );
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Editorial Workspace Header */}
@@ -123,17 +135,62 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
         </div>
 
-        {teacherAssignments.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+          {onOpenUserProfile && (
+            <button
+              type="button"
+              onClick={onOpenUserProfile}
+              className="inline-flex items-center justify-center gap-1.5 h-10 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
+            >
+              <UserCog className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>My Profile</span>
+            </button>
+          )}
+          {teacherAssignments.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onStartAttendance(teacherAssignments[0].subject.id, teacherAssignments[0].assignment.part || 'theory')}
+              className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
+            >
+              <ClipboardCheck className="w-4 h-4 shrink-0" />
+              <span>Launch 1-Click Roll Call</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Assigned Semester Form Fill-up Coordinator Shortcut */}
+      {teacherFormFillupResponsibilities.length > 0 && onOpenFormFillup && (
+        <div className="bg-white rounded-xl p-4 sm:px-5 border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
+              <Receipt className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Assigned Form Fill-up Coordinator
+              </h2>
+              <p className="text-xs text-slate-600 mt-0.5">
+                You are responsible for semester final exam form fill-up calculation for{' '}
+                <span className="font-semibold text-slate-900">
+                  {teacherFormFillupResponsibilities
+                    .map(r => classes.find(c => c.id === r.classId)?.name || `${r.semester} Semester`)
+                    .join(', ')}
+                </span>
+                .
+              </p>
+            </div>
+          </div>
           <button
             type="button"
-            onClick={() => onStartAttendance(teacherAssignments[0].subject.id, teacherAssignments[0].assignment.part || 'theory')}
-            className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0 self-start md:self-auto"
+            onClick={() => onOpenFormFillup(teacherFormFillupResponsibilities[0].classId)}
+            className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 self-start sm:self-auto"
           >
-            <ClipboardCheck className="w-4 h-4 shrink-0" />
-            <span>Launch 1-Click Roll Call</span>
+            <span>Open Form Fill-up Desk</span>
+            <ArrowRight className="w-3.5 h-3.5 text-emerald-400" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* KPI Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">

@@ -1,0 +1,238 @@
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import {
+  ClassGroup,
+  FormFillupFeeConfig,
+  FormFillupStudentRecord,
+  Student,
+  User,
+} from '../types/attendance';
+import {
+  calculateFormFillupBatchTotals,
+  calculateStudentFormFillupFee,
+  formatResultStatusLabel,
+  StudentResultInput,
+} from './formFillupLogic';
+
+export interface FormFillupPDFOptions {
+  classGroup: ClassGroup;
+  students: Student[];
+  records: FormFillupStudentRecord[];
+  feeConfig: FormFillupFeeConfig;
+  defaultPracticalCount?: number;
+  coordinator?: User;
+  generatedBy?: User | null;
+}
+
+export function generateFormFillupPDF(options: FormFillupPDFOptions): jsPDF {
+  const {
+    classGroup,
+    students,
+    records,
+    feeConfig,
+    defaultPracticalCount = 0,
+    coordinator,
+    generatedBy,
+  } = options;
+
+  const activeStudents = [...students]
+    .filter(s => s.classId === classGroup.id && s.status === 'active')
+    .sort((a, b) => a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true }));
+
+  const recordMap = new Map<string, FormFillupStudentRecord>();
+  records.forEach(r => {
+    if (r.classId === classGroup.id) {
+      recordMap.set(r.studentId, r);
+    }
+  });
+
+  const batchSummary = calculateFormFillupBatchTotals({
+    students,
+    records,
+    feeConfig,
+    defaultPracticalCount,
+  });
+
+  // A4 Landscape (297mm x 210mm) for clean 9-metric breakdown columns
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Header Banner
+  doc.setFillColor(15, 23, 42);
+  doc.rect(0, 0, pageWidth, 27, 'F');
+  doc.setFillColor(5, 150, 105);
+  doc.rect(0, 0, pageWidth, 3, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text('BANGLADESH TECHNICAL EDUCATION BOARD (BTEB)', pageWidth / 2, 10, {
+    align: 'center',
+  });
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(203, 213, 225);
+  doc.text('DIPLOMA IN COMPUTER SCIENCE & TECHNOLOGY (85) • SEMESTER FINAL FORM FILL-UP FEE SCHEDULE', pageWidth / 2, 15.5, {
+    align: 'center',
+  });
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.setTextColor(110, 231, 183);
+  doc.text(`${classGroup.name.toUpperCase()} (${classGroup.section})`, pageWidth / 2, 22, {
+    align: 'center',
+  });
+
+  // Metadata Box
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(226, 232, 240);
+  doc.roundedRect(10, 31, pageWidth - 20, 20, 2, 2, 'FD');
+
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Assigned Coordinator:', 14, 37.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    coordinator ? `${coordinator.name} (${coordinator.email})` : 'Department Administration',
+    49,
+    37.5
+  );
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fee Rates (Tk):', 14, 44.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Exam: ${feeConfig.examFee} | Ref/Sub: ${feeConfig.referredExamFeePerSubject} | MS Reg: ${feeConfig.marksheetFeeRegular} | MS Ref/Sem: ${feeConfig.marksheetFeeReferredPerSemester} | Center Reg: ${feeConfig.centerFeeRegular} | Center Ref/Sem: ${feeConfig.centerFeeReferredPerSemester} | Prac/Sub: ${feeConfig.practicalFeePerSubject} | Qn: ${feeConfig.questionFee} | Delay: ${feeConfig.delayFee}`,
+    39,
+    44.5
+  );
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Total Collectible:', pageWidth - 75, 37.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Tk ${batchSummary.totalCollectibleTk.toLocaleString()} (${batchSummary.totalStudents} Students)`,
+    pageWidth - 46,
+    37.5
+  );
+
+  doc.setFont('helvetica', 'bold');
+  doc.text('Collected / Paid:', pageWidth - 75, 44.5);
+  doc.setFont('helvetica', 'normal');
+  doc.text(
+    `Tk ${batchSummary.totalCollectedTk.toLocaleString()} (${batchSummary.paidOrSubmittedCount}/${batchSummary.totalStudents})`,
+    pageWidth - 46,
+    44.5
+  );
+
+  const tableBody = activeStudents.map(stu => {
+    const rec = recordMap.get(stu.id);
+    const input: StudentResultInput = rec
+      ? {
+          resultStatus: rec.resultStatus,
+          referredSubjectsCount: rec.referredSubjectsCount,
+          referredSemestersCount: rec.referredSemestersCount,
+          practicalSubjectsCount: rec.practicalSubjectsCount,
+          applyDelayFee: rec.applyDelayFee,
+        }
+      : {
+          resultStatus: 'regular',
+          referredSubjectsCount: 0,
+          referredSemestersCount: 0,
+          practicalSubjectsCount: defaultPracticalCount,
+          applyDelayFee: false,
+        };
+    const b = calculateStudentFormFillupFee(feeConfig, input);
+    const statusLabel = rec?.paymentStatus ? rec.paymentStatus.toUpperCase() : 'PENDING';
+
+    return [
+      stu.rollNumber,
+      stu.name,
+      formatResultStatusLabel(input.resultStatus),
+      String(input.referredSubjectsCount),
+      String(input.referredSemestersCount),
+      String(input.practicalSubjectsCount),
+      String(b.examFeeAmount),
+      String(b.referredExamFeeAmount),
+      String(b.marksheetRegularAmount + b.marksheetReferredAmount),
+      String(b.centerRegularAmount + b.centerReferredAmount),
+      String(b.practicalFeeAmount),
+      String(b.questionFeeAmount),
+      String(b.delayFeeAmount),
+      `${b.totalAmountTk}`,
+      statusLabel,
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 55,
+    margin: { left: 10, right: 10 },
+    head: [[
+      'Roll',
+      'Student Name',
+      'Result',
+      'Ref Sub',
+      'Ref Sem',
+      'Prac Sub',
+      'Exam',
+      'Ref Exam',
+      'Marksheet',
+      'Center',
+      'Practical',
+      'Question',
+      'Delay',
+      'Total (Tk)',
+      'Status',
+    ]],
+    body: tableBody,
+    theme: 'grid',
+    headStyles: {
+      fillColor: [15, 23, 42],
+      textColor: [255, 255, 255],
+      fontSize: 7.5,
+      fontStyle: 'bold',
+      halign: 'center',
+    },
+    bodyStyles: {
+      fontSize: 7.5,
+      textColor: [30, 41, 59],
+      valign: 'middle',
+    },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 16 },
+      1: { halign: 'left', cellWidth: 40 },
+      2: { halign: 'left', cellWidth: 28 },
+      3: { halign: 'center', cellWidth: 13 },
+      4: { halign: 'center', cellWidth: 13 },
+      5: { halign: 'center', cellWidth: 14 },
+      6: { halign: 'right', cellWidth: 14 },
+      7: { halign: 'right', cellWidth: 16 },
+      8: { halign: 'right', cellWidth: 18 },
+      9: { halign: 'right', cellWidth: 16 },
+      10: { halign: 'right', cellWidth: 17 },
+      11: { halign: 'right', cellWidth: 16 },
+      12: { halign: 'right', cellWidth: 14 },
+      13: { halign: 'right', cellWidth: 20, fontStyle: 'bold' },
+      14: { halign: 'center', cellWidth: 18 },
+    },
+  });
+
+  const finalY = ((doc as any).lastAutoTable?.finalY || 140) + 12;
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(
+    `Generated by ${generatedBy?.name || coordinator?.name || 'Presently'} on ${new Date().toISOString().split('T')[0]}`,
+    12,
+    Math.min(finalY, 198)
+  );
+
+  return doc;
+}

@@ -148,6 +148,62 @@
         "evaluatedAt": { "type": "string", "description": "ISO evaluation timestamp" }
       },
       "required": ["courseworkId", "studentId", "subjectId", "classId", "part", "status"]
+    },
+    "FormFillupResponsibility": {
+      "title": "FormFillupResponsibility",
+      "description": "Teacher assigned by admin to manage semester final exam form fill-up for a specific semester",
+      "type": "object",
+      "properties": {
+        "semester": { "type": "string", "description": "Semester label (1st-8th)" },
+        "classId": { "type": "string", "description": "Semester class batch ID" },
+        "teacherId": { "type": "string", "description": "Assigned teacher user ID" },
+        "academicYear": { "type": "string", "description": "Academic year" },
+        "assignedAt": { "type": "string", "description": "Assignment date" },
+        "assignedBy": { "type": "string", "description": "Admin identifier" }
+      },
+      "required": ["semester", "classId", "teacherId"]
+    },
+    "FormFillupFeeConfig": {
+      "title": "FormFillupFeeConfig",
+      "description": "Configurable 9-metric BTEB semester final form fill-up fee schedule in BDT (Tk)",
+      "type": "object",
+      "properties": {
+        "semester": { "type": "string", "description": "Semester label" },
+        "classId": { "type": "string", "description": "Class batch ID" },
+        "examFee": { "type": "number", "description": "Flat exam fee per regular student" },
+        "referredExamFeePerSubject": { "type": "number", "description": "Referred exam fee per referred subject" },
+        "marksheetFeeRegular": { "type": "number", "description": "Regular marksheet fee" },
+        "marksheetFeeReferredPerSemester": { "type": "number", "description": "Referred marksheet fee per referred semester" },
+        "centerFeeRegular": { "type": "number", "description": "Flat regular center fee" },
+        "centerFeeReferredPerSemester": { "type": "number", "description": "Referred center fee per referred semester" },
+        "practicalFeePerSubject": { "type": "number", "description": "Practical fee per practical subject" },
+        "questionFee": { "type": "number", "description": "Flat question fee per student" },
+        "delayFee": { "type": "number", "description": "Late/delay fee when applicable" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" },
+        "updatedBy": { "type": "string", "description": "Teacher or admin email/name" }
+      },
+      "required": ["semester", "classId", "examFee", "referredExamFeePerSubject", "marksheetFeeRegular", "marksheetFeeReferredPerSemester", "centerFeeRegular", "centerFeeReferredPerSemester", "practicalFeePerSubject", "questionFee", "delayFee"]
+    },
+    "FormFillupStudentRecord": {
+      "title": "FormFillupStudentRecord",
+      "description": "Student semester result inputs and auto-calculated form fill-up fee in Tk",
+      "type": "object",
+      "properties": {
+        "semester": { "type": "string", "description": "Semester label" },
+        "classId": { "type": "string", "description": "Class batch ID" },
+        "studentId": { "type": "string", "description": "Student ID" },
+        "resultStatus": { "type": "string", "enum": ["regular", "regular_with_referred", "referred_only"], "description": "Student exam eligibility category from result" },
+        "referredSubjectsCount": { "type": "number", "description": "Count of referred subjects" },
+        "referredSemestersCount": { "type": "number", "description": "Count of referred semesters" },
+        "practicalSubjectsCount": { "type": "number", "description": "Count of practical subjects" },
+        "applyDelayFee": { "type": "boolean", "description": "Whether late delay fee applies" },
+        "resultSummaryNote": { "type": "string", "description": "Optional GPA or referred course codes", "maxLength": 200 },
+        "calculatedAmountTk": { "type": "number", "description": "Auto-calculated total Tk amount" },
+        "paymentStatus": { "type": "string", "enum": ["pending", "verified", "paid", "submitted"], "description": "Payment and board submission progress" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp" },
+        "updatedBy": { "type": "string", "description": "Coordinator who entered or saved result" }
+      },
+      "required": ["semester", "classId", "studentId", "resultStatus", "calculatedAmountTk", "paymentStatus"]
     }
   },
   "firestore": {
@@ -186,6 +242,18 @@
     "/studentEvaluations/{evaluationId}": {
       "schema": "StudentAssignmentEvaluation",
       "description": "Individual student assignment submission statuses, marks, and teacher evaluations"
+    },
+    "/formFillupResponsibilities/{respId}": {
+      "schema": "FormFillupResponsibility",
+      "description": "Admin allocations assigning semester form fill-up coordination to teachers"
+    },
+    "/formFillupFeeConfigs/{configId}": {
+      "schema": "FormFillupFeeConfig",
+      "description": "Semester-specific 9-metric form fill-up fee configuration in Tk"
+    },
+    "/formFillupRecords/{recordId}": {
+      "schema": "FormFillupStudentRecord",
+      "description": "Per-student exam result inputs, calculated form fill-up fees in Tk, and payment clearance status"
     }
   }
 }

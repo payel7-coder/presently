@@ -16,6 +16,15 @@ export interface User {
   employeeId: string;
   title?: string;
   dailyClassTarget?: number;
+  phone?: string;
+  qualification?: string;
+  specialization?: string;
+  officeRoom?: string;
+  officeHours?: string;
+  joiningDate?: string;
+  bloodGroup?: string;
+  bio?: string;
+  profileUpdatedAt?: string;
   approvalStatus?: UserApprovalStatus;
   registeredAt?: string;
   approvedAt?: string;
@@ -69,6 +78,16 @@ export interface Student {
   phone?: string;
   parentContact?: string;
   parentEmail?: string;
+  guardianName?: string;
+  bloodGroup?: string;
+  dateOfBirth?: string;
+  session?: string;
+  shift?: string;
+  admissionYear?: string;
+  presentAddress?: string;
+  permanentAddress?: string;
+  academicStanding?: string;
+  remarks?: string;
   status: 'active' | 'inactive';
 }
 
@@ -153,3 +172,50 @@ export interface StudentAssignmentEvaluation {
   evaluatedAt?: string;
 }
 
+export type FormFillupResultStatus = 'regular' | 'regular_with_referred' | 'referred_only';
+
+export type FormFillupPaymentStatus = 'pending' | 'verified' | 'paid' | 'submitted';
+
+export interface FormFillupResponsibility {
+  id: string;
+  semester: string; // e.g. "1st" .. "8th"
+  classId: string;
+  teacherId: string;
+  academicYear: string;
+  assignedAt: string;
+  assignedBy?: string;
+}
+
+export interface FormFillupFeeConfig {
+  id: string;
+  semester: string;
+  classId: string;
+  examFee: number; // 1. flat per regular/promoted student
+  referredExamFeePerSubject: number; // 2. per referred subject
+  marksheetFeeRegular: number; // 3. flat regular marksheet fee
+  marksheetFeeReferredPerSemester: number; // 4. per referred semester
+  centerFeeRegular: number; // 5. flat regular center fee
+  centerFeeReferredPerSemester: number; // 6. per referred semester
+  practicalFeePerSubject: number; // 7. per practical subject
+  questionFee: number; // 8. flat per student
+  delayFee: number; // 9. late / delay fee when applicable
+  updatedAt: string;
+  updatedBy?: string;
+}
+
+export interface FormFillupStudentRecord {
+  id: string;
+  semester: string;
+  classId: string;
+  studentId: string;
+  resultStatus: FormFillupResultStatus;
+  referredSubjectsCount: number;
+  referredSemestersCount: number;
+  practicalSubjectsCount: number;
+  applyDelayFee: boolean;
+  resultSummaryNote?: string;
+  calculatedAmountTk: number;
+  paymentStatus: FormFillupPaymentStatus;
+  updatedAt: string;
+  updatedBy?: string;
+}

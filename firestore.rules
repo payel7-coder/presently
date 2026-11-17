@@ -43,6 +43,18 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    match /formFillupResponsibilities/{respId} {
+      allow read, write: if true;
+    }
+
+    match /formFillupFeeConfigs/{configId} {
+      allow read, write: if true;
+    }
+
+    match /formFillupRecords/{recordId} {
+      allow read, write: if true;
+    }
+
     match /{document=**} {
       allow read, write: if true;
     }

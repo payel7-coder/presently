@@ -10,14 +10,19 @@ import {
   FileSpreadsheet,
   CheckCircle2,
   Shield,
-  X
+  X,
+  User as UserIcon,
 } from 'lucide-react';
 
 interface ClassRosterViewProps {
   onOpenBulkImport: (classId?: string) => void;
+  onViewStudentProfile?: (studentId: string) => void;
 }
 
-export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImport }) => {
+export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
+  onOpenBulkImport,
+  onViewStudentProfile,
+}) => {
   const { classes, subjects, assignments, sessions, students, addStudent, deleteStudent, currentUser, isAdmin } = useAttendance();
 
   const visibleClasses = useMemo(
@@ -227,9 +232,7 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
                     <th className="py-3 px-4">Contact</th>
                     <th className="py-3 px-4">Parent / Guardian</th>
                     <th className="py-3 px-4">Status</th>
-                    {currentUser?.role === 'admin' && (
-                      <th className="py-3 px-4 text-right">Actions</th>
-                    )}
+                    <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -245,7 +248,19 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
                         <div className="flex items-center gap-2.5">
                           <Avatar src={student.avatar} name={student.name} size="sm" />
                           <div>
-                            <span className="font-semibold text-slate-900 block">{student.name}</span>
+                            {onViewStudentProfile ? (
+                              <button
+                                type="button"
+                                onClick={() => onViewStudentProfile(student.id)}
+                                className="font-semibold text-slate-900 hover:text-emerald-700 hover:underline text-left block"
+                              >
+                                {student.name}
+                              </button>
+                            ) : (
+                              <span className="font-semibold text-slate-900 block">
+                                {student.name}
+                              </span>
+                            )}
                             <span className="text-[11px] text-slate-400">{student.email}</span>
                           </div>
                         </div>
@@ -269,19 +284,32 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({ onOpenBulkImpo
                           <CheckCircle2 className="w-3 h-3" /> Active
                         </span>
                       </td>
-                      {currentUser?.role === 'admin' && (
-                        <td className="py-3 px-4 text-right">
-                          <button
-                            type="button"
-                            onClick={() => deleteStudent(student.id)}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
-                            title="Delete student"
-                            aria-label={`Delete ${student.name}`}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      )}
+                      <td className="py-3 px-4 text-right">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          {onViewStudentProfile && (
+                            <button
+                              type="button"
+                              onClick={() => onViewStudentProfile(student.id)}
+                              className="h-7 px-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 transition-colors whitespace-nowrap"
+                              aria-label={`View profile for ${student.name}`}
+                            >
+                              <UserIcon className="w-3 h-3 text-emerald-600" />
+                              <span>View Profile</span>
+                            </button>
+                          )}
+                          {currentUser?.role === 'admin' && (
+                            <button
+                              type="button"
+                              onClick={() => deleteStudent(student.id)}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              title="Delete student"
+                              aria-label={`Delete ${student.name}`}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
