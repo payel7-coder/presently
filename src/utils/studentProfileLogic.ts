@@ -360,6 +360,8 @@ export function validateStudentProfileUpdate(
     parentContact: opt(draft.parentContact),
     parentEmail: opt(draft.parentEmail),
     guardianName: opt(draft.guardianName),
+    fatherName: opt(draft.fatherName),
+    motherName: opt(draft.motherName),
     bloodGroup: opt(draft.bloodGroup),
     dateOfBirth: opt(draft.dateOfBirth),
     session: opt(draft.session),

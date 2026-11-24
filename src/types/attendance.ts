@@ -80,6 +80,8 @@ export interface Student {
   parentContact?: string;
   parentEmail?: string;
   guardianName?: string;
+  fatherName?: string;
+  motherName?: string;
   bloodGroup?: string;
   dateOfBirth?: string;
   session?: string;

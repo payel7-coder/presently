@@ -42,14 +42,64 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
   // Parse header
   const headerTokens = parseCSVLine(lines[0]).map(h => h.toLowerCase().trim().replace(/['"]/g, ''));
   
-  // Find column indices with fuzzy matching
-  const nameIndex = headerTokens.findIndex(h => h.includes('name'));
-  const rollIndex = headerTokens.findIndex(h => h.includes('roll') || (h.includes('id') && !h.includes('guid')) || h.includes('registration'));
+  // Find column indices with exact priority so Father/Mother Name and Guardian Phone don't collide with Name/Phone
+  const findExactOrFiltered = (exactList: string[], predicate: (h: string) => boolean) => {
+    const exactIdx = headerTokens.findIndex(h => exactList.includes(h));
+    if (exactIdx !== -1) return exactIdx;
+    return headerTokens.findIndex(predicate);
+  };
+
+  const nameIndex = findExactOrFiltered(
+    ['name', 'student name', 'student_name', 'full name', 'full_name'],
+    h =>
+      h.includes('name') &&
+      !h.includes('father') &&
+      !h.includes('mother') &&
+      !h.includes('guardian') &&
+      !h.includes('parent')
+  );
+  const rollIndex = findExactOrFiltered(
+    ['roll number', 'roll no', 'roll', 'board roll', 'class roll', 'roll_number'],
+    h => h.includes('roll') || (h.includes('id') && !h.includes('guid'))
+  );
   const regIndex = headerTokens.findIndex(h => h.includes('reg'));
-  const emailIndex = headerTokens.findIndex(h => h.includes('email') && !h.includes('parent'));
+  const emailIndex = findExactOrFiltered(
+    ['student email', 'student_email', 'email', 'email address'],
+    h =>
+      h.includes('email') &&
+      !h.includes('parent') &&
+      !h.includes('guardian') &&
+      !h.includes('father') &&
+      !h.includes('mother')
+  );
   const genderIndex = headerTokens.findIndex(h => h.includes('gender') || h.includes('sex'));
-  const phoneIndex = headerTokens.findIndex(h => h.includes('phone') || h.includes('mobile') || h.includes('contact'));
-  const parentEmailIndex = headerTokens.findIndex(h => h.includes('parent') && (h.includes('email') || h.includes('contact')));
+  const dobIndex = findExactOrFiltered(
+    ['date of birth', 'date_of_birth', 'dob', 'birth date', 'birthdate'],
+    h => h === 'dob' || h.includes('date of birth') || h.includes('date_of_birth') || h.includes('birth')
+  );
+  const fatherNameIndex = findExactOrFiltered(
+    ['father name', 'father_name', "father's name"],
+    h => h.includes('father')
+  );
+  const motherNameIndex = findExactOrFiltered(
+    ['mother name', 'mother_name', "mother's name"],
+    h => h.includes('mother')
+  );
+  const phoneIndex = findExactOrFiltered(
+    ['phone', 'student phone', 'mobile', 'student mobile'],
+    h =>
+      (h.includes('phone') || h.includes('mobile') || h.includes('contact')) &&
+      !h.includes('guardian') &&
+      !h.includes('parent') &&
+      !h.includes('father') &&
+      !h.includes('mother')
+  );
+  const guardianPhoneIndex = findExactOrFiltered(
+    ['guardian phone', 'guardian_phone', 'guardian mobile', 'guardian contact', 'parent phone', 'parent contact'],
+    h =>
+      (h.includes('guardian') || h.includes('parent')) &&
+      (h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'))
+  );
 
   if (nameIndex === -1) {
     result.errors.push({ line: 1, message: 'Missing required "Name" column in CSV header' });
@@ -74,8 +124,11 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
     const registrationNumber = regIndex !== -1 ? (tokens[regIndex] || '').trim() : undefined;
     const email = emailIndex !== -1 ? (tokens[emailIndex] || '').trim() : '';
     const rawGender = genderIndex !== -1 ? (tokens[genderIndex] || '').trim().toLowerCase() : '';
+    const dateOfBirth = dobIndex !== -1 ? (tokens[dobIndex] || '').trim() : '';
+    const fatherName = fatherNameIndex !== -1 ? (tokens[fatherNameIndex] || '').trim() : '';
+    const motherName = motherNameIndex !== -1 ? (tokens[motherNameIndex] || '').trim() : '';
     const phone = phoneIndex !== -1 ? (tokens[phoneIndex] || '').trim() : '';
-    const parentContact = parentEmailIndex !== -1 ? (tokens[parentEmailIndex] || '').trim() : '';
+    const guardianPhone = guardianPhoneIndex !== -1 ? (tokens[guardianPhoneIndex] || '').trim() : '';
 
     if (!name) {
       result.errors.push({ line: lineNumber, message: 'Student Name is empty' });
@@ -95,7 +148,7 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
 
     // Basic email validation if provided
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      result.errors.push({ line: lineNumber, message: `Invalid email format "${email}" for student ${name}` });
+      result.errors.push({ line: lineNumber, message: `Invalid student email format "${email}" for student ${name}` });
       continue;
     }
 
@@ -108,13 +161,16 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
 
     result.students.push({
       rollNumber,
-      registrationNumber,
+      registrationNumber: registrationNumber || undefined,
       name,
       email: email || `${rollNumber.toLowerCase().replace(/[^a-z0-9]/g, '')}@student.bteb.edu.bd`,
       gender,
       classId: targetClassId,
+      dateOfBirth: dateOfBirth || undefined,
+      fatherName: fatherName || undefined,
+      motherName: motherName || undefined,
       phone: phone || undefined,
-      parentContact: parentContact || undefined,
+      parentContact: guardianPhone || undefined,
       status: 'active',
     });
     result.validCount++;
@@ -159,11 +215,11 @@ function cleanFieldValue(val: string): string {
  */
 export function generateStudentCSVTemplate(): string {
   return [
-    'Roll Number,Registration Number,Name,Email,Gender,Phone,Parent Email',
-    '621051,1502189407,Naimur Rahman,naimur.621051@student.bteb.edu.bd,Male,+880 1711-234567,parent.rahman@gmail.com',
-    '621052,1502189408,Jannatul Ferdous,jannatul.621052@student.bteb.edu.bd,Female,+880 1711-234568,parent.ferdous@gmail.com',
-    '621053,1502189409,Sabbir Ahmed,sabbir.621053@student.bteb.edu.bd,Male,+880 1711-234569,parent.ahmed@gmail.com',
-    '621054,1502189410,Sumaiya Islam,sumaiya.621054@student.bteb.edu.bd,Female,+880 1711-234570,parent.islam@gmail.com',
+    'Roll Number,Registration Number,Name,Student Email,Gender,Date of Birth,Father Name,Mother Name,Phone,Guardian Phone',
+    '621051,1502189407,Naimur Rahman,naimur.621051@student.bteb.edu.bd,Male,2005-03-14,Md. Shafiqur Rahman,Salma Begum,+880 1711-234567,+880 1811-234567',
+    '621052,1502189408,Jannatul Ferdous,jannatul.621052@student.bteb.edu.bd,Female,2005-07-22,Abdul Karim,Nasrin Akter,+880 1711-234568,+880 1811-234568',
+    '621053,1502189409,Sabbir Ahmed,sabbir.621053@student.bteb.edu.bd,Male,2004-11-08,Mahbubur Rahman,Rokeya Sultana,+880 1711-234569,+880 1811-234569',
+    '621054,1502189410,Sumaiya Islam,sumaiya.621054@student.bteb.edu.bd,Female,2005-01-19,Kamrul Islam,Tahmina Khatun,+880 1711-234570,+880 1811-234570',
   ].join('\n');
 }
 

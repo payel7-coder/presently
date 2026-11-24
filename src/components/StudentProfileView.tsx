@@ -590,21 +590,27 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               </div>
               <dl className="divide-y divide-slate-100 text-xs">
                 <div className="px-5 py-3 flex items-center justify-between gap-4">
+                  <dt className="text-slate-500 font-medium">Father Name</dt>
+                  <dd className="font-semibold text-slate-900 text-right">
+                    {student.fatherName || '—'}
+                  </dd>
+                </div>
+                <div className="px-5 py-3 flex items-center justify-between gap-4">
+                  <dt className="text-slate-500 font-medium">Mother Name</dt>
+                  <dd className="font-semibold text-slate-900 text-right">
+                    {student.motherName || '—'}
+                  </dd>
+                </div>
+                <div className="px-5 py-3 flex items-center justify-between gap-4">
                   <dt className="text-slate-500 font-medium">Guardian Name</dt>
                   <dd className="font-semibold text-slate-900 text-right">
                     {student.guardianName || 'Not Recorded'}
                   </dd>
                 </div>
                 <div className="px-5 py-3 flex items-center justify-between gap-4">
-                  <dt className="text-slate-500 font-medium">Guardian Mobile</dt>
+                  <dt className="text-slate-500 font-medium">Guardian Phone</dt>
                   <dd className="font-mono text-slate-900 text-right">
                     {student.parentContact || '—'}
-                  </dd>
-                </div>
-                <div className="px-5 py-3 flex items-center justify-between gap-4">
-                  <dt className="text-slate-500 font-medium">Guardian Email</dt>
-                  <dd className="text-slate-900 text-right break-all">
-                    {student.parentEmail || '—'}
                   </dd>
                 </div>
               </dl>
@@ -1163,7 +1169,30 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Father Name</label>
+                  <input
+                    type="text"
+                    placeholder="Father's full name"
+                    value={editDraft.fatherName || ''}
+                    onChange={e => setEditDraft({ ...editDraft, fatherName: e.target.value })}
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Mother Name</label>
+                  <input
+                    type="text"
+                    placeholder="Mother's full name"
+                    value={editDraft.motherName || ''}
+                    onChange={e => setEditDraft({ ...editDraft, motherName: e.target.value })}
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-slate-900"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Guardian Name</label>
                   <input
@@ -1176,7 +1205,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Guardian Mobile
+                    Guardian Phone
                   </label>
                   <input
                     type="text"
@@ -1186,18 +1215,6 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                       setEditDraft({ ...editDraft, parentContact: e.target.value })
                     }
                     className="w-full h-9 px-3 border border-slate-300 rounded-lg font-mono text-slate-900"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Guardian Email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="guardian@example.com"
-                    value={editDraft.parentEmail || ''}
-                    onChange={e => setEditDraft({ ...editDraft, parentEmail: e.target.value })}
-                    className="w-full h-9 px-3 border border-slate-300 rounded-lg text-slate-900"
                   />
                 </div>
               </div>

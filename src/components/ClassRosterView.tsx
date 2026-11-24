@@ -270,12 +270,12 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
                         {student.phone || '—'}
                       </td>
                       <td className="py-3 px-4">
-                        <span className="text-slate-700 block">
-                          {student.parentEmail || '—'}
+                        <span className="text-slate-700 font-mono block">
+                          {student.parentContact || student.parentEmail || '—'}
                         </span>
-                        {student.parentContact && (
-                          <span className="text-[11px] text-slate-400 font-mono">
-                            {student.parentContact}
+                        {(student.fatherName || student.motherName) && (
+                          <span className="text-[11px] text-slate-400 block">
+                            {[student.fatherName, student.motherName].filter(Boolean).join(' / ')}
                           </span>
                         )}
                       </td>
