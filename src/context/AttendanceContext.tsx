@@ -57,7 +57,12 @@ import {
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
-import { signOut } from 'firebase/auth';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  signOut,
+} from 'firebase/auth';
 
 interface NewTeacherInput {
   name: string;
@@ -196,13 +201,39 @@ const DEMO_USER_IDS = new Set([
   'admin-principal',
 ]);
 
+const STATIC_SESSION_TOKEN = 'firebase-static-session';
+
+const isKnownStaticHosting = () =>
+  typeof window !== 'undefined' &&
+  (window.location.hostname.endsWith('.github.io') || window.location.protocol === 'file:');
+
+const isStaticHostMissingApi = (response: Response) => {
+  const ct = (response.headers.get('content-type') || '').toLowerCase();
+  return !ct.includes('application/json') && [404, 405, 501].includes(response.status);
+};
+
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Active session is held strictly in JS/React memory (never persisted in localStorage/sessionStorage)
-  const [currentUser, setCurrentUserState] = useState<User | null>(null);
-  const [accessToken, setAccessTokenState] = useState<string | null>(null);
-  const accessTokenRef = useRef<string | null>(null);
+  // Active session is held strictly in JS/React memory when backed by Express; static GitHub Pages restores local session
+  const [currentUser, setCurrentUserState] = useState<User | null>(() => {
+    if (!isKnownStaticHosting()) return null;
+    try {
+      const saved = localStorage.getItem('presently_active_user');
+      return saved ? (JSON.parse(saved) as User) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [accessToken, setAccessTokenState] = useState<string | null>(() => {
+    if (!isKnownStaticHosting()) return null;
+    try {
+      return localStorage.getItem('presently_active_user') ? STATIC_SESSION_TOKEN : null;
+    } catch {
+      return null;
+    }
+  });
+  const accessTokenRef = useRef<string | null>(accessToken);
 
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>(BTEB_CLASSES);
@@ -218,8 +249,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [formFillupRecords, setFormFillupRecords] = useState<FormFillupStudentRecord[]>([]);
   const [isFirebaseLive, setIsFirebaseLive] = useState(false);
 
-  // Clear any legacy localStorage auth state on boot
+  // Clear legacy localStorage auth state on boot when Express server auth is active
   useEffect(() => {
+    if (isKnownStaticHosting()) return;
     try {
       localStorage.removeItem('presently_active_user');
     } catch {
@@ -414,12 +446,16 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const verifyActiveSession = useCallback(async (): Promise<boolean> => {
     const token = accessTokenRef.current;
     if (!token) return false;
+    if (token === STATIC_SESSION_TOKEN || isKnownStaticHosting()) return true;
     try {
       const res = await fetch('/api/auth/me', {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       });
+      if (isStaticHostMissingApi(res)) {
+        return true;
+      }
       if (!res.ok) {
         setAccessToken(null);
         setCurrentUserState(null);
@@ -560,7 +596,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const syncUsersDirectoryToServer = useCallback(async (userList: User[], tokenOverride?: string | null) => {
     const token = tokenOverride ?? accessTokenRef.current;
-    if (!token || userList.length === 0) return;
+    if (!token || token === STATIC_SESSION_TOKEN || isKnownStaticHosting() || userList.length === 0) return;
     try {
       await fetch('/api/auth/admin/sync-users', {
         method: 'POST',
@@ -643,14 +679,104 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const loginWithFirebaseFallback = async (cleanEmail: string, pass: string): Promise<User> => {
+    const matched = await findUserByEmailWithFirestore(cleanEmail);
+    if (matched) {
+      const access = evaluateLoginAccess(matched);
+      if (!access.allowed) {
+        await signOut(auth).catch(() => {});
+        throw new Error(access.reason);
+      }
+    }
+
+    const persistStaticUser = async (profile: User) => {
+      const customTarget = localStorage.getItem(`presently_daily_target_${profile.id}`);
+      const hydrated = customTarget
+        ? { ...profile, dailyClassTarget: parseInt(customTarget, 10) }
+        : profile.dailyClassTarget === undefined
+          ? { ...profile, dailyClassTarget: 4 }
+          : profile;
+      setAccessToken(STATIC_SESSION_TOKEN);
+      setCurrentUserState(hydrated);
+      try {
+        localStorage.setItem('presently_active_user', JSON.stringify(hydrated));
+      } catch {
+        // Ignore storage restrictions
+      }
+      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), hydrated]);
+      try {
+        const cleanUser: any = { ...hydrated };
+        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+        await setDoc(doc(db, 'users', hydrated.id), cleanUser, { merge: true });
+      } catch (err) {
+        console.warn('Firestore user profile sync error:', err);
+      }
+      return hydrated;
+    };
+
+    try {
+      const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      const userProfile: User = matched
+        ? { ...matched, id: res.user.uid || matched.id }
+        : {
+            ...buildInstitutionalProfile(cleanEmail, res.user.uid),
+            approvalStatus: 'approved',
+          };
+      const access = evaluateLoginAccess(userProfile);
+      if (!access.allowed) {
+        await signOut(auth).catch(() => {});
+        throw new Error(access.reason);
+      }
+      return await persistStaticUser(userProfile);
+    } catch (firebaseErr: any) {
+      if (
+        firebaseErr?.message &&
+        (firebaseErr.message.includes('pending administrator approval') ||
+          firebaseErr.message.includes('declined by the administrator'))
+      ) {
+        throw firebaseErr;
+      }
+      if (matched) {
+        const access = evaluateLoginAccess(matched);
+        if (!access.allowed) {
+          throw new Error(access.reason);
+        }
+        return await persistStaticUser(matched);
+      }
+      if (!isPrimaryAdminEmail(cleanEmail)) {
+        throw new Error(
+          'No approved account found for this email. Please switch to Register to submit a registration request for administrator approval.'
+        );
+      }
+      const fallbackAdmin: User = {
+        ...buildInstitutionalProfile(cleanEmail, 'admin-payel'),
+        approvalStatus: 'approved',
+      };
+      return await persistStaticUser(fallbackAdmin);
+    }
+  };
+
   const loginWithEmail = async (email: string, pass: string): Promise<User> => {
     const cleanEmail = email.trim().toLowerCase();
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify({ email: cleanEmail, password: pass }),
-    });
+    if (isKnownStaticHosting()) {
+      return loginWithFirebaseFallback(cleanEmail, pass);
+    }
+
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ email: cleanEmail, password: pass }),
+      });
+    } catch {
+      return loginWithFirebaseFallback(cleanEmail, pass);
+    }
+
+    if (isStaticHostMissingApi(response)) {
+      return loginWithFirebaseFallback(cleanEmail, pass);
+    }
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -704,6 +830,92 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return baseProfile;
   };
 
+  const registerWithFirebaseFallback = async (
+    cleanEmail: string,
+    pass: string,
+    name: string,
+    role: 'admin' | 'teacher'
+  ): Promise<RegisterResult> => {
+    const existing = await findUserByEmailWithFirestore(cleanEmail);
+    if (existing) {
+      const existingStatus = resolveUserApprovalStatus(existing);
+      if (existingStatus === 'pending') {
+        throw new Error(
+          'An account with this email is already registered and awaiting administrator approval.'
+        );
+      }
+      if (existingStatus === 'rejected') {
+        throw new Error(
+          'A previous registration request for this email was declined. Please contact an administrator.'
+        );
+      }
+      throw new Error('An approved account with this email already exists. Please use Sign In instead.');
+    }
+
+    const isPrimary = isPrimaryAdminEmail(cleanEmail);
+    const approvalStatus = isPrimary ? 'approved' : 'pending';
+    const registeredAt = new Date().toISOString();
+    const buildRegisteredUser = (uid: string): User => ({
+      id: uid,
+      name: name.trim(),
+      email: cleanEmail,
+      role: isPrimary ? 'admin' : role,
+      avatar:
+        isPrimary || role === 'admin'
+          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      department: 'Computer Science & Technology',
+      employeeId:
+        isPrimary || role === 'admin'
+          ? `ADM-${Date.now().toString().slice(-4)}`
+          : `BTEB-${Date.now().toString().slice(-4)}`,
+      title:
+        isPrimary || role === 'admin'
+          ? 'Institutional Administrator'
+          : 'Instructor (Computer Technology)',
+      dailyClassTarget: 4,
+      approvalStatus,
+      registeredAt,
+      ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
+    });
+
+    let newUser: User;
+    try {
+      const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+      newUser = buildRegisteredUser(res.user.uid);
+    } catch (e: any) {
+      if (e?.code === 'auth/email-already-in-use') {
+        throw new Error(
+          'An account with this email already exists in authentication. Please sign in or contact an administrator.'
+        );
+      }
+      newUser = buildRegisteredUser(isPrimary ? 'admin-payel' : `user-${Date.now()}`);
+    }
+
+    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
+    try {
+      const cleanUser: any = { ...newUser };
+      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+      await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
+    } catch (err) {
+      console.warn('Firestore user write error:', err);
+    }
+
+    if (approvalStatus === 'pending') {
+      await signOut(auth).catch(() => {});
+      return { user: newUser, requiresApproval: true };
+    }
+
+    setAccessToken(STATIC_SESSION_TOKEN);
+    setCurrentUserState(newUser);
+    try {
+      localStorage.setItem('presently_active_user', JSON.stringify(newUser));
+    } catch {
+      // Ignore storage restrictions
+    }
+    return { user: newUser, requiresApproval: false };
+  };
+
   const registerWithEmail = async (
     email: string,
     pass: string,
@@ -711,22 +923,35 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     role: 'admin' | 'teacher'
   ): Promise<RegisterResult> => {
     const cleanEmail = email.trim().toLowerCase();
+    if (isKnownStaticHosting()) {
+      return registerWithFirebaseFallback(cleanEmail, pass, name, role);
+    }
+
     const isPrimary = isPrimaryAdminEmail(cleanEmail);
     const registeredAt = new Date().toISOString();
     const suggestedId = isPrimary ? 'admin-payel' : `user-${Date.now()}`;
 
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify({
-        id: suggestedId,
-        email: cleanEmail,
-        password: pass,
-        name: name.trim(),
-        role,
-      }),
-    });
+    let response: Response;
+    try {
+      response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          id: suggestedId,
+          email: cleanEmail,
+          password: pass,
+          name: name.trim(),
+          role,
+        }),
+      });
+    } catch {
+      return registerWithFirebaseFallback(cleanEmail, pass, name, role);
+    }
+
+    if (isStaticHostMissingApi(response)) {
+      return registerWithFirebaseFallback(cleanEmail, pass, name, role);
+    }
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -794,27 +1019,57 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const requestPasswordReset = async (email: string): Promise<string> => {
-    const response = await fetch('/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify({ email: email.trim().toLowerCase() }),
-    });
+    const cleanEmail = email.trim().toLowerCase();
+    const genericMsg = 'If an account with that email exists, a password reset link has been sent.';
+
+    const sendFirebaseResetFallback = async (): Promise<string> => {
+      try {
+        await sendPasswordResetEmail(auth, cleanEmail);
+      } catch (err: any) {
+        if (err?.code && !['auth/user-not-found', 'auth/invalid-email'].includes(err.code)) {
+          console.warn('Firebase password reset fallback notice:', err.code);
+        }
+      }
+      return genericMsg;
+    };
+
+    if (isKnownStaticHosting()) {
+      return sendFirebaseResetFallback();
+    }
+
+    let response: Response;
+    try {
+      response = await fetch('/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({ email: cleanEmail }),
+      });
+    } catch {
+      return sendFirebaseResetFallback();
+    }
+
+    if (isStaticHostMissingApi(response)) {
+      return sendFirebaseResetFallback();
+    }
+
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
       throw new Error(data.error || 'Unable to process password reset request.');
     }
-    return (
-      data.message ||
-      'If an account with that email exists, a password reset link has been sent.'
-    );
+    return data.message || genericMsg;
   };
 
   const logout = async () => {
     const token = accessTokenRef.current;
     setAccessToken(null);
     setCurrentUserState(null);
-    if (token) {
+    try {
+      localStorage.removeItem('presently_active_user');
+    } catch {
+      // Ignore storage restrictions
+    }
+    if (token && token !== STATIC_SESSION_TOKEN && !isKnownStaticHosting()) {
       try {
         await fetch('/api/auth/logout', {
           method: 'POST',

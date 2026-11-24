@@ -35,7 +35,11 @@ function AttendanceApp() {
   }, []);
 
   const navigateHomeToLogin = () => {
-    window.history.pushState({}, '', '/');
+    const baseTarget =
+      import.meta.env.BASE_URL && import.meta.env.BASE_URL !== './'
+        ? import.meta.env.BASE_URL
+        : window.location.pathname.replace(/\/reset-password\/?$/, '') || '/';
+    window.history.pushState({}, '', baseTarget);
     setResetRoute({ isResetRoute: false, token: '' });
   };
 
