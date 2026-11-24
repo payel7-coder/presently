@@ -40,7 +40,7 @@ function AttendanceApp() {
         ? import.meta.env.BASE_URL
         : window.location.pathname.replace(/\/reset-password\/?$/, '') || '/';
     window.history.pushState({}, '', baseTarget);
-    setResetRoute({ isResetRoute: false, token: '' });
+    setResetRoute({ isResetRoute: false, token: '', mode: 'server' });
   };
 
   // Navigation tab
@@ -78,6 +78,7 @@ function AttendanceApp() {
     return (
       <ResetPasswordView
         token={resetRoute.token}
+        mode={resetRoute.mode}
         onNavigateToLogin={navigateHomeToLogin}
         onPasswordResetSuccess={() => {
           logout().catch(() => {});

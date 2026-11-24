@@ -202,8 +202,11 @@ const DEMO_USER_IDS = new Set([
 ]);
 
 const STATIC_SESSION_TOKEN = 'firebase-static-session';
+const AUTH_API_BASE = (import.meta.env.VITE_AUTH_API_BASE_URL || '').replace(/\/+$/, '');
+const resolveAuthApiUrl = (path: string) => `${AUTH_API_BASE}${path}`;
 
 const isKnownStaticHosting = () =>
+  !AUTH_API_BASE &&
   typeof window !== 'undefined' &&
   (window.location.hostname.endsWith('.github.io') || window.location.protocol === 'file:');
 
@@ -448,7 +451,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!token) return false;
     if (token === STATIC_SESSION_TOKEN || isKnownStaticHosting()) return true;
     try {
-      const res = await fetch('/api/auth/me', {
+      const res = await fetch(resolveAuthApiUrl('/api/auth/me'), {
         method: 'GET',
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
@@ -598,7 +601,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const token = tokenOverride ?? accessTokenRef.current;
     if (!token || token === STATIC_SESSION_TOKEN || isKnownStaticHosting() || userList.length === 0) return;
     try {
-      await fetch('/api/auth/admin/sync-users', {
+      await fetch(resolveAuthApiUrl('/api/auth/admin/sync-users'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -764,7 +767,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     let response: Response;
     try {
-      response = await fetch('/api/auth/login', {
+      response = await fetch(resolveAuthApiUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
@@ -933,7 +936,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     let response: Response;
     try {
-      response = await fetch('/api/auth/register', {
+      response = await fetch(resolveAuthApiUrl('/api/auth/register'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
@@ -1023,11 +1026,64 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const genericMsg = 'If an account with that email exists, a password reset link has been sent.';
 
     const sendFirebaseResetFallback = async (): Promise<string> => {
+      // Detect when Firebase Email/Password auth is disabled in the Firebase project so we don't silently report success
+      const apiKey = auth.app.options.apiKey;
+      if (apiKey) {
+        try {
+          const probeRes = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: 'provider-probe@invalid.local',
+                password: 'ProbePassword#123',
+                returnSecureToken: true,
+              }),
+            }
+          );
+          const probeData = await probeRes.json().catch(() => ({}));
+          const probeErr = probeData?.error?.message;
+          if (probeErr === 'PASSWORD_LOGIN_DISABLED' || probeErr === 'OPERATION_NOT_ALLOWED') {
+            throw new Error(
+              'Password reset email cannot be sent from static GitHub Pages because Firebase Email/Password sign-in is disabled for this project and no backend server is running here. Enable Email/Password in Firebase Console (Authentication → Sign-in method) or use the full-stack app URL.'
+            );
+          }
+        } catch (probeErr: any) {
+          if (probeErr?.message?.includes('Firebase Email/Password sign-in is disabled')) {
+            throw probeErr;
+          }
+        }
+      }
+
+      const appBasePath =
+        import.meta.env.BASE_URL && import.meta.env.BASE_URL !== './'
+          ? import.meta.env.BASE_URL
+          : '/presently/';
+      const continueUrl =
+        typeof window !== 'undefined' ? `${window.location.origin}${appBasePath}` : undefined;
+
       try {
-        await sendPasswordResetEmail(auth, cleanEmail);
+        if (continueUrl) {
+          await sendPasswordResetEmail(auth, cleanEmail, {
+            url: continueUrl,
+            handleCodeInApp: true,
+          });
+        } else {
+          await sendPasswordResetEmail(auth, cleanEmail);
+        }
       } catch (err: any) {
-        if (err?.code && !['auth/user-not-found', 'auth/invalid-email'].includes(err.code)) {
-          console.warn('Firebase password reset fallback notice:', err.code);
+        if (
+          err?.code === 'auth/unauthorized-continue-uri' ||
+          err?.code === 'auth/invalid-continue-uri'
+        ) {
+          await sendPasswordResetEmail(auth, cleanEmail);
+        } else if (err?.code === 'auth/operation-not-allowed') {
+          throw new Error(
+            'Password reset email cannot be sent because Firebase Email/Password sign-in is disabled for this project.'
+          );
+        } else if (err?.code && !['auth/user-not-found', 'auth/invalid-email'].includes(err.code)) {
+          throw new Error(err?.message || 'Unable to send Firebase password reset email.');
         }
       }
       return genericMsg;
@@ -1039,7 +1095,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     let response: Response;
     try {
-      response = await fetch('/forgot-password', {
+      response = await fetch(resolveAuthApiUrl('/forgot-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
@@ -1071,7 +1127,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
     if (token && token !== STATIC_SESSION_TOKEN && !isKnownStaticHosting()) {
       try {
-        await fetch('/api/auth/logout', {
+        await fetch(resolveAuthApiUrl('/api/auth/logout'), {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}` },
         });

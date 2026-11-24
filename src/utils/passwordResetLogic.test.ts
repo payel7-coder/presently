@@ -81,9 +81,15 @@ describe('passwordResetLogic', () => {
     assert.throws(() => buildResetLink('javascript:alert(1)', 'token123'));
 
     const extracted = extractResetRouteFromLocation('/reset-password', '?token=xyz_987');
-    assert.deepEqual(extracted, { isResetRoute: true, token: 'xyz_987' });
+    assert.deepEqual(extracted, { isResetRoute: true, token: 'xyz_987', mode: 'server' });
+
+    const subpathReset = extractResetRouteFromLocation('/presently/reset-password', '?token=sub_token_1');
+    assert.deepEqual(subpathReset, { isResetRoute: true, token: 'sub_token_1', mode: 'server' });
+
+    const firebaseReset = extractResetRouteFromLocation('/presently/', '?mode=resetPassword&oobCode=fb_code_123');
+    assert.deepEqual(firebaseReset, { isResetRoute: true, token: 'fb_code_123', mode: 'firebase' });
 
     const nonReset = extractResetRouteFromLocation('/', '?token=xyz_987');
-    assert.deepEqual(nonReset, { isResetRoute: false, token: '' });
+    assert.deepEqual(nonReset, { isResetRoute: false, token: '', mode: 'server' });
   });
 });

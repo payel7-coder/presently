@@ -10,19 +10,27 @@ import {
   Lock,
   ShieldCheck,
 } from 'lucide-react';
+import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
+import { auth } from '../firebase/config';
 import {
+  ResetRouteMode,
   validatePasswordComplexity,
   validatePasswordResetPayload,
 } from '../utils/passwordResetLogic';
 
+const AUTH_API_BASE = (import.meta.env.VITE_AUTH_API_BASE_URL || '').replace(/\/+$/, '');
+const resolveAuthApiUrl = (path: string) => `${AUTH_API_BASE}${path}`;
+
 interface ResetPasswordViewProps {
   token: string;
+  mode?: ResetRouteMode;
   onNavigateToLogin: () => void;
   onPasswordResetSuccess?: () => void;
 }
 
 export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
   token,
+  mode = 'server',
   onNavigateToLogin,
   onPasswordResetSuccess,
 }) => {
@@ -56,11 +64,54 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
     setTokenState('checking');
     setTokenError(null);
 
-    fetch(`/api/auth/reset-password/verify?token=${encodeURIComponent(token)}`, {
+    if (mode === 'firebase') {
+      verifyPasswordResetCode(auth, token)
+        .then(() => {
+          if (!cancelled) {
+            setTokenState('valid');
+          }
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setTokenState('invalid');
+            setTokenError(
+              'This Firebase password reset link is invalid, expired, or has already been used.'
+            );
+          }
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const isStaticGithubPagesWithoutApi =
+      !AUTH_API_BASE &&
+      typeof window !== 'undefined' &&
+      window.location.hostname.endsWith('.github.io');
+
+    if (isStaticGithubPagesWithoutApi) {
+      setTokenState('invalid');
+      setTokenError(
+        'This server-issued password reset link requires the full-stack backend server and cannot be verified on static GitHub Pages.'
+      );
+      return;
+    }
+
+    fetch(resolveAuthApiUrl(`/api/auth/reset-password/verify?token=${encodeURIComponent(token)}`), {
       method: 'GET',
       cache: 'no-store',
     })
       .then(async res => {
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        if (!ct.includes('application/json') && [404, 405, 501].includes(res.status)) {
+          if (!cancelled) {
+            setTokenState('invalid');
+            setTokenError(
+              'Password reset backend API is not available on this static host.'
+            );
+          }
+          return;
+        }
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok || !data.valid) {
@@ -82,7 +133,7 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, mode]);
 
   const complexity = validatePasswordComplexity(newPassword);
   const passwordsMatch = Boolean(confirmPassword) && newPassword === confirmPassword;
@@ -90,6 +141,40 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitError(null);
+
+    if (mode === 'firebase') {
+      if (!token.trim()) {
+        setSubmitError('Missing Firebase password reset code.');
+        return;
+      }
+      if (!complexity.valid) {
+        setSubmitError(complexity.errors[0] || 'Please satisfy all password requirements.');
+        return;
+      }
+      if (!passwordsMatch) {
+        setSubmitError('New password and confirmation password do not match.');
+        return;
+      }
+
+      setIsSubmitting(true);
+      try {
+        await confirmPasswordReset(auth, token.trim(), newPassword);
+        setIsSuccess(true);
+        setSuccessMessage('Your password has been updated. Please sign in with your new password.');
+        setNewPassword('');
+        setConfirmPassword('');
+        onPasswordResetSuccess?.();
+      } catch (err: any) {
+        const msg =
+          err?.code === 'auth/expired-action-code' || err?.code === 'auth/invalid-action-code'
+            ? 'This password reset link has expired or has already been used. Please request a new one.'
+            : err?.message || 'Unable to update password via Firebase Authentication.';
+        setSubmitError(msg);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     const validation = validatePasswordResetPayload({
       token,
@@ -104,7 +189,7 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
 
     setIsSubmitting(true);
     try {
-      const response = await fetch('/reset-password', {
+      const response = await fetch(resolveAuthApiUrl('/reset-password'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',

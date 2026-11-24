@@ -186,16 +186,28 @@ export function buildResetLink(origin: string, rawToken: string): string {
   return `${cleanOrigin}/reset-password?token=${encodeURIComponent(rawToken)}`;
 }
 
+export type ResetRouteMode = 'server' | 'firebase';
+
 export function extractResetRouteFromLocation(pathname: string, search: string): {
   isResetRoute: boolean;
   token: string;
+  mode: ResetRouteMode;
 } {
-  const normalizedPath = pathname.replace(/\/+$/, '') || '/';
-  const isResetRoute = normalizedPath === '/reset-password';
-  if (!isResetRoute) {
-    return { isResetRoute: false, token: '' };
-  }
   const params = new URLSearchParams(search);
+  const queryMode = (params.get('mode') || '').trim();
+  const oobCode = (params.get('oobCode') || '').trim();
+
+  if (queryMode === 'resetPassword' && oobCode) {
+    return { isResetRoute: true, token: oobCode, mode: 'firebase' };
+  }
+
+  const normalizedPath = pathname.replace(/\/+$/, '') || '/';
+  const isResetRoute =
+    normalizedPath === '/reset-password' || normalizedPath.endsWith('/reset-password');
+  if (!isResetRoute) {
+    return { isResetRoute: false, token: '', mode: 'server' };
+  }
   const token = (params.get('token') || '').trim();
-  return { isResetRoute: true, token };
+  return { isResetRoute: true, token, mode: 'server' };
 }
+
