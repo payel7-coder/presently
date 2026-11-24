@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
+import { validatePasswordComplexity } from '../utils/passwordResetLogic';
 import {
   CheckCircle2,
   Lock,
@@ -7,19 +8,22 @@ import {
   Eye,
   EyeOff,
   ArrowRight,
+  ArrowLeft,
   ShieldCheck,
   Database,
   AlertCircle,
   ClipboardCheck,
-  Clock
+  Clock,
+  KeyRound,
 } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
-  const { loginWithEmail, registerWithEmail, isFirebaseLive } = useAttendance();
+  const { loginWithEmail, registerWithEmail, requestPasswordReset, isFirebaseLive } = useAttendance();
 
-  const [authMode, setAuthMode] = useState<'signin' | 'register'>('signin');
+  const [authMode, setAuthMode] = useState<'signin' | 'register' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<'admin' | 'teacher'>('teacher');
   const [showPassword, setShowPassword] = useState(false);
@@ -28,39 +32,64 @@ export const AuthScreen: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
+  const registerComplexity = validatePasswordComplexity(password);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessNotice(null);
 
-    if (!email.trim() || !password.trim()) {
+    if (authMode === 'forgot') {
+      if (!email.trim()) {
+        setErrorMessage('Please enter your institutional email address.');
+        return;
+      }
+      setIsLoading(true);
+      try {
+        const message = await requestPasswordReset(email.trim());
+        setSuccessNotice(message);
+      } catch (err: any) {
+        setErrorMessage(err.message || 'Unable to process reset request.');
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
+
+    if (!email.trim() || !password) {
       setErrorMessage('Please provide both email address and password.');
       return;
     }
 
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters long.');
-      return;
+    if (authMode === 'register') {
+      if (!name.trim()) {
+        setErrorMessage('Please enter your full name.');
+        return;
+      }
+      if (!registerComplexity.valid) {
+        setErrorMessage(registerComplexity.errors[0]);
+        return;
+      }
+      if (password !== confirmPassword) {
+        setErrorMessage('Password and confirmation password do not match.');
+        return;
+      }
     }
 
     setIsLoading(true);
 
     try {
       if (authMode === 'signin') {
-        await loginWithEmail(email.trim(), password.trim());
+        await loginWithEmail(email.trim(), password);
       } else {
-        if (!name.trim()) {
-          setErrorMessage('Please enter your full name.');
-          setIsLoading(false);
-          return;
-        }
-        const result = await registerWithEmail(email.trim(), password.trim(), name.trim(), role);
+        const result = await registerWithEmail(email.trim(), password, name.trim(), role);
         if (result.requiresApproval) {
           setSuccessNotice(
             `Registration submitted for ${result.user.email} (${result.user.role === 'admin' ? 'Administrator' : 'Teacher'}). An administrator must approve your account before you can sign in.`
           );
           setAuthMode('signin');
           setPassword('');
+          setConfirmPassword('');
           setName('');
         }
       }
@@ -146,52 +175,73 @@ export const AuthScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column on Desktop, First on Mobile: Sign In / Registration Form */}
+        {/* Right Column on Desktop, First on Mobile: Sign In / Registration / Forgot Password Form */}
         <div className="order-1 lg:order-2 lg:col-span-7 p-6 sm:p-10 flex flex-col justify-between bg-white">
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-                  {authMode === 'signin' ? 'Sign in to your account' : 'Register faculty account'}
+                  {authMode === 'signin'
+                    ? 'Sign in to your account'
+                    : authMode === 'register'
+                      ? 'Register faculty account'
+                      : 'Reset your password'}
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
                   {authMode === 'signin'
                     ? 'Enter your institutional email and password to continue'
-                    : 'Create an institutional profile for your department role'}
+                    : authMode === 'register'
+                      ? 'Create an institutional profile for your department role'
+                      : 'Receive a single-use recovery link valid for 15 minutes'}
                 </p>
               </div>
 
-              <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg self-start sm:self-auto shrink-0">
+              {authMode === 'forgot' ? (
                 <button
                   type="button"
                   onClick={() => {
                     setAuthMode('signin');
                     setErrorMessage(null);
-                  }}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
-                    authMode === 'signin'
-                      ? 'bg-white text-slate-900 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
-                >
-                  Sign In
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAuthMode('register');
-                    setErrorMessage(null);
                     setSuccessNotice(null);
                   }}
-                  className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
-                    authMode === 'register'
-                      ? 'bg-white text-slate-900 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  }`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 self-start sm:self-auto shrink-0 whitespace-nowrap"
                 >
-                  Register
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Back to Sign In</span>
                 </button>
-              </div>
+              ) : (
+                <div className="inline-flex items-center bg-slate-100 p-1 rounded-lg self-start sm:self-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('signin');
+                      setErrorMessage(null);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+                      authMode === 'signin'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Sign In
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthMode('register');
+                      setErrorMessage(null);
+                      setSuccessNotice(null);
+                    }}
+                    className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+                      authMode === 'register'
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Register
+                  </button>
+                </div>
+              )}
             </div>
 
             {errorMessage && (
@@ -301,37 +351,114 @@ export const AuthScreen: React.FC = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                  Password <span className="text-rose-500">*</span>
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    placeholder="Enter password (min 6 characters)"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full h-10 pl-10 pr-10 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md"
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
+              {authMode !== 'forgot' && (
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold text-slate-700">
+                      Password <span className="text-rose-500">*</span>
+                    </label>
+                    {authMode === 'signin' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('forgot');
+                          setErrorMessage(null);
+                          setSuccessNotice(null);
+                        }}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      placeholder={
+                        authMode === 'register'
+                          ? 'Min 8 chars, upper, lower, digit & special'
+                          : 'Enter password'
+                      }
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className="w-full h-10 pl-10 pr-10 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-md"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {authMode === 'register' && (
-                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
-                  <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
-                  <span>
-                    New registrations require administrator approval before your account can sign in.
+                <>
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-semibold text-slate-700">
+                        Password Policy
+                      </span>
+                      <span className="font-mono text-[11px] text-slate-500 tabular-nums">
+                        {registerComplexity.strengthScore}/5
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1">
+                      {registerComplexity.checks.map(check => (
+                        <div
+                          key={check.id}
+                          className={`flex items-center gap-1.5 text-[11px] ${
+                            check.passed ? 'text-emerald-700 font-medium' : 'text-slate-500'
+                          }`}
+                        >
+                          <CheckCircle2
+                            className={`w-3 h-3 shrink-0 ${
+                              check.passed ? 'text-emerald-600' : 'text-slate-300'
+                            }`}
+                          />
+                          <span>{check.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                      Confirm Password <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        placeholder="Re-enter password"
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        className="w-full h-10 pl-10 pr-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
+                    <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                    <span>
+                      New registrations require administrator approval before your account can sign in.
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {authMode === 'forgot' && (
+                <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2.5">
+                  <KeyRound className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">
+                    Enter your registered faculty or administrator email. You will receive a single-use password reset link that expires after 15 minutes.
                   </span>
                 </div>
               )}
@@ -347,10 +474,22 @@ export const AuthScreen: React.FC = () => {
                   }`}
                 >
                   {isLoading ? (
-                    <span>{authMode === 'signin' ? 'Signing in...' : 'Submitting request...'}</span>
+                    <span>
+                      {authMode === 'signin'
+                        ? 'Signing in...'
+                        : authMode === 'register'
+                          ? 'Submitting request...'
+                          : 'Sending reset link...'}
+                    </span>
                   ) : (
                     <>
-                      <span>{authMode === 'signin' ? 'Sign In to My Interface' : 'Submit Registration for Approval'}</span>
+                      <span>
+                        {authMode === 'signin'
+                          ? 'Sign In to My Interface'
+                          : authMode === 'register'
+                            ? 'Submit Registration for Approval'
+                            : 'Send Password Reset Link'}
+                      </span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}

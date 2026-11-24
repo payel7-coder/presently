@@ -1,6 +1,7 @@
 import {
   AttendanceRecord,
   AttendanceSession,
+  AttendanceStatus,
   ClassGroup,
   CSVParseResult,
   Student,
@@ -1012,6 +1013,92 @@ export function getPendingUsers(users: User[]): User[] {
 export function getApprovedTeachers(users: User[]): User[] {
   return users.filter(u => u.role === 'teacher' && resolveUserApprovalStatus(u) === 'approved');
 }
+
+export interface RollCallDraftEntry {
+  status?: AttendanceStatus;
+  remarks?: string;
+}
+
+export interface ResolvedRollCallResult {
+  resolvedStatuses: Record<string, { status: AttendanceStatus; remarks?: string }>;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+  totalStudents: number;
+}
+
+/**
+ * Builds the initial roll-call map for taking attendance.
+ * New sessions start with no status marked (neither P nor A),
+ * while existing sessions preserve saved records and leave newly added students unmarked.
+ */
+export function buildInitialRollCallDraft(
+  classStudents: Student[],
+  existingRecords: AttendanceRecord[] = []
+): Record<string, RollCallDraftEntry> {
+  const recordByStudent = new Map(existingRecords.map(r => [r.studentId, r]));
+  const draft: Record<string, RollCallDraftEntry> = {};
+
+  classStudents.forEach(stu => {
+    const found = recordByStudent.get(stu.id);
+    if (found) {
+      draft[stu.id] = {
+        status: found.status,
+        ...(found.remarks ? { remarks: found.remarks } : {}),
+      };
+    } else {
+      draft[stu.id] = {};
+    }
+  });
+
+  return draft;
+}
+
+/**
+ * Resolves a roll-call draft before saving attendance:
+ * Any student whose status is unmarked (undefined or omitted) counts as 'absent'.
+ */
+export function resolveRollCallForSave(
+  classStudents: Student[],
+  draftStatuses: Record<string, RollCallDraftEntry>
+): ResolvedRollCallResult {
+  const resolvedStatuses: Record<string, { status: AttendanceStatus; remarks?: string }> = {};
+  let presentCount = 0;
+  let absentCount = 0;
+  let lateCount = 0;
+  let excusedCount = 0;
+
+  const targetIds =
+    classStudents.length > 0
+      ? classStudents.map(s => s.id)
+      : Object.keys(draftStatuses);
+
+  targetIds.forEach(studentId => {
+    const entry = draftStatuses[studentId];
+    const resolvedStatus: AttendanceStatus = entry?.status ?? 'absent';
+
+    if (resolvedStatus === 'present') presentCount++;
+    else if (resolvedStatus === 'absent') absentCount++;
+    else if (resolvedStatus === 'late') lateCount++;
+    else if (resolvedStatus === 'excused') excusedCount++;
+
+    resolvedStatuses[studentId] = {
+      status: resolvedStatus,
+      ...(entry?.remarks ? { remarks: entry.remarks } : {}),
+    };
+  });
+
+  return {
+    resolvedStatuses,
+    presentCount,
+    absentCount,
+    lateCount,
+    excusedCount,
+    totalStudents: targetIds.length,
+  };
+}
+
 
 
 

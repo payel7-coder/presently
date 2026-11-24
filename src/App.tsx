@@ -13,10 +13,31 @@ import { StudentAssignmentsTracker } from './components/StudentAssignmentsTracke
 import { FormFillupManager } from './components/FormFillupManager';
 import { StudentProfileView } from './components/StudentProfileView';
 import { UserProfileView } from './components/UserProfileView';
+import { ResetPasswordView } from './components/ResetPasswordView';
+import { extractResetRouteFromLocation } from './utils/passwordResetLogic';
 import { SubjectPart } from './types/attendance';
 
 function AttendanceApp() {
-  const { currentUser, setCurrentUser, users } = useAttendance();
+  const { currentUser, logout } = useAttendance();
+
+  const [resetRoute, setResetRoute] = useState(() =>
+    extractResetRouteFromLocation(window.location.pathname, window.location.search)
+  );
+
+  React.useEffect(() => {
+    const syncRoute = () => {
+      setResetRoute(
+        extractResetRouteFromLocation(window.location.pathname, window.location.search)
+      );
+    };
+    window.addEventListener('popstate', syncRoute);
+    return () => window.removeEventListener('popstate', syncRoute);
+  }, []);
+
+  const navigateHomeToLogin = () => {
+    window.history.pushState({}, '', '/');
+    setResetRoute({ isResetRoute: false, token: '' });
+  };
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState<string>(() => {
@@ -48,6 +69,18 @@ function AttendanceApp() {
 
   // Login modal
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+
+  if (resetRoute.isResetRoute) {
+    return (
+      <ResetPasswordView
+        token={resetRoute.token}
+        onNavigateToLogin={navigateHomeToLogin}
+        onPasswordResetSuccess={() => {
+          logout().catch(() => {});
+        }}
+      />
+    );
+  }
 
   // If unauthenticated, display the authorized login screen!
   if (!currentUser) {

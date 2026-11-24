@@ -24,9 +24,12 @@ import {
 } from '../utils/formFillupLogic';
 import { generateFormFillupPDF } from '../utils/pdfFormFillup';
 import { ImportResultsModal } from './ImportResultsModal';
+import { FormFillupInvoiceModal } from './FormFillupInvoiceModal';
+import { canGenerateFormFillupInvoice } from '../utils/formFillupInvoiceLogic';
 import { ImportedStudentResultRow } from '../utils/resultImportLogic';
 import {
   Receipt,
+  FileCheck2,
   UserCog,
   Save,
   CheckCircle2,
@@ -234,6 +237,7 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
     breakdown: FeeBreakdown;
   } | null>(null);
   const [isImportResultsModalOpen, setIsImportResultsModalOpen] = useState<boolean>(false);
+  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState<boolean>(false);
 
   const [statusMessage, setStatusMessage] = useState<{
     type: 'success' | 'error';
@@ -243,6 +247,11 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
   if (!currentUser) return null;
 
   const canEditFeeSchedule = canEditFormFillupFeeConfig(currentUser);
+  const canGenerateInvoice = canGenerateFormFillupInvoice({
+    currentUser,
+    classGroup: selectedClass,
+    responsibilities: formFillupResponsibilities,
+  });
 
   const activeCoordinator = selectedClass
     ? (() => {
@@ -749,7 +758,7 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">
           {isAdmin && (
             <button
               type="button"
@@ -757,7 +766,7 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
               className="h-9 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
             >
               <UserCog className="w-3.5 h-3.5 text-slate-500" />
-              <span>Coordinator Allocation</span>
+              <span>Coordinators</span>
               {showCoordinatorPanel ? (
                 <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
               ) : (
@@ -780,11 +789,22 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                 type="button"
                 onClick={handleDownloadPDF}
                 disabled={activeClassStudents.length === 0}
-                className="h-9 px-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                className="h-9 px-3 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
               >
-                <FileText className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Download PDF</span>
+                <FileText className="w-3.5 h-3.5 text-slate-600" />
+                <span>Ledger PDF</span>
               </button>
+              {canGenerateInvoice && (
+                <button
+                  type="button"
+                  onClick={() => setIsInvoiceModalOpen(true)}
+                  disabled={activeClassStudents.length === 0}
+                  className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                >
+                  <FileCheck2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Generate Invoice</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -1620,15 +1640,27 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
       )}
 
       {selectedClass && effectiveFeeConfig && (
-        <ImportResultsModal
-          isOpen={isImportResultsModalOpen}
-          onClose={() => setIsImportResultsModalOpen(false)}
-          classGroup={selectedClass}
-          students={activeClassStudents}
-          feeConfig={effectiveFeeConfig}
-          existingRecords={liveDraftRecords}
-          onImportAndSave={handleImportAndSaveResults}
-        />
+        <>
+          <ImportResultsModal
+            isOpen={isImportResultsModalOpen}
+            onClose={() => setIsImportResultsModalOpen(false)}
+            classGroup={selectedClass}
+            students={activeClassStudents}
+            feeConfig={effectiveFeeConfig}
+            existingRecords={liveDraftRecords}
+            onImportAndSave={handleImportAndSaveResults}
+          />
+          <FormFillupInvoiceModal
+            isOpen={isInvoiceModalOpen}
+            onClose={() => setIsInvoiceModalOpen(false)}
+            classGroup={selectedClass}
+            students={activeClassStudents}
+            records={liveDraftRecords}
+            feeConfig={effectiveFeeConfig}
+            coordinator={activeCoordinator}
+            generatedBy={currentUser}
+          />
+        </>
       )}
     </div>
   );

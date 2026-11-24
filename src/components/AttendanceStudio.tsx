@@ -19,7 +19,12 @@ import {
   AlertCircle,
   X
 } from 'lucide-react';
-import { calculateStudentAttendanceStats } from '../utils/attendanceLogic';
+import {
+  buildInitialRollCallDraft,
+  calculateStudentAttendanceStats,
+  resolveRollCallForSave,
+  RollCallDraftEntry,
+} from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
 import { DownloadAbsentListModal } from './DownloadAbsentListModal';
 
@@ -98,11 +103,11 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     return activeClass ? getClassStudents(activeClass.id) : [];
   }, [activeClass, getClassStudents]);
 
-  const [statuses, setStatuses] = useState<Record<string, { status: AttendanceStatus; remarks?: string }>>({});
+  const [statuses, setStatuses] = useState<Record<string, RollCallDraftEntry>>({});
   const [existingSessionId, setExistingSessionId] = useState<string | null>(null);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | AttendanceStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'unmarked' | AttendanceStatus>('all');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
 
   const [activeRemarkStudent, setActiveRemarkStudent] = useState<Student | null>(null);
@@ -128,23 +133,11 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
       setExistingSessionId(existing.id);
       setTopic(existing.topic || '');
       const existingRecs = getSessionRecords(existing.id);
-      const initialMap: Record<string, { status: AttendanceStatus; remarks?: string }> = {};
-      classStudents.forEach(stu => {
-        const found = existingRecs.find(r => r.studentId === stu.id);
-        initialMap[stu.id] = {
-          status: found ? found.status : 'present',
-          remarks: found?.remarks,
-        };
-      });
-      setStatuses(initialMap);
+      setStatuses(buildInitialRollCallDraft(classStudents, existingRecs));
     } else {
       setExistingSessionId(null);
       setTopic('');
-      const initialMap: Record<string, { status: AttendanceStatus; remarks?: string }> = {};
-      classStudents.forEach(stu => {
-        initialMap[stu.id] = { status: 'present' };
-      });
-      setStatuses(initialMap);
+      setStatuses(buildInitialRollCallDraft(classStudents));
     }
   }, [activeSubjectId, activePart, sessionDate, classStudents.length]);
 
@@ -159,17 +152,31 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   };
 
   const cycleStatus = (studentId: string) => {
-    const current = statuses[studentId]?.status || 'present';
+    const current = statuses[studentId]?.status;
+    if (!current) {
+      setStudentStatus(studentId, 'present');
+      return;
+    }
     const sequence: AttendanceStatus[] = ['present', 'absent', 'late', 'excused'];
     const nextIndex = (sequence.indexOf(current) + 1) % sequence.length;
     setStudentStatus(studentId, sequence[nextIndex]);
   };
 
   const markAll = (status: AttendanceStatus) => {
-    const nextMap: Record<string, { status: AttendanceStatus; remarks?: string }> = {};
+    const nextMap: Record<string, RollCallDraftEntry> = {};
     classStudents.forEach(stu => {
       nextMap[stu.id] = {
         status,
+        remarks: statuses[stu.id]?.remarks,
+      };
+    });
+    setStatuses(nextMap);
+  };
+
+  const clearAllMarks = () => {
+    const nextMap: Record<string, RollCallDraftEntry> = {};
+    classStudents.forEach(stu => {
+      nextMap[stu.id] = {
         remarks: statuses[stu.id]?.remarks,
       };
     });
@@ -181,26 +188,34 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     let absent = 0;
     let late = 0;
     let excused = 0;
+    let unmarked = 0;
     const total = classStudents.length;
 
-    Object.values(statuses).forEach(item => {
-      if (item.status === 'present') present++;
-      else if (item.status === 'absent') absent++;
-      else if (item.status === 'late') late++;
-      else if (item.status === 'excused') excused++;
+    classStudents.forEach(stu => {
+      const status = statuses[stu.id]?.status;
+      if (status === 'present') present++;
+      else if (status === 'absent') absent++;
+      else if (status === 'late') late++;
+      else if (status === 'excused') excused++;
+      else unmarked++;
     });
 
     const rate = total > 0 ? Math.round(((present + late * 0.75 + excused) / total) * 100) : 0;
-    return { total, present, absent, late, excused, rate };
-  }, [statuses, classStudents.length]);
+    return { total, present, absent, late, excused, unmarked, rate };
+  }, [statuses, classStudents]);
 
   const filteredStudents = useMemo(() => {
     return classStudents.filter(student => {
-      const currentStatus = statuses[student.id]?.status || 'present';
+      const currentStatus = statuses[student.id]?.status;
       const matchesSearch =
         student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         student.rollNumber.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesFilter = statusFilter === 'all' || currentStatus === statusFilter;
+      const matchesFilter =
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'unmarked'
+            ? !currentStatus
+            : currentStatus === statusFilter;
       return matchesSearch && matchesFilter;
     });
   }, [classStudents, statuses, searchQuery, statusFilter]);
@@ -209,6 +224,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
     if (!activeSubject || !activeClass || isFutureDate) return;
 
     try {
+      const resolved = resolveRollCallForSave(classStudents, statuses);
       const partLabel = activePart === 'practical' ? 'Practical' : 'Theory';
       const saved = await saveAttendanceSession(
         {
@@ -220,9 +236,14 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           date: sessionDate,
           topic: topic || `${activeSubject.name} (${partLabel})`,
         },
-        statuses
+        resolved.resolvedStatuses
       );
 
+      setStatuses(resolved.resolvedStatuses);
+      setExistingSessionId(saved.id);
+      if (statusFilter === 'unmarked') {
+        setStatusFilter('all');
+      }
       setSubmittedSessionInfo({
         present: saved.presentCount,
         absent: saved.absentCount,
@@ -473,10 +494,16 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-sky-400" />
               {stats.excused} Excused
             </span>
+            {stats.unmarked > 0 && (
+              <span className="inline-flex items-center gap-1.5 text-slate-300">
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                {stats.unmarked} Unmarked (→ Absent on save)
+              </span>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="flex flex-wrap items-center gap-2 ml-auto">
           <button
             type="button"
             onClick={() => markAll('present')}
@@ -493,9 +520,10 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
           <button
             type="button"
-            onClick={() => markAll('absent')}
+            onClick={clearAllMarks}
             disabled={isFutureDate}
-            className={`hidden sm:flex h-9 items-center gap-1 px-2.5 rounded-lg text-xs font-medium transition-colors border whitespace-nowrap ${
+            title="Clear all P / A / L / E marks"
+            className={`flex h-9 items-center gap-1 px-2.5 rounded-lg text-xs font-medium transition-colors border whitespace-nowrap ${
               isFutureDate
                 ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
@@ -594,6 +622,17 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           >
             All ({classStudents.length})
           </button>
+          {stats.unmarked > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter('unmarked')}
+              className={`h-8 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                statusFilter === 'unmarked' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              }`}
+            >
+              Unmarked ({stats.unmarked})
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setStatusFilter('present')}
@@ -676,7 +715,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
       ) : viewMode === 'cards' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 tabular-nums">
           {filteredStudents.map(student => {
-            const currentStatus = statuses[student.id]?.status || 'present';
+            const currentStatus = statuses[student.id]?.status;
             const remarks = statuses[student.id]?.remarks;
             const studentStats = calculateStudentAttendanceStats(student, sessions, records);
 
@@ -684,12 +723,13 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             const isAbsent = currentStatus === 'absent';
             const isLate = currentStatus === 'late';
             const isExcused = currentStatus === 'excused';
+            const isUnmarked = !currentStatus;
 
             return (
               <div
                 key={student.id}
                 className={`bg-white rounded-xl p-4 border transition-colors ${
-                  isPresent
+                  isUnmarked || isPresent
                     ? 'border-slate-200 hover:border-slate-300'
                     : isAbsent
                     ? 'border-rose-300 bg-rose-50/20'
@@ -709,10 +749,12 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                           ? 'bg-rose-600'
                           : isLate
                           ? 'bg-amber-600'
-                          : 'bg-sky-600'
+                          : isExcused
+                          ? 'bg-sky-600'
+                          : 'bg-slate-400'
                       }`}
                     >
-                      {currentStatus[0].toUpperCase()}
+                      {currentStatus ? currentStatus[0].toUpperCase() : '—'}
                     </span>
                   </div>
 
@@ -840,7 +882,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.map(student => {
-                  const currentStatus = statuses[student.id]?.status || 'present';
+                  const currentStatus = statuses[student.id]?.status;
                   const remarks = statuses[student.id]?.remarks;
                   const studentStats = calculateStudentAttendanceStats(student, sessions, records);
 

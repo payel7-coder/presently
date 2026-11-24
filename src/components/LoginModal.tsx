@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
+import { validatePasswordComplexity } from '../utils/passwordResetLogic';
 import {
   LogIn,
   KeyRound,
@@ -15,9 +16,9 @@ interface LoginModalProps {
 }
 
 export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
-  const { loginWithEmail, registerWithEmail } = useAttendance();
+  const { loginWithEmail, registerWithEmail, requestPasswordReset } = useAttendance();
 
-  const [mode, setMode] = useState<'email-login' | 'register'>('email-login');
+  const [mode, setMode] = useState<'email-login' | 'register' | 'forgot'>('email-login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -32,6 +33,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
     e.preventDefault();
     setErrorMsg(null);
     setSuccessMsg(null);
+
+    if (mode === 'forgot') {
+      setLoading(true);
+      try {
+        const message = await requestPasswordReset(email.trim());
+        setSuccessMsg(message);
+      } catch (err: any) {
+        setErrorMsg(err.message || 'Unable to process password reset request');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (mode === 'register') {
+      const check = validatePasswordComplexity(password);
+      if (!check.valid) {
+        setErrorMsg(check.errors[0]);
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
@@ -68,7 +91,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-900 tracking-tight">
-                Switch Account
+                {mode === 'forgot' ? 'Reset Password' : 'Switch Account'}
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 BTEB Probidhan 2022 Institutional Authentication
@@ -103,6 +126,15 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             }`}
           >
             Register
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMode('forgot'); setErrorMsg(null); setSuccessMsg(null); }}
+            className={`flex-1 py-1.5 rounded-md transition-colors ${
+              mode === 'forgot' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Reset
           </button>
         </div>
 
@@ -169,30 +201,55 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Password
-            </label>
-            <div className="relative">
-              <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="password"
-                required
-                minLength={6}
-                placeholder="Enter password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
-              />
+          {mode !== 'forgot' && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700">
+                  Password
+                </label>
+                {mode === 'email-login' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode('forgot');
+                      setErrorMsg(null);
+                      setSuccessMsg(null);
+                    }}
+                    className="text-[11px] font-semibold text-emerald-700 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+              </div>
+              <div className="relative">
+                <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="password"
+                  required
+                  minLength={mode === 'register' ? 8 : 1}
+                  placeholder={mode === 'register' ? 'Min 8 chars, upper, lower, digit, symbol' : 'Enter password'}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full h-9 pl-9 pr-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
             className="w-full mt-2 h-9 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white rounded-lg text-xs font-semibold transition-colors flex items-center justify-center"
           >
-            <span>{loading ? 'Authenticating...' : mode === 'email-login' ? 'Sign In' : 'Submit for Admin Approval'}</span>
+            <span>
+              {loading
+                ? 'Processing...'
+                : mode === 'email-login'
+                  ? 'Sign In'
+                  : mode === 'register'
+                    ? 'Submit for Admin Approval'
+                    : 'Send Password Reset Link'}
+            </span>
           </button>
         </form>
       </div>

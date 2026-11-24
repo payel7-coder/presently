@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import {
   AssignmentSubmissionStatus,
   AttendanceRecord,
@@ -29,6 +29,8 @@ import {
   getPendingUsers,
   getApprovedTeachers,
   isPrimaryAdminEmail,
+  resolveRollCallForSave,
+  RollCallDraftEntry,
 } from '../utils/attendanceLogic';
 import {
   validateCourseworkInput,
@@ -55,11 +57,7 @@ import {
   deleteDoc,
   onSnapshot,
 } from 'firebase/firestore';
-import {
-  signInWithEmailAndPassword,
-  signOut,
-  createUserWithEmailAndPassword,
-} from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 
 interface NewTeacherInput {
   name: string;
@@ -78,6 +76,7 @@ export interface RegisterResult {
 interface AttendanceContextType {
   currentUser: User | null;
   setCurrentUser: (user: User | null) => void;
+  accessToken: string | null;
   users: User[];
   teachers: User[];
   pendingUsers: User[];
@@ -97,9 +96,10 @@ interface AttendanceContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   canImportStudents: boolean;
-  loginWithPreset: (user: User) => Promise<void>;
   loginWithEmail: (email: string, pass: string) => Promise<User>;
   registerWithEmail: (email: string, pass: string, name: string, role: 'admin' | 'teacher') => Promise<RegisterResult>;
+  requestPasswordReset: (email: string) => Promise<string>;
+  verifyActiveSession: () => Promise<boolean>;
   logout: () => Promise<void>;
   isFirebaseLive: boolean;
 
@@ -135,7 +135,7 @@ interface AttendanceContextType {
       timeSlot?: string;
       topic?: string;
     },
-    studentStatuses: Record<string, { status: AttendanceStatus; remarks?: string }>
+    studentStatuses: Record<string, RollCallDraftEntry>
   ) => Promise<AttendanceSession>;
 
   getSessionByDate: (subjectId: string, date: string, part?: SubjectPart) => AttendanceSession | undefined;
@@ -199,27 +199,10 @@ const DEMO_USER_IDS = new Set([
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Current active user profile (null when unauthenticated)
-  const [currentUser, setCurrentUserState] = useState<User | null>(() => {
-    const saved = localStorage.getItem('presently_active_user');
-    if (!saved) return null;
-    try {
-      const u: User = JSON.parse(saved);
-      if (!evaluateLoginAccess(u).allowed) {
-        localStorage.removeItem('presently_active_user');
-        return null;
-      }
-      const customTarget = localStorage.getItem(`presently_daily_target_${u.id}`);
-      if (customTarget) {
-        u.dailyClassTarget = parseInt(customTarget, 10);
-      } else if (u.dailyClassTarget === undefined) {
-        u.dailyClassTarget = 4;
-      }
-      return u;
-    } catch {
-      return null;
-    }
-  });
+  // Active session is held strictly in JS/React memory (never persisted in localStorage/sessionStorage)
+  const [currentUser, setCurrentUserState] = useState<User | null>(null);
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
 
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>(BTEB_CLASSES);
@@ -235,14 +218,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [formFillupRecords, setFormFillupRecords] = useState<FormFillupStudentRecord[]>([]);
   const [isFirebaseLive, setIsFirebaseLive] = useState(false);
 
-  // Sync active user to localStorage
+  // Clear any legacy localStorage auth state on boot
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('presently_active_user', JSON.stringify(currentUser));
-    } else {
+    try {
       localStorage.removeItem('presently_active_user');
+    } catch {
+      // Ignore storage access restrictions
     }
-  }, [currentUser]);
+  }, []);
 
   // Helper to initialize Firestore with BTEB 2022 classes & subjects only (no demo faculty/students)
   const seedInitialFirestore = async () => {
@@ -416,14 +399,53 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, []);
 
+  const setAccessToken = (token: string | null) => {
+    accessTokenRef.current = token;
+    setAccessTokenState(token);
+  };
+
   const setCurrentUser = (user: User | null) => {
     setCurrentUserState(user);
-    if (user) {
-      localStorage.setItem('presently_active_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('presently_active_user');
+    if (!user) {
+      setAccessToken(null);
     }
   };
+
+  const verifyActiveSession = useCallback(async (): Promise<boolean> => {
+    const token = accessTokenRef.current;
+    if (!token) return false;
+    try {
+      const res = await fetch('/api/auth/me', {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        setAccessToken(null);
+        setCurrentUserState(null);
+        return false;
+      }
+      return true;
+    } catch {
+      return true;
+    }
+  }, []);
+
+  // Re-verify active JWT against server on window focus / periodic check so password resets sign out active tabs immediately
+  useEffect(() => {
+    if (!accessToken || !currentUser) return;
+    const onFocus = () => {
+      verifyActiveSession();
+    };
+    window.addEventListener('focus', onFocus);
+    const timer = window.setInterval(() => {
+      verifyActiveSession();
+    }, 30000);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(timer);
+    };
+  }, [accessToken, currentUser, verifyActiveSession]);
 
   // Guard active session against live approval revocation or rejection
   useEffect(() => {
@@ -432,13 +454,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       u => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase()
     );
     if (syncedUser && !evaluateLoginAccess(syncedUser).allowed) {
-      localStorage.removeItem('presently_active_user');
+      setAccessToken(null);
       setCurrentUserState(null);
       signOut(auth).catch(() => {});
     }
   }, [users, currentUser]);
 
-  const isAuthenticated = Boolean(currentUser);
+  const isAuthenticated = Boolean(currentUser && accessToken);
   const isAdmin = currentUser?.role === 'admin';
   const canImportStudents = Boolean(isAdmin);
 
@@ -490,7 +512,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     setCurrentUserState(updatedUser);
-    localStorage.setItem('presently_active_user', JSON.stringify(updatedUser));
     localStorage.setItem(`presently_daily_target_${currentUser.id}`, validTarget.toString());
 
     setUsers(prev => prev.map(u => (u.id === currentUser.id ? updatedUser : u)));
@@ -517,7 +538,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const updatedUser = validation.updatedUser;
 
     setCurrentUserState(updatedUser);
-    localStorage.setItem('presently_active_user', JSON.stringify(updatedUser));
     if (typeof updatedUser.dailyClassTarget === 'number') {
       localStorage.setItem(
         `presently_daily_target_${updatedUser.id}`,
@@ -538,24 +558,37 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return updatedUser;
   };
 
-  // Auth Functions
-  const loginWithPreset = async (user: User) => {
-    const customTarget = localStorage.getItem(`presently_daily_target_${user.id}`);
-    const resolvedTarget = customTarget ? parseInt(customTarget, 10) : (user.dailyClassTarget || 4);
-    const userWithTarget: User = {
-      ...user,
-      dailyClassTarget: resolvedTarget,
-    };
-    setCurrentUserState(userWithTarget);
-    localStorage.setItem('presently_active_user', JSON.stringify(userWithTarget));
+  const syncUsersDirectoryToServer = useCallback(async (userList: User[], tokenOverride?: string | null) => {
+    const token = tokenOverride ?? accessTokenRef.current;
+    if (!token || userList.length === 0) return;
     try {
-      const cleanUser: any = { ...userWithTarget };
-      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-      await setDoc(doc(db, 'users', user.id), cleanUser, { merge: true });
+      await fetch('/api/auth/admin/sync-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          users: userList.map(u => ({
+            id: u.id,
+            email: u.email,
+            name: u.name,
+            role: u.role,
+            approvalStatus: resolveUserApprovalStatus(u),
+          })),
+        }),
+      });
     } catch (e) {
-      console.warn('Firestore user profile sync:', e);
+      console.warn('Auth directory sync skipped:', e);
     }
-  };
+  }, []);
+
+  // Automatically sync Firestore faculty directory into server auth DB when Admin is authenticated
+  useEffect(() => {
+    if (isAdmin && accessToken && users.length > 0) {
+      syncUsersDirectoryToServer(users, accessToken);
+    }
+  }, [isAdmin, accessToken, users, syncUsersDirectoryToServer]);
 
   const buildInstitutionalProfile = (cleanEmail: string, uid: string): User => {
     const isDesignatedAdmin =
@@ -612,99 +645,63 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const loginWithEmail = async (email: string, pass: string): Promise<User> => {
     const cleanEmail = email.trim().toLowerCase();
-    const matched = await findUserByEmailWithFirestore(cleanEmail);
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ email: cleanEmail, password: pass }),
+    });
 
-    if (matched) {
-      const access = evaluateLoginAccess(matched);
-      if (!access.allowed) {
-        try {
-          await signOut(auth);
-        } catch {
-          // Ignore signOut error when enforcing approval gate
-        }
-        throw new Error(access.reason);
-      }
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Authentication failed. Please check your credentials.');
     }
+
+    const serverUser = data.user as {
+      id: string;
+      email: string;
+      name: string;
+      role: 'admin' | 'teacher';
+      approvalStatus: 'approved' | 'pending' | 'rejected';
+    };
+    const token = data.accessToken as string;
+
+    const existingProfile = await findUserByEmailWithFirestore(cleanEmail);
+    const customTarget = localStorage.getItem(`presently_daily_target_${serverUser.id}`);
+    const baseProfile = existingProfile
+      ? {
+          ...existingProfile,
+          id: existingProfile.id || serverUser.id,
+          email: serverUser.email,
+          role: serverUser.role,
+          approvalStatus: serverUser.approvalStatus,
+        }
+      : {
+          ...buildInstitutionalProfile(cleanEmail, serverUser.id),
+          name: serverUser.name,
+          role: serverUser.role,
+          approvalStatus: serverUser.approvalStatus,
+        };
+
+    if (customTarget) {
+      baseProfile.dailyClassTarget = parseInt(customTarget, 10);
+    } else if (baseProfile.dailyClassTarget === undefined) {
+      baseProfile.dailyClassTarget = 4;
+    }
+
+    setAccessToken(token);
+    setCurrentUserState(baseProfile);
+    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), baseProfile]);
 
     try {
-      const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
-      const userProfile: User = matched
-        ? { ...matched, id: res.user.uid || matched.id }
-        : {
-            ...buildInstitutionalProfile(cleanEmail, res.user.uid),
-            approvalStatus: 'approved',
-          };
-
-      const access = evaluateLoginAccess(userProfile);
-      if (!access.allowed) {
-        await signOut(auth).catch(() => {});
-        throw new Error(access.reason);
-      }
-
-      setCurrentUserState(userProfile);
-      localStorage.setItem('presently_active_user', JSON.stringify(userProfile));
-      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), userProfile]);
-
-      try {
-        const cleanUser: any = { ...userProfile };
-        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-        await setDoc(doc(db, 'users', userProfile.id), cleanUser, { merge: true });
-      } catch (err) {
-        console.warn('Firestore user profile sync error:', err);
-      }
-      return userProfile;
-    } catch (firebaseErr: any) {
-      if (
-        firebaseErr?.message &&
-        (firebaseErr.message.includes('pending administrator approval') ||
-          firebaseErr.message.includes('declined by the administrator'))
-      ) {
-        throw firebaseErr;
-      }
-
-      console.warn('Firebase auth attempt handled with institutional fallback:', firebaseErr?.code);
-
-      if (matched) {
-        const access = evaluateLoginAccess(matched);
-        if (!access.allowed) {
-          throw new Error(access.reason);
-        }
-        setCurrentUserState(matched);
-        localStorage.setItem('presently_active_user', JSON.stringify(matched));
-        try {
-          const cleanUser: any = { ...matched };
-          Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-          await setDoc(doc(db, 'users', matched.id), cleanUser, { merge: true });
-        } catch (e) {
-          console.warn('User profile Firestore sync:', e);
-        }
-        return matched;
-      }
-
-      // Only primary institutional administrator may auto-bootstrap on fallback
-      if (!isPrimaryAdminEmail(cleanEmail)) {
-        throw new Error(
-          'No approved account found for this email. Please switch to Register to submit a registration request for administrator approval.'
-        );
-      }
-
-      const fallbackUser: User = {
-        ...buildInstitutionalProfile(cleanEmail, 'admin-payel'),
-        approvalStatus: 'approved',
-      };
-
-      setCurrentUserState(fallbackUser);
-      localStorage.setItem('presently_active_user', JSON.stringify(fallbackUser));
-      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), fallbackUser]);
-      try {
-        const cleanUser: any = { ...fallbackUser };
-        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-        await setDoc(doc(db, 'users', fallbackUser.id), cleanUser, { merge: true });
-      } catch (e) {
-        console.warn('User profile Firestore sync:', e);
-      }
-      return fallbackUser;
+      const cleanUser: any = { ...baseProfile };
+      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+      await setDoc(doc(db, 'users', baseProfile.id), cleanUser, { merge: true });
+    } catch (err) {
+      console.warn('Firestore user profile sync error:', err);
     }
+
+    return baseProfile;
   };
 
   const registerWithEmail = async (
@@ -714,58 +711,68 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     role: 'admin' | 'teacher'
   ): Promise<RegisterResult> => {
     const cleanEmail = email.trim().toLowerCase();
-    const existing = await findUserByEmailWithFirestore(cleanEmail);
-
-    if (existing) {
-      const existingStatus = resolveUserApprovalStatus(existing);
-      if (existingStatus === 'pending') {
-        throw new Error(
-          'An account with this email is already registered and awaiting administrator approval.'
-        );
-      }
-      if (existingStatus === 'rejected') {
-        throw new Error(
-          'A previous registration request for this email was declined. Please contact an administrator.'
-        );
-      }
-      throw new Error(
-        'An approved account with this email already exists. Please use Sign In instead.'
-      );
-    }
-
     const isPrimary = isPrimaryAdminEmail(cleanEmail);
-    const approvalStatus = isPrimary ? 'approved' : 'pending';
     const registeredAt = new Date().toISOString();
+    const suggestedId = isPrimary ? 'admin-payel' : `user-${Date.now()}`;
 
-    const buildRegisteredUser = (uid: string): User => ({
-      id: uid,
-      name: name.trim(),
-      email: cleanEmail,
-      role: isPrimary ? 'admin' : role,
-      avatar: (isPrimary || role === 'admin')
-        ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      department: 'Computer Science & Technology',
-      employeeId: (isPrimary || role === 'admin') ? `ADM-${Date.now().toString().slice(-4)}` : `BTEB-${Date.now().toString().slice(-4)}`,
-      title: (isPrimary || role === 'admin') ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
-      dailyClassTarget: 4,
-      approvalStatus,
-      registeredAt,
-      ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({
+        id: suggestedId,
+        email: cleanEmail,
+        password: pass,
+        name: name.trim(),
+        role,
+      }),
     });
 
-    let newUser: User;
-    try {
-      const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-      newUser = buildRegisteredUser(res.user.uid);
-    } catch (e: any) {
-      if (e?.code === 'auth/email-already-in-use') {
-        throw new Error(
-          'An account with this email already exists in authentication. Please sign in or contact an administrator.'
-        );
-      }
-      newUser = buildRegisteredUser(`user-${Date.now()}`);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Unable to register account. Please review your details.');
     }
+
+    const serverUser = data.user as {
+      id: string;
+      email: string;
+      name: string;
+      role: 'admin' | 'teacher';
+      approvalStatus: 'approved' | 'pending' | 'rejected';
+    };
+    const requiresApproval = Boolean(data.requiresApproval);
+
+    const existingProfile = await findUserByEmailWithFirestore(cleanEmail);
+    const newUser: User = existingProfile
+      ? {
+          ...existingProfile,
+          name: serverUser.name,
+          role: serverUser.role,
+          approvalStatus: serverUser.approvalStatus,
+        }
+      : {
+          id: serverUser.id,
+          name: serverUser.name,
+          email: serverUser.email,
+          role: serverUser.role,
+          avatar:
+            serverUser.role === 'admin'
+              ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+              : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+          department: 'Computer Science & Technology',
+          employeeId:
+            serverUser.role === 'admin'
+              ? `ADM-${Date.now().toString().slice(-4)}`
+              : `BTEB-${Date.now().toString().slice(-4)}`,
+          title:
+            serverUser.role === 'admin'
+              ? 'Institutional Administrator'
+              : 'Instructor (Computer Technology)',
+          dailyClassTarget: 4,
+          approvalStatus: serverUser.approvalStatus,
+          registeredAt,
+          ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
+        };
 
     setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
 
@@ -777,28 +784,51 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       console.warn('Firestore user write error:', err);
     }
 
-    if (approvalStatus === 'pending') {
-      try {
-        await signOut(auth);
-      } catch {
-        // Ignore if not signed into Firebase Auth
-      }
+    if (requiresApproval || !data.accessToken) {
       return { user: newUser, requiresApproval: true };
     }
 
+    setAccessToken(data.accessToken);
     setCurrentUserState(newUser);
-    localStorage.setItem('presently_active_user', JSON.stringify(newUser));
     return { user: newUser, requiresApproval: false };
   };
 
+  const requestPasswordReset = async (email: string): Promise<string> => {
+    const response = await fetch('/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
+      body: JSON.stringify({ email: email.trim().toLowerCase() }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || 'Unable to process password reset request.');
+    }
+    return (
+      data.message ||
+      'If an account with that email exists, a password reset link has been sent.'
+    );
+  };
+
   const logout = async () => {
+    const token = accessTokenRef.current;
+    setAccessToken(null);
+    setCurrentUserState(null);
+    if (token) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      } catch {
+        // Ignore network failure during logout cleanup
+      }
+    }
     try {
       await signOut(auth);
-    } catch (e) {
-      console.warn(e);
+    } catch {
+      // Ignore Firebase Auth cleanup error
     }
-    localStorage.removeItem('presently_active_user');
-    setCurrentUserState(null);
   };
 
   // Admin: Add / Remove Real Faculty Teachers
@@ -836,6 +866,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
 
     setUsers(prev => [...prev, newTeacher]);
+    await syncUsersDirectoryToServer([newTeacher]);
 
     try {
       const cleanUser: any = { ...newTeacher };
@@ -1104,7 +1135,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       timeSlot?: string;
       topic?: string;
     },
-    studentStatuses: Record<string, { status: AttendanceStatus; remarks?: string }>
+    studentStatuses: Record<string, RollCallDraftEntry>
   ) => {
     const todayStr = new Date().toISOString().split('T')[0];
     if (sessionDetails.date > todayStr) {
@@ -1113,19 +1144,8 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const resolvedPart: SubjectPart = sessionDetails.part || 'theory';
     const classStudents = getClassStudents(sessionDetails.classId);
-    let pCount = 0;
-    let aCount = 0;
-    let lCount = 0;
-    let eCount = 0;
-
-    const studentIds = Object.keys(studentStatuses);
-    studentIds.forEach(id => {
-      const status = studentStatuses[id]?.status || 'present';
-      if (status === 'present') pCount++;
-      else if (status === 'absent') aCount++;
-      else if (status === 'late') lCount++;
-      else if (status === 'excused') eCount++;
-    });
+    const resolved = resolveRollCallForSave(classStudents, studentStatuses);
+    const studentIds = Object.keys(resolved.resolvedStatuses);
 
     const sessionId = sessionDetails.id || `bteb-sess-${resolvedPart}-${Date.now()}`;
     const partLabel = resolvedPart === 'practical' ? 'Practical' : 'Theory';
@@ -1138,17 +1158,17 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       date: sessionDetails.date,
       timeSlot: sessionDetails.timeSlot || `${partLabel} Session`,
       topic: sessionDetails.topic || `BTEB ${partLabel} Class`,
-      totalStudents: classStudents.length,
-      presentCount: pCount,
-      absentCount: aCount,
-      lateCount: lCount,
-      excusedCount: eCount,
+      totalStudents: resolved.totalStudents,
+      presentCount: resolved.presentCount,
+      absentCount: resolved.absentCount,
+      lateCount: resolved.lateCount,
+      excusedCount: resolved.excusedCount,
       createdAt: new Date().toISOString(),
       isSubmitted: true,
     };
 
     const newRecords: AttendanceRecord[] = studentIds.map(studentId => {
-      const data = studentStatuses[studentId];
+      const data = resolved.resolvedStatuses[studentId];
       const rec: AttendanceRecord = {
         id: `rec-${sessionId}-${studentId}`,
         sessionId,
@@ -1691,6 +1711,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       value={{
         currentUser,
         setCurrentUser,
+        accessToken,
         users,
         teachers,
         pendingUsers,
@@ -1708,9 +1729,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isAuthenticated,
         isAdmin,
         canImportStudents,
-        loginWithPreset,
         loginWithEmail,
         registerWithEmail,
+        requestPasswordReset,
+        verifyActiveSession,
         logout,
         isFirebaseLive,
         getTeacherSubjects,

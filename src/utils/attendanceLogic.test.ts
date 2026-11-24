@@ -15,6 +15,8 @@ import {
   evaluateLoginAccess,
   getPendingUsers,
   getApprovedTeachers,
+  buildInitialRollCallDraft,
+  resolveRollCallForSave,
 } from './attendanceLogic';
 import { ClassGroup, Student, AttendanceSession, AttendanceRecord, Subject, SubjectAssignment, User } from '../types/attendance';
 
@@ -673,5 +675,58 @@ test('approval workflow enforces pending/rejected gate while keeping legacy user
   assert.deepEqual(activeTeachers.map(u => u.id), ['tch-legacy', 'tch-approved']);
 });
 
+test('buildInitialRollCallDraft starts unmarked for new sessions and preserves saved marks', () => {
+  const roster: Student[] = [
+    { id: 's1', rollNumber: '101', name: 'Student One', email: 's1@test.edu', gender: 'Male', classId: 'c1', status: 'active' },
+    { id: 's2', rollNumber: '102', name: 'Student Two', email: 's2@test.edu', gender: 'Female', classId: 'c1', status: 'active' },
+    { id: 's3', rollNumber: '103', name: 'Student Three', email: 's3@test.edu', gender: 'Male', classId: 'c1', status: 'active' },
+  ];
 
+  // New session: neither P nor A is marked initially
+  const newDraft = buildInitialRollCallDraft(roster);
+  assert.equal(newDraft.s1.status, undefined);
+  assert.equal(newDraft.s2.status, undefined);
+  assert.equal(newDraft.s3.status, undefined);
 
+  // Existing session: saved marks restored, newly added student remains unmarked
+  const savedRecords: AttendanceRecord[] = [
+    { id: 'r1', sessionId: 'sess-1', studentId: 's1', status: 'present', markedAt: '2026-11-23' },
+    { id: 'r2', sessionId: 'sess-1', studentId: 's2', status: 'late', remarks: 'Bus delay', markedAt: '2026-11-23' },
+  ];
+  const editDraft = buildInitialRollCallDraft(roster, savedRecords);
+  assert.equal(editDraft.s1.status, 'present');
+  assert.equal(editDraft.s2.status, 'late');
+  assert.equal(editDraft.s2.remarks, 'Bus delay');
+  assert.equal(editDraft.s3.status, undefined);
+});
+
+test('resolveRollCallForSave counts all unmarked and missing students as absent', () => {
+  const roster: Student[] = [
+    { id: 's1', rollNumber: '101', name: 'Student One', email: 's1@test.edu', gender: 'Male', classId: 'c1', status: 'active' },
+    { id: 's2', rollNumber: '102', name: 'Student Two', email: 's2@test.edu', gender: 'Female', classId: 'c1', status: 'active' },
+    { id: 's3', rollNumber: '103', name: 'Student Three', email: 's3@test.edu', gender: 'Male', classId: 'c1', status: 'active' },
+    { id: 's4', rollNumber: '104', name: 'Student Four', email: 's4@test.edu', gender: 'Female', classId: 'c1', status: 'active' },
+    { id: 's5', rollNumber: '105', name: 'Student Five', email: 's5@test.edu', gender: 'Male', classId: 'c1', status: 'active' },
+  ];
+
+  const draft = {
+    s1: { status: 'present' as const },
+    s2: {}, // unmarked -> absent
+    s3: { status: 'late' as const, remarks: 'Traffic' },
+    s4: { status: undefined, remarks: 'No call' }, // unmarked with note -> absent with note preserved
+    // s5 omitted completely -> absent
+  };
+
+  const resolved = resolveRollCallForSave(roster, draft);
+  assert.equal(resolved.totalStudents, 5);
+  assert.equal(resolved.presentCount, 1);
+  assert.equal(resolved.absentCount, 3);
+  assert.equal(resolved.lateCount, 1);
+  assert.equal(resolved.excusedCount, 0);
+  assert.equal(resolved.resolvedStatuses.s1.status, 'present');
+  assert.equal(resolved.resolvedStatuses.s2.status, 'absent');
+  assert.equal(resolved.resolvedStatuses.s3.status, 'late');
+  assert.equal(resolved.resolvedStatuses.s4.status, 'absent');
+  assert.equal(resolved.resolvedStatuses.s4.remarks, 'No call');
+  assert.equal(resolved.resolvedStatuses.s5.status, 'absent');
+});
