@@ -47,6 +47,11 @@ import {
   buildUserProfileUpdatePayload,
   UserProfileEditableInput,
 } from '../utils/userProfileLogic';
+import {
+  mapFirebaseAuthError,
+  validateEmailAddress,
+  validatePasswordComplexity,
+} from '../utils/passwordResetLogic';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -61,6 +66,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
+  onAuthStateChanged,
   signOut,
 } from 'firebase/auth';
 
@@ -201,26 +207,12 @@ const DEMO_USER_IDS = new Set([
   'admin-principal',
 ]);
 
-const STATIC_SESSION_TOKEN = 'firebase-static-session';
-const AUTH_API_BASE = (import.meta.env.VITE_AUTH_API_BASE_URL || '').replace(/\/+$/, '');
-const resolveAuthApiUrl = (path: string) => `${AUTH_API_BASE}${path}`;
-
-const isKnownStaticHosting = () =>
-  !AUTH_API_BASE &&
-  typeof window !== 'undefined' &&
-  (window.location.hostname.endsWith('.github.io') || window.location.protocol === 'file:');
-
-const isStaticHostMissingApi = (response: Response) => {
-  const ct = (response.headers.get('content-type') || '').toLowerCase();
-  return !ct.includes('application/json') && [404, 405, 501].includes(response.status);
-};
+const STATIC_SESSION_TOKEN = 'firebase-auth-session';
 
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Active session is held strictly in JS/React memory when backed by Express; static GitHub Pages restores local session
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
-    if (!isKnownStaticHosting()) return null;
     try {
       const saved = localStorage.getItem('presently_active_user');
       return saved ? (JSON.parse(saved) as User) : null;
@@ -229,7 +221,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
   const [accessToken, setAccessTokenState] = useState<string | null>(() => {
-    if (!isKnownStaticHosting()) return null;
     try {
       return localStorage.getItem('presently_active_user') ? STATIC_SESSION_TOKEN : null;
     } catch {
@@ -237,6 +228,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
   const accessTokenRef = useRef<string | null>(accessToken);
+  const isAuthTransitionRef = useRef(false);
 
   const [users, setUsers] = useState<User[]>([]);
   const [classes, setClasses] = useState<ClassGroup[]>(BTEB_CLASSES);
@@ -251,16 +243,6 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [formFillupFeeConfigs, setFormFillupFeeConfigs] = useState<FormFillupFeeConfig[]>([]);
   const [formFillupRecords, setFormFillupRecords] = useState<FormFillupStudentRecord[]>([]);
   const [isFirebaseLive, setIsFirebaseLive] = useState(false);
-
-  // Clear legacy localStorage auth state on boot when Express server auth is active
-  useEffect(() => {
-    if (isKnownStaticHosting()) return;
-    try {
-      localStorage.removeItem('presently_active_user');
-    } catch {
-      // Ignore storage access restrictions
-    }
-  }, []);
 
   // Helper to initialize Firestore with BTEB 2022 classes & subjects only (no demo faculty/students)
   const seedInitialFirestore = async () => {
@@ -447,30 +429,34 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const verifyActiveSession = useCallback(async (): Promise<boolean> => {
-    const token = accessTokenRef.current;
-    if (!token) return false;
-    if (token === STATIC_SESSION_TOKEN || isKnownStaticHosting()) return true;
+    const fbUser = auth.currentUser;
+    if (!fbUser) {
+      setAccessToken(null);
+      setCurrentUserState(null);
+      try {
+        localStorage.removeItem('presently_active_user');
+      } catch {
+        // Ignore storage restrictions
+      }
+      return false;
+    }
     try {
-      const res = await fetch(resolveAuthApiUrl('/api/auth/me'), {
-        method: 'GET',
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      });
-      if (isStaticHostMissingApi(res)) {
-        return true;
-      }
-      if (!res.ok) {
-        setAccessToken(null);
-        setCurrentUserState(null);
-        return false;
-      }
+      const freshToken = await fbUser.getIdToken(true);
+      setAccessToken(freshToken);
       return true;
     } catch {
-      return true;
+      setAccessToken(null);
+      setCurrentUserState(null);
+      try {
+        localStorage.removeItem('presently_active_user');
+      } catch {
+        // Ignore storage restrictions
+      }
+      return false;
     }
   }, []);
 
-  // Re-verify active JWT against server on window focus / periodic check so password resets sign out active tabs immediately
+  // Re-verify active Firebase Auth session on window focus so password resets revoke active tabs cleanly
   useEffect(() => {
     if (!accessToken || !currentUser) return;
     const onFocus = () => {
@@ -479,7 +465,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     window.addEventListener('focus', onFocus);
     const timer = window.setInterval(() => {
       verifyActiveSession();
-    }, 30000);
+    }, 60000);
     return () => {
       window.removeEventListener('focus', onFocus);
       window.clearInterval(timer);
@@ -597,37 +583,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return updatedUser;
   };
 
-  const syncUsersDirectoryToServer = useCallback(async (userList: User[], tokenOverride?: string | null) => {
-    const token = tokenOverride ?? accessTokenRef.current;
-    if (!token || token === STATIC_SESSION_TOKEN || isKnownStaticHosting() || userList.length === 0) return;
-    try {
-      await fetch(resolveAuthApiUrl('/api/auth/admin/sync-users'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          users: userList.map(u => ({
-            id: u.id,
-            email: u.email,
-            name: u.name,
-            role: u.role,
-            approvalStatus: resolveUserApprovalStatus(u),
-          })),
-        }),
-      });
-    } catch (e) {
-      console.warn('Auth directory sync skipped:', e);
-    }
+  const syncUsersDirectoryToServer = useCallback(async (_userList: User[], _tokenOverride?: string | null) => {
+    // Authentication and user directory run directly on Firebase Auth + Firestore
+    return;
   }, []);
-
-  // Automatically sync Firestore faculty directory into server auth DB when Admin is authenticated
-  useEffect(() => {
-    if (isAdmin && accessToken && users.length > 0) {
-      syncUsersDirectoryToServer(users, accessToken);
-    }
-  }, [isAdmin, accessToken, users, syncUsersDirectoryToServer]);
 
   const buildInstitutionalProfile = (cleanEmail: string, uid: string): User => {
     const isDesignatedAdmin =
@@ -682,8 +641,108 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  const loginWithFirebaseFallback = async (cleanEmail: string, pass: string): Promise<User> => {
+  // Synchronize React session state with Firebase Auth persistence
+  useEffect(() => {
+    const unsubAuth = onAuthStateChanged(auth, async fbUser => {
+      if (isAuthTransitionRef.current) return;
+
+      if (!fbUser || !fbUser.email) {
+        setAccessToken(null);
+        setCurrentUserState(null);
+        try {
+          localStorage.removeItem('presently_active_user');
+        } catch {
+          // Ignore storage restrictions
+        }
+        return;
+      }
+
+      const cleanEmail = fbUser.email.trim().toLowerCase();
+      const matched = await findUserByEmailWithFirestore(cleanEmail);
+      const profile: User = matched
+        ? {
+            ...matched,
+            firebaseAuthUid: fbUser.uid,
+          }
+        : {
+            ...buildInstitutionalProfile(cleanEmail, fbUser.uid),
+            firebaseAuthUid: fbUser.uid,
+            approvalStatus: isPrimaryAdminEmail(cleanEmail) ? 'approved' : 'pending',
+          };
+
+      const access = evaluateLoginAccess(profile);
+      if (!access.allowed) {
+        setAccessToken(null);
+        setCurrentUserState(null);
+        try {
+          localStorage.removeItem('presently_active_user');
+        } catch {
+          // Ignore storage restrictions
+        }
+        await signOut(auth).catch(() => {});
+        return;
+      }
+
+      const customTarget = localStorage.getItem(`presently_daily_target_${profile.id}`);
+      const hydrated = customTarget
+        ? { ...profile, dailyClassTarget: parseInt(customTarget, 10) }
+        : profile.dailyClassTarget === undefined
+          ? { ...profile, dailyClassTarget: 4 }
+          : profile;
+
+      try {
+        const idToken = await fbUser.getIdToken();
+        setAccessToken(idToken);
+      } catch {
+        setAccessToken(STATIC_SESSION_TOKEN);
+      }
+      setCurrentUserState(hydrated);
+      try {
+        localStorage.setItem('presently_active_user', JSON.stringify(hydrated));
+      } catch {
+        // Ignore storage restrictions
+      }
+    });
+
+    return () => unsubAuth();
+  }, []);
+
+  const persistActiveFirebaseUser = async (profile: User, idToken: string): Promise<User> => {
+    const customTarget = localStorage.getItem(`presently_daily_target_${profile.id}`);
+    const hydrated = customTarget
+      ? { ...profile, dailyClassTarget: parseInt(customTarget, 10) }
+      : profile.dailyClassTarget === undefined
+        ? { ...profile, dailyClassTarget: 4 }
+        : profile;
+
+    setAccessToken(idToken);
+    setCurrentUserState(hydrated);
+    try {
+      localStorage.setItem('presently_active_user', JSON.stringify(hydrated));
+    } catch {
+      // Ignore storage restrictions
+    }
+    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== hydrated.email.toLowerCase()), hydrated]);
+
+    try {
+      const cleanUser: any = { ...hydrated };
+      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+      await setDoc(doc(db, 'users', hydrated.id), cleanUser, { merge: true });
+    } catch (err) {
+      console.warn('Firestore user profile sync error:', err);
+    }
+
+    return hydrated;
+  };
+
+  const loginWithEmail = async (email: string, pass: string): Promise<User> => {
+    const emailValidation = validateEmailAddress(email);
+    if (!emailValidation.valid) {
+      throw new Error(emailValidation.error || 'Please enter a valid email address.');
+    }
+    const cleanEmail = emailValidation.email;
     const matched = await findUserByEmailWithFirestore(cleanEmail);
+
     if (matched) {
       const access = evaluateLoginAccess(matched);
       if (!access.allowed) {
@@ -692,45 +751,28 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }
     }
 
-    const persistStaticUser = async (profile: User) => {
-      const customTarget = localStorage.getItem(`presently_daily_target_${profile.id}`);
-      const hydrated = customTarget
-        ? { ...profile, dailyClassTarget: parseInt(customTarget, 10) }
-        : profile.dailyClassTarget === undefined
-          ? { ...profile, dailyClassTarget: 4 }
-          : profile;
-      setAccessToken(STATIC_SESSION_TOKEN);
-      setCurrentUserState(hydrated);
-      try {
-        localStorage.setItem('presently_active_user', JSON.stringify(hydrated));
-      } catch {
-        // Ignore storage restrictions
-      }
-      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), hydrated]);
-      try {
-        const cleanUser: any = { ...hydrated };
-        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-        await setDoc(doc(db, 'users', hydrated.id), cleanUser, { merge: true });
-      } catch (err) {
-        console.warn('Firestore user profile sync error:', err);
-      }
-      return hydrated;
-    };
-
+    isAuthTransitionRef.current = true;
     try {
-      const res = await signInWithEmailAndPassword(auth, cleanEmail, pass);
+      const cred = await signInWithEmailAndPassword(auth, cleanEmail, pass);
       const userProfile: User = matched
-        ? { ...matched, id: res.user.uid || matched.id }
+        ? {
+            ...matched,
+            firebaseAuthUid: cred.user.uid,
+          }
         : {
-            ...buildInstitutionalProfile(cleanEmail, res.user.uid),
-            approvalStatus: 'approved',
+            ...buildInstitutionalProfile(cleanEmail, cred.user.uid),
+            firebaseAuthUid: cred.user.uid,
+            approvalStatus: isPrimaryAdminEmail(cleanEmail) ? 'approved' : 'pending',
           };
+
       const access = evaluateLoginAccess(userProfile);
       if (!access.allowed) {
         await signOut(auth).catch(() => {});
         throw new Error(access.reason);
       }
-      return await persistStaticUser(userProfile);
+
+      const idToken = await cred.user.getIdToken();
+      return await persistActiveFirebaseUser(userProfile, idToken);
     } catch (firebaseErr: any) {
       if (
         firebaseErr?.message &&
@@ -739,106 +781,36 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       ) {
         throw firebaseErr;
       }
-      if (matched) {
-        const access = evaluateLoginAccess(matched);
-        if (!access.allowed) {
-          throw new Error(access.reason);
-        }
-        return await persistStaticUser(matched);
-      }
-      if (!isPrimaryAdminEmail(cleanEmail)) {
+
+      if (firebaseErr?.code === 'auth/invalid-credential' && matched && !matched.firebaseAuthUid) {
         throw new Error(
-          'No approved account found for this email. Please switch to Register to submit a registration request for administrator approval.'
+          'Invalid email or password. If you have not created a Firebase password for this profile yet, switch to Register to set your password.'
         );
       }
-      const fallbackAdmin: User = {
-        ...buildInstitutionalProfile(cleanEmail, 'admin-payel'),
-        approvalStatus: 'approved',
-      };
-      return await persistStaticUser(fallbackAdmin);
+
+      throw new Error(mapFirebaseAuthError(firebaseErr?.code, firebaseErr?.message));
+    } finally {
+      isAuthTransitionRef.current = false;
     }
   };
 
-  const loginWithEmail = async (email: string, pass: string): Promise<User> => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (isKnownStaticHosting()) {
-      return loginWithFirebaseFallback(cleanEmail, pass);
-    }
-
-    let response: Response;
-    try {
-      response = await fetch(resolveAuthApiUrl('/api/auth/login'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ email: cleanEmail, password: pass }),
-      });
-    } catch {
-      return loginWithFirebaseFallback(cleanEmail, pass);
-    }
-
-    if (isStaticHostMissingApi(response)) {
-      return loginWithFirebaseFallback(cleanEmail, pass);
-    }
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || 'Authentication failed. Please check your credentials.');
-    }
-
-    const serverUser = data.user as {
-      id: string;
-      email: string;
-      name: string;
-      role: 'admin' | 'teacher';
-      approvalStatus: 'approved' | 'pending' | 'rejected';
-    };
-    const token = data.accessToken as string;
-
-    const existingProfile = await findUserByEmailWithFirestore(cleanEmail);
-    const customTarget = localStorage.getItem(`presently_daily_target_${serverUser.id}`);
-    const baseProfile = existingProfile
-      ? {
-          ...existingProfile,
-          id: existingProfile.id || serverUser.id,
-          email: serverUser.email,
-          role: serverUser.role,
-          approvalStatus: serverUser.approvalStatus,
-        }
-      : {
-          ...buildInstitutionalProfile(cleanEmail, serverUser.id),
-          name: serverUser.name,
-          role: serverUser.role,
-          approvalStatus: serverUser.approvalStatus,
-        };
-
-    if (customTarget) {
-      baseProfile.dailyClassTarget = parseInt(customTarget, 10);
-    } else if (baseProfile.dailyClassTarget === undefined) {
-      baseProfile.dailyClassTarget = 4;
-    }
-
-    setAccessToken(token);
-    setCurrentUserState(baseProfile);
-    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), baseProfile]);
-
-    try {
-      const cleanUser: any = { ...baseProfile };
-      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-      await setDoc(doc(db, 'users', baseProfile.id), cleanUser, { merge: true });
-    } catch (err) {
-      console.warn('Firestore user profile sync error:', err);
-    }
-
-    return baseProfile;
-  };
-
-  const registerWithFirebaseFallback = async (
-    cleanEmail: string,
+  const registerWithEmail = async (
+    email: string,
     pass: string,
     name: string,
     role: 'admin' | 'teacher'
   ): Promise<RegisterResult> => {
+    const emailValidation = validateEmailAddress(email);
+    if (!emailValidation.valid) {
+      throw new Error(emailValidation.error || 'Please enter a valid email address.');
+    }
+    const cleanEmail = emailValidation.email;
+
+    const complexity = validatePasswordComplexity(pass);
+    if (!complexity.valid) {
+      throw new Error(complexity.errors[0] || 'Password does not meet security requirements.');
+    }
+
     const existing = await findUserByEmailWithFirestore(cleanEmail);
     if (existing) {
       const existingStatus = resolveUserApprovalStatus(existing);
@@ -852,288 +824,158 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           'A previous registration request for this email was declined. Please contact an administrator.'
         );
       }
-      throw new Error('An approved account with this email already exists. Please use Sign In instead.');
-    }
-
-    const isPrimary = isPrimaryAdminEmail(cleanEmail);
-    const approvalStatus = isPrimary ? 'approved' : 'pending';
-    const registeredAt = new Date().toISOString();
-    const buildRegisteredUser = (uid: string): User => ({
-      id: uid,
-      name: name.trim(),
-      email: cleanEmail,
-      role: isPrimary ? 'admin' : role,
-      avatar:
-        isPrimary || role === 'admin'
-          ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-          : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-      department: 'Computer Science & Technology',
-      employeeId:
-        isPrimary || role === 'admin'
-          ? `ADM-${Date.now().toString().slice(-4)}`
-          : `BTEB-${Date.now().toString().slice(-4)}`,
-      title:
-        isPrimary || role === 'admin'
-          ? 'Institutional Administrator'
-          : 'Instructor (Computer Technology)',
-      dailyClassTarget: 4,
-      approvalStatus,
-      registeredAt,
-      ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
-    });
-
-    let newUser: User;
-    try {
-      const res = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
-      newUser = buildRegisteredUser(res.user.uid);
-    } catch (e: any) {
-      if (e?.code === 'auth/email-already-in-use') {
+      if (existing.firebaseAuthUid) {
         throw new Error(
-          'An account with this email already exists in authentication. Please sign in or contact an administrator.'
+          'An approved account with this email already exists. Please Sign In or use Forgot password?'
         );
       }
-      newUser = buildRegisteredUser(isPrimary ? 'admin-payel' : `user-${Date.now()}`);
-    }
-
-    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
-    try {
-      const cleanUser: any = { ...newUser };
-      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-      await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
-    } catch (err) {
-      console.warn('Firestore user write error:', err);
-    }
-
-    if (approvalStatus === 'pending') {
-      await signOut(auth).catch(() => {});
-      return { user: newUser, requiresApproval: true };
-    }
-
-    setAccessToken(STATIC_SESSION_TOKEN);
-    setCurrentUserState(newUser);
-    try {
-      localStorage.setItem('presently_active_user', JSON.stringify(newUser));
-    } catch {
-      // Ignore storage restrictions
-    }
-    return { user: newUser, requiresApproval: false };
-  };
-
-  const registerWithEmail = async (
-    email: string,
-    pass: string,
-    name: string,
-    role: 'admin' | 'teacher'
-  ): Promise<RegisterResult> => {
-    const cleanEmail = email.trim().toLowerCase();
-    if (isKnownStaticHosting()) {
-      return registerWithFirebaseFallback(cleanEmail, pass, name, role);
     }
 
     const isPrimary = isPrimaryAdminEmail(cleanEmail);
-    const registeredAt = new Date().toISOString();
-    const suggestedId = isPrimary ? 'admin-payel' : `user-${Date.now()}`;
+    const approvalStatus = existing
+      ? resolveUserApprovalStatus(existing)
+      : isPrimary
+        ? 'approved'
+        : 'pending';
+    const registeredAt = existing?.registeredAt || new Date().toISOString();
 
-    let response: Response;
+    isAuthTransitionRef.current = true;
     try {
-      response = await fetch(resolveAuthApiUrl('/api/auth/register'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({
-          id: suggestedId,
-          email: cleanEmail,
-          password: pass,
-          name: name.trim(),
-          role,
-        }),
-      });
-    } catch {
-      return registerWithFirebaseFallback(cleanEmail, pass, name, role);
+      const cred = await createUserWithEmailAndPassword(auth, cleanEmail, pass);
+      const newUser: User = existing
+        ? {
+            ...existing,
+            name: name.trim() || existing.name,
+            firebaseAuthUid: cred.user.uid,
+            approvalStatus,
+          }
+        : {
+            id: cred.user.uid,
+            firebaseAuthUid: cred.user.uid,
+            name: name.trim(),
+            email: cleanEmail,
+            role: isPrimary ? 'admin' : role,
+            avatar:
+              isPrimary || role === 'admin'
+                ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+                : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+            department: 'Computer Science & Technology',
+            employeeId:
+              isPrimary || role === 'admin'
+                ? `ADM-${Date.now().toString().slice(-4)}`
+                : `BTEB-${Date.now().toString().slice(-4)}`,
+            title:
+              isPrimary || role === 'admin'
+                ? 'Institutional Administrator'
+                : 'Instructor (Computer Technology)',
+            dailyClassTarget: 4,
+            approvalStatus,
+            registeredAt,
+            ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
+          };
+
+      setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
+      try {
+        const cleanUser: any = { ...newUser };
+        Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
+        await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
+      } catch (err) {
+        console.warn('Firestore user write error:', err);
+      }
+
+      if (approvalStatus === 'pending') {
+        await signOut(auth).catch(() => {});
+        return { user: newUser, requiresApproval: true };
+      }
+
+      const idToken = await cred.user.getIdToken();
+      const hydrated = await persistActiveFirebaseUser(newUser, idToken);
+      return { user: hydrated, requiresApproval: false };
+    } catch (firebaseErr: any) {
+      throw new Error(mapFirebaseAuthError(firebaseErr?.code, firebaseErr?.message));
+    } finally {
+      isAuthTransitionRef.current = false;
     }
-
-    if (isStaticHostMissingApi(response)) {
-      return registerWithFirebaseFallback(cleanEmail, pass, name, role);
-    }
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || 'Unable to register account. Please review your details.');
-    }
-
-    const serverUser = data.user as {
-      id: string;
-      email: string;
-      name: string;
-      role: 'admin' | 'teacher';
-      approvalStatus: 'approved' | 'pending' | 'rejected';
-    };
-    const requiresApproval = Boolean(data.requiresApproval);
-
-    const existingProfile = await findUserByEmailWithFirestore(cleanEmail);
-    const newUser: User = existingProfile
-      ? {
-          ...existingProfile,
-          name: serverUser.name,
-          role: serverUser.role,
-          approvalStatus: serverUser.approvalStatus,
-        }
-      : {
-          id: serverUser.id,
-          name: serverUser.name,
-          email: serverUser.email,
-          role: serverUser.role,
-          avatar:
-            serverUser.role === 'admin'
-              ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-              : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-          department: 'Computer Science & Technology',
-          employeeId:
-            serverUser.role === 'admin'
-              ? `ADM-${Date.now().toString().slice(-4)}`
-              : `BTEB-${Date.now().toString().slice(-4)}`,
-          title:
-            serverUser.role === 'admin'
-              ? 'Institutional Administrator'
-              : 'Instructor (Computer Technology)',
-          dailyClassTarget: 4,
-          approvalStatus: serverUser.approvalStatus,
-          registeredAt,
-          ...(isPrimary ? { approvedAt: registeredAt, approvedBy: cleanEmail } : {}),
-        };
-
-    setUsers(prev => [...prev.filter(u => u.email.toLowerCase() !== cleanEmail), newUser]);
-
-    try {
-      const cleanUser: any = { ...newUser };
-      Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-      await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
-    } catch (err) {
-      console.warn('Firestore user write error:', err);
-    }
-
-    if (requiresApproval || !data.accessToken) {
-      return { user: newUser, requiresApproval: true };
-    }
-
-    setAccessToken(data.accessToken);
-    setCurrentUserState(newUser);
-    return { user: newUser, requiresApproval: false };
   };
 
   const requestPasswordReset = async (email: string): Promise<string> => {
-    const cleanEmail = email.trim().toLowerCase();
-    const genericMsg = 'If an account with that email exists, a password reset link has been sent.';
+    const emailValidation = validateEmailAddress(email);
+    if (!emailValidation.valid) {
+      throw new Error(emailValidation.error || 'Please enter a valid email address.');
+    }
+    const cleanEmail = emailValidation.email;
 
-    const sendFirebaseResetFallback = async (): Promise<string> => {
-      // Detect when Firebase Email/Password auth is disabled in the Firebase project so we don't silently report success
-      const apiKey = auth.app.options.apiKey;
-      if (apiKey) {
-        try {
-          const probeRes = await fetch(
-            `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: 'provider-probe@invalid.local',
-                password: 'ProbePassword#123',
-                returnSecureToken: true,
-              }),
-            }
-          );
-          const probeData = await probeRes.json().catch(() => ({}));
-          const probeErr = probeData?.error?.message;
-          if (probeErr === 'PASSWORD_LOGIN_DISABLED' || probeErr === 'OPERATION_NOT_ALLOWED') {
-            throw new Error(
-              'Password reset email cannot be sent from static GitHub Pages because Firebase Email/Password sign-in is disabled for this project and no backend server is running here. Enable Email/Password in Firebase Console (Authentication → Sign-in method) or use the full-stack app URL.'
-            );
-          }
-        } catch (probeErr: any) {
-          if (probeErr?.message?.includes('Firebase Email/Password sign-in is disabled')) {
-            throw probeErr;
-          }
-        }
-      }
-
-      const appBasePath =
-        import.meta.env.BASE_URL && import.meta.env.BASE_URL !== './'
-          ? import.meta.env.BASE_URL
-          : '/presently/';
-      const continueUrl =
-        typeof window !== 'undefined' ? `${window.location.origin}${appBasePath}` : undefined;
-
+    // Verify Firebase Email/Password provider is enabled before sending so disabled projects report clearly
+    const apiKey = auth.app.options.apiKey;
+    if (apiKey) {
       try {
-        if (continueUrl) {
-          await sendPasswordResetEmail(auth, cleanEmail, {
-            url: continueUrl,
-            handleCodeInApp: true,
-          });
-        } else {
-          await sendPasswordResetEmail(auth, cleanEmail);
-        }
-      } catch (err: any) {
-        if (
-          err?.code === 'auth/unauthorized-continue-uri' ||
-          err?.code === 'auth/invalid-continue-uri'
-        ) {
-          await sendPasswordResetEmail(auth, cleanEmail);
-        } else if (err?.code === 'auth/operation-not-allowed') {
+        const probeRes = await fetch(
+          `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: 'provider-probe@invalid.local',
+              password: 'ProbePassword#123',
+              returnSecureToken: true,
+            }),
+          }
+        );
+        const probeData = await probeRes.json().catch(() => ({}));
+        const probeErr = probeData?.error?.message;
+        if (probeErr === 'PASSWORD_LOGIN_DISABLED' || probeErr === 'OPERATION_NOT_ALLOWED') {
           throw new Error(
-            'Password reset email cannot be sent because Firebase Email/Password sign-in is disabled for this project.'
+            'Firebase Email/Password sign-in is disabled for this project. Enable Email/Password in Firebase Console (Authentication → Sign-in method) to send password reset emails.'
           );
-        } else if (err?.code && !['auth/user-not-found', 'auth/invalid-email'].includes(err.code)) {
-          throw new Error(err?.message || 'Unable to send Firebase password reset email.');
+        }
+      } catch (probeErr: any) {
+        if (probeErr?.message?.includes('Firebase Email/Password sign-in is disabled')) {
+          throw probeErr;
         }
       }
-      return genericMsg;
-    };
-
-    if (isKnownStaticHosting()) {
-      return sendFirebaseResetFallback();
     }
 
-    let response: Response;
+    const appBasePath =
+      import.meta.env.BASE_URL && import.meta.env.BASE_URL !== './'
+        ? import.meta.env.BASE_URL
+        : '/';
+    const continueUrl =
+      typeof window !== 'undefined' ? `${window.location.origin}${appBasePath}` : undefined;
+
     try {
-      response = await fetch(resolveAuthApiUrl('/forgot-password'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        cache: 'no-store',
-        body: JSON.stringify({ email: cleanEmail }),
-      });
-    } catch {
-      return sendFirebaseResetFallback();
+      if (continueUrl) {
+        await sendPasswordResetEmail(auth, cleanEmail, {
+          url: continueUrl,
+          handleCodeInApp: true,
+        });
+      } else {
+        await sendPasswordResetEmail(auth, cleanEmail);
+      }
+    } catch (err: any) {
+      if (
+        err?.code === 'auth/unauthorized-continue-uri' ||
+        err?.code === 'auth/invalid-continue-uri'
+      ) {
+        await sendPasswordResetEmail(auth, cleanEmail);
+      } else if (err?.code === 'auth/operation-not-allowed') {
+        throw new Error(
+          'Firebase Email/Password sign-in is disabled for this project. Enable it in Firebase Console → Authentication → Sign-in method.'
+        );
+      } else if (err?.code && !['auth/user-not-found', 'auth/invalid-email'].includes(err.code)) {
+        throw new Error(mapFirebaseAuthError(err.code, err.message));
+      }
     }
 
-    if (isStaticHostMissingApi(response)) {
-      return sendFirebaseResetFallback();
-    }
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(data.error || 'Unable to process password reset request.');
-    }
-    return data.message || genericMsg;
+    return `If a Firebase Email/Password account exists for ${cleanEmail}, a password reset link has been sent. Please check your inbox and spam folder.`;
   };
 
   const logout = async () => {
-    const token = accessTokenRef.current;
     setAccessToken(null);
     setCurrentUserState(null);
     try {
       localStorage.removeItem('presently_active_user');
     } catch {
       // Ignore storage restrictions
-    }
-    if (token && token !== STATIC_SESSION_TOKEN && !isKnownStaticHosting()) {
-      try {
-        await fetch(resolveAuthApiUrl('/api/auth/logout'), {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        });
-      } catch {
-        // Ignore network failure during logout cleanup
-      }
     }
     try {
       await signOut(auth);

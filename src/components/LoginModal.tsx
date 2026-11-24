@@ -236,6 +236,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
+          {mode === 'forgot' && (
+            <p className="text-[11px] text-slate-500 leading-relaxed bg-slate-50 border border-slate-200 rounded-lg p-2.5">
+              Firebase Authentication will email a password reset link to your registered faculty or administrator address.
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={loading}

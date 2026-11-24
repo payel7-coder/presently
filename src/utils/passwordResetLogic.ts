@@ -211,3 +211,32 @@ export function extractResetRouteFromLocation(pathname: string, search: string):
   return { isResetRoute: true, token, mode: 'server' };
 }
 
+export function mapFirebaseAuthError(code: string | undefined, fallbackMessage?: string): string {
+  switch (code) {
+    case 'auth/invalid-credential':
+    case 'auth/wrong-password':
+    case 'auth/user-not-found':
+      return 'Invalid email or password. Please verify your credentials or click Forgot password? to reset.';
+    case 'auth/email-already-in-use':
+      return 'An account with this email already exists in Firebase Authentication. Please Sign In or use Forgot password?';
+    case 'auth/operation-not-allowed':
+      return 'Firebase Email/Password sign-in is disabled for this project. Enable it in Firebase Console → Authentication → Sign-in method.';
+    case 'auth/weak-password':
+      return 'Password does not meet security requirements. Use at least 8 characters with uppercase, lowercase, number, and special character.';
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.';
+    case 'auth/too-many-requests':
+      return 'Too many attempts detected. Please wait a few minutes before trying again.';
+    case 'auth/expired-action-code':
+    case 'auth/invalid-action-code':
+      return 'This Firebase password reset link is invalid, expired, or has already been used. Please request a new one.';
+    case 'auth/user-disabled':
+      return 'This account has been disabled in Firebase Authentication. Please contact an administrator.';
+    case 'auth/network-request-failed':
+      return 'Network error communicating with Firebase Authentication. Please check your connection and retry.';
+    default:
+      return fallbackMessage || 'Authentication request failed. Please try again.';
+  }
+}
+
+

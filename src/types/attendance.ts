@@ -29,6 +29,7 @@ export interface User {
   registeredAt?: string;
   approvedAt?: string;
   approvedBy?: string;
+  firebaseAuthUid?: string;
 }
 
 export interface ClassGroup {

@@ -13,6 +13,7 @@ import {
 import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import {
+  mapFirebaseAuthError,
   ResetRouteMode,
   validatePasswordComplexity,
   validatePasswordResetPayload,
@@ -50,9 +51,11 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setVerifiedEmail(null);
     if (!token) {
       setTokenState('invalid');
       setTokenError(
@@ -66,16 +69,20 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
 
     if (mode === 'firebase') {
       verifyPasswordResetCode(auth, token)
-        .then(() => {
+        .then(email => {
           if (!cancelled) {
+            setVerifiedEmail(email || null);
             setTokenState('valid');
           }
         })
-        .catch(() => {
+        .catch(err => {
           if (!cancelled) {
             setTokenState('invalid');
             setTokenError(
-              'This Firebase password reset link is invalid, expired, or has already been used.'
+              mapFirebaseAuthError(
+                err?.code,
+                'This Firebase password reset link is invalid, expired, or has already been used.'
+              )
             );
           }
         });
@@ -165,11 +172,9 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
         setConfirmPassword('');
         onPasswordResetSuccess?.();
       } catch (err: any) {
-        const msg =
-          err?.code === 'auth/expired-action-code' || err?.code === 'auth/invalid-action-code'
-            ? 'This password reset link has expired or has already been used. Please request a new one.'
-            : err?.message || 'Unable to update password via Firebase Authentication.';
-        setSubmitError(msg);
+        setSubmitError(
+          mapFirebaseAuthError(err?.code, err?.message || 'Unable to update password via Firebase Authentication.')
+        );
       } finally {
         setIsSubmitting(false);
       }
@@ -259,7 +264,9 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
                 Set a Strong Password
               </h1>
               <p className="text-sm text-slate-300 mt-2.5 leading-relaxed">
-                Reset links expire automatically after 15 minutes and can only be used once. Completing this reset signs out all active sessions across devices.
+                {mode === 'firebase'
+                  ? 'This single-use Firebase recovery link verifies your account email before updating your Firebase Authentication credentials.'
+                  : 'Reset links expire automatically after 15 minutes and can only be used once. Completing this reset signs out all active sessions across devices.'}
               </p>
             </div>
 
@@ -269,7 +276,9 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
                 <div>
                   <h2 className="text-xs font-semibold text-white">Single-Use Verification</h2>
                   <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-                    Your recovery token is hashed in storage and invalidated immediately on update.
+                    {mode === 'firebase'
+                      ? 'Your Firebase action code is validated once and invalidated immediately after reset.'
+                      : 'Your recovery token is hashed in storage and invalidated immediately on update.'}
                   </p>
                 </div>
               </div>
@@ -286,8 +295,10 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
           </div>
 
           <div className="mt-8 pt-5 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-            <span>Encrypted Recovery Flow</span>
-            <span className="font-mono text-[11px] text-slate-400">15m TTL</span>
+            <span>{mode === 'firebase' ? 'Firebase Auth Recovery' : 'Encrypted Recovery Flow'}</span>
+            <span className="font-mono text-[11px] text-slate-400">
+              {mode === 'firebase' ? 'OOB Code' : '15m TTL'}
+            </span>
           </div>
         </div>
 
@@ -300,7 +311,14 @@ export const ResetPasswordView: React.FC<ResetPasswordViewProps> = ({
                   Create new password
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
-                  Choose a strong institutional password meeting all complexity rules
+                  {verifiedEmail ? (
+                    <>
+                      Setting a new password for{' '}
+                      <span className="font-semibold text-slate-800">{verifiedEmail}</span>
+                    </>
+                  ) : (
+                    'Choose a strong institutional password meeting all complexity rules'
+                  )}
                 </p>
               </div>
               <button

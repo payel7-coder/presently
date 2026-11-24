@@ -192,7 +192,7 @@ export const AuthScreen: React.FC = () => {
                     ? 'Enter your institutional email and password to continue'
                     : authMode === 'register'
                       ? 'Create an institutional profile for your department role'
-                      : 'Receive a single-use recovery link valid for 15 minutes'}
+                      : 'Receive a Firebase password reset link via email'}
                 </p>
               </div>
 
@@ -458,7 +458,7 @@ export const AuthScreen: React.FC = () => {
                 <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2.5">
                   <KeyRound className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span className="leading-relaxed">
-                    Enter your registered faculty or administrator email. You will receive a single-use password reset link that expires after 15 minutes.
+                    Enter your registered faculty or administrator email. Firebase Authentication will send a password reset link to your inbox (check spam/junk if not visible).
                   </span>
                 </div>
               )}

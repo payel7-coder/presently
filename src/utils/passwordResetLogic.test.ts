@@ -4,6 +4,7 @@ import {
   buildResetLink,
   extractResetRouteFromLocation,
   isValidRawTokenFormat,
+  mapFirebaseAuthError,
   validateEmailAddress,
   validatePasswordComplexity,
   validatePasswordResetPayload,
@@ -91,5 +92,12 @@ describe('passwordResetLogic', () => {
 
     const nonReset = extractResetRouteFromLocation('/', '?token=xyz_987');
     assert.deepEqual(nonReset, { isResetRoute: false, token: '', mode: 'server' });
+  });
+
+  it('maps Firebase auth error codes to actionable messages', () => {
+    assert.match(mapFirebaseAuthError('auth/invalid-credential'), /Invalid email or password/i);
+    assert.match(mapFirebaseAuthError('auth/operation-not-allowed'), /Firebase Console/i);
+    assert.match(mapFirebaseAuthError('auth/expired-action-code'), /invalid, expired/i);
+    assert.equal(mapFirebaseAuthError('auth/unknown', 'Custom error'), 'Custom error');
   });
 });
