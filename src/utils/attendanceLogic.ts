@@ -12,6 +12,7 @@ import {
   User,
   UserApprovalStatus,
 } from '../types/attendance';
+import { normalizeStudentSessionFields } from './studentSessionLogic';
 
 /**
  * Parses raw CSV string into student records with line-by-line validation.
@@ -100,6 +101,14 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
       (h.includes('guardian') || h.includes('parent')) &&
       (h.includes('phone') || h.includes('mobile') || h.includes('contact') || h.includes('number'))
   );
+  const sessionIndex = findExactOrFiltered(
+    ['session', 'academic session', 'academic_session', 'admission session', 'admission_session'],
+    h => h === 'session' || h.includes('academic session') || h.includes('admission session')
+  );
+  const admissionYearIndex = findExactOrFiltered(
+    ['admission year', 'admission_year', 'adm year', 'adm_year', 'intake year'],
+    h => h.includes('admission') && h.includes('year')
+  );
 
   if (nameIndex === -1) {
     result.errors.push({ line: 1, message: 'Missing required "Name" column in CSV header' });
@@ -129,6 +138,8 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
     const motherName = motherNameIndex !== -1 ? (tokens[motherNameIndex] || '').trim() : '';
     const phone = phoneIndex !== -1 ? (tokens[phoneIndex] || '').trim() : '';
     const guardianPhone = guardianPhoneIndex !== -1 ? (tokens[guardianPhoneIndex] || '').trim() : '';
+    const rawSession = sessionIndex !== -1 ? (tokens[sessionIndex] || '').trim() : '';
+    const rawAdmissionYear = admissionYearIndex !== -1 ? (tokens[admissionYearIndex] || '').trim() : '';
 
     if (!name) {
       result.errors.push({ line: lineNumber, message: 'Student Name is empty' });
@@ -159,6 +170,11 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
       gender = 'Female';
     }
 
+    const { session, admissionYear } = normalizeStudentSessionFields({
+      session: rawSession,
+      admissionYear: rawAdmissionYear,
+    });
+
     result.students.push({
       rollNumber,
       registrationNumber: registrationNumber || undefined,
@@ -171,6 +187,8 @@ export function parseStudentCSV(csvContent: string, targetClassId: string): CSVP
       motherName: motherName || undefined,
       phone: phone || undefined,
       parentContact: guardianPhone || undefined,
+      session,
+      admissionYear,
       status: 'active',
     });
     result.validCount++;
@@ -215,11 +233,11 @@ function cleanFieldValue(val: string): string {
  */
 export function generateStudentCSVTemplate(): string {
   return [
-    'Roll Number,Registration Number,Name,Student Email,Gender,Date of Birth,Father Name,Mother Name,Phone,Guardian Phone',
-    '621051,1502189407,Naimur Rahman,naimur.621051@student.bteb.edu.bd,Male,2005-03-14,Md. Shafiqur Rahman,Salma Begum,+880 1711-234567,+880 1811-234567',
-    '621052,1502189408,Jannatul Ferdous,jannatul.621052@student.bteb.edu.bd,Female,2005-07-22,Abdul Karim,Nasrin Akter,+880 1711-234568,+880 1811-234568',
-    '621053,1502189409,Sabbir Ahmed,sabbir.621053@student.bteb.edu.bd,Male,2004-11-08,Mahbubur Rahman,Rokeya Sultana,+880 1711-234569,+880 1811-234569',
-    '621054,1502189410,Sumaiya Islam,sumaiya.621054@student.bteb.edu.bd,Female,2005-01-19,Kamrul Islam,Tahmina Khatun,+880 1711-234570,+880 1811-234570',
+    'Roll Number,Registration Number,Name,Student Email,Gender,Date of Birth,Father Name,Mother Name,Phone,Guardian Phone,Session,Admission Year',
+    '621051,1502189407,Naimur Rahman,naimur.621051@student.bteb.edu.bd,Male,2005-03-14,Md. Shafiqur Rahman,Salma Begum,+880 1711-234567,+880 1811-234567,2024-25,2024',
+    '621052,1502189408,Jannatul Ferdous,jannatul.621052@student.bteb.edu.bd,Female,2005-07-22,Abdul Karim,Nasrin Akter,+880 1711-234568,+880 1811-234568,2024-25,2024',
+    '621053,1502189409,Sabbir Ahmed,sabbir.621053@student.bteb.edu.bd,Male,2004-11-08,Mahbubur Rahman,Rokeya Sultana,+880 1711-234569,+880 1811-234569,2023-24,2023',
+    '621054,1502189410,Sumaiya Islam,sumaiya.621054@student.bteb.edu.bd,Female,2005-01-19,Kamrul Islam,Tahmina Khatun,+880 1711-234570,+880 1811-234570,2024-25,2024',
   ].join('\n');
 }
 

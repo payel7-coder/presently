@@ -66,6 +66,15 @@ export interface SubjectAssignment {
   assignedAt: string;
 }
 
+export interface StudentSemesterHistoryEntry {
+  semester: string;
+  classId: string;
+  academicYear?: string;
+  session?: string;
+  promotedAt: string;
+  promotedBy?: string;
+}
+
 export interface Student {
   id: string;
   rollNumber: string; // BTEB Board Roll / Class Roll (e.g. "621045", "CST-401")
@@ -87,6 +96,7 @@ export interface Student {
   session?: string;
   shift?: string;
   admissionYear?: string;
+  semesterHistory?: StudentSemesterHistoryEntry[];
   presentAddress?: string;
   permanentAddress?: string;
   academicStanding?: string;
@@ -109,6 +119,7 @@ export interface AttendanceSession {
   classId: string;
   teacherId: string;
   part?: SubjectPart; // 'theory' | 'practical'
+  academicYear?: string;
   date: string; // YYYY-MM-DD
   timeSlot?: string; // Optional period label
   topic?: string;

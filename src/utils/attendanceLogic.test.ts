@@ -62,7 +62,7 @@ STU-010, Bob Walker, bob@example.com`;
   assert.ok(dupResult.errors.some(e => e.message.includes('Duplicate Roll Number')));
 });
 
-test('parseStudentCSV & generateStudentCSVTemplate support Date of Birth, Father Name, Mother Name, Guardian Phone, Student Email without Parent Email', () => {
+test('parseStudentCSV & generateStudentCSVTemplate support Date of Birth, Father Name, Mother Name, Guardian Phone, Student Email, Session, and Admission Year without Parent Email', () => {
   const template = generateStudentCSVTemplate();
   const headerLine = template.split('\n')[0];
   assert.ok(headerLine.includes('Date of Birth'));
@@ -70,6 +70,8 @@ test('parseStudentCSV & generateStudentCSVTemplate support Date of Birth, Father
   assert.ok(headerLine.includes('Mother Name'));
   assert.ok(headerLine.includes('Guardian Phone'));
   assert.ok(headerLine.includes('Student Email'));
+  assert.ok(headerLine.includes('Session'));
+  assert.ok(headerLine.includes('Admission Year'));
   assert.equal(headerLine.toLowerCase().includes('parent email'), false);
 
   const parsedTemplate = parseStudentCSV(template, 'class-cst-4');
@@ -80,13 +82,18 @@ test('parseStudentCSV & generateStudentCSVTemplate support Date of Birth, Father
   assert.equal(parsedTemplate.students[0].fatherName, 'Md. Shafiqur Rahman');
   assert.equal(parsedTemplate.students[0].motherName, 'Salma Begum');
   assert.equal(parsedTemplate.students[0].parentContact, '+880 1811-234567');
+  assert.equal(parsedTemplate.students[0].session, '2024-25');
+  assert.equal(parsedTemplate.students[0].admissionYear, '2024');
+  assert.equal(parsedTemplate.students[2].session, '2023-24');
+  assert.equal(parsedTemplate.students[2].admissionYear, '2023');
 
-  // Verify column collision safety when Father Name / Guardian Phone appear before Student Name / Phone
-  const reorderedCSV = `Roll Number,Father Name,Mother Name,Name,Guardian Phone,Phone,Student Email,Date of Birth,Parent Email
-621099,Karim Uddin,Hasina Begum,Tariqul Islam,+8801911000111,+8801711000222,tariqul@student.bteb.edu.bd,2004-12-01,oldparent@example.com`;
+  // Verify column collision safety & auto-derivation when only Admission Year or only Session is supplied
+  const reorderedCSV = `Roll Number,Father Name,Mother Name,Name,Guardian Phone,Phone,Student Email,Date of Birth,Parent Email,Admission Year,Session
+621099,Karim Uddin,Hasina Begum,Tariqul Islam,+8801911000111,+8801711000222,tariqul@student.bteb.edu.bd,2004-12-01,oldparent@example.com,2022,
+621100,Rahim Uddin,Amena Begum,Farhana Akter,+8801911000333,+8801711000444,farhana@student.bteb.edu.bd,2005-05-01,,,2021-22`;
   const parsedReordered = parseStudentCSV(reorderedCSV, 'class-cst-4');
   assert.equal(parsedReordered.errors.length, 0);
-  assert.equal(parsedReordered.validCount, 1);
+  assert.equal(parsedReordered.validCount, 2);
   assert.equal(parsedReordered.students[0].name, 'Tariqul Islam');
   assert.equal(parsedReordered.students[0].fatherName, 'Karim Uddin');
   assert.equal(parsedReordered.students[0].motherName, 'Hasina Begum');
@@ -95,6 +102,10 @@ test('parseStudentCSV & generateStudentCSVTemplate support Date of Birth, Father
   assert.equal(parsedReordered.students[0].email, 'tariqul@student.bteb.edu.bd');
   assert.equal(parsedReordered.students[0].dateOfBirth, '2004-12-01');
   assert.equal(parsedReordered.students[0].parentEmail, undefined);
+  assert.equal(parsedReordered.students[0].session, '2022-23');
+  assert.equal(parsedReordered.students[0].admissionYear, '2022');
+  assert.equal(parsedReordered.students[1].session, '2021-22');
+  assert.equal(parsedReordered.students[1].admissionYear, '2021');
 });
 
 test('calculateStudentAttendanceStats computes accurate stats and streak', () => {

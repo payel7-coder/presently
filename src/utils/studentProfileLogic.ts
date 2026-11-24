@@ -15,6 +15,7 @@ import {
 } from '../types/attendance';
 import { calculateStudentAttendanceStats } from './attendanceLogic';
 import { calculateStudentCourseworkSummary, StudentCourseworkSummary } from './courseworkLogic';
+import { normalizeStudentSessionFields } from './studentSessionLogic';
 import {
   calculateStudentFormFillupFee,
   createDefaultFeeConfig,
@@ -349,6 +350,11 @@ export function validateStudentProfileUpdate(
   }
 
   const opt = (val?: string) => (val && val.trim() ? val.trim() : undefined);
+  const { session: normalizedSession, admissionYear: normalizedAdmissionYear } =
+    normalizeStudentSessionFields({
+      session: opt(draft.session),
+      admissionYear: opt(draft.admissionYear),
+    });
 
   const normalized: Student = {
     ...draft,
@@ -364,9 +370,9 @@ export function validateStudentProfileUpdate(
     motherName: opt(draft.motherName),
     bloodGroup: opt(draft.bloodGroup),
     dateOfBirth: opt(draft.dateOfBirth),
-    session: opt(draft.session),
+    session: normalizedSession,
     shift: opt(draft.shift),
-    admissionYear: opt(draft.admissionYear),
+    admissionYear: normalizedAdmissionYear,
     presentAddress: opt(draft.presentAddress),
     permanentAddress: opt(draft.permanentAddress),
     academicStanding: opt(draft.academicStanding),

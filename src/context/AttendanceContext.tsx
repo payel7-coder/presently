@@ -52,6 +52,11 @@ import {
   validateEmailAddress,
   validatePasswordComplexity,
 } from '../utils/passwordResetLogic';
+import {
+  buildPromotedStudentsPlan,
+  normalizeStudentSessionFields,
+  PromotionPlanResult,
+} from '../utils/studentSessionLogic';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -132,6 +137,11 @@ interface AttendanceContextType {
   bulkImportStudents: (classId: string, newStudents: Omit<Student, 'id'>[]) => Promise<number>;
   addStudent: (student: Omit<Student, 'id'>) => Promise<Student>;
   updateStudent: (student: Student) => Promise<void>;
+  promoteStudents: (
+    sourceClassId: string,
+    studentIds: string[],
+    targetClassId: string | null
+  ) => Promise<PromotionPlanResult>;
   deleteStudent: (studentId: string) => Promise<void>;
 
   // Attendance actions
@@ -1197,14 +1207,24 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       throw new Error('Access Denied: Student bulk import is restricted to Administrator role.');
     }
 
+    const targetClass = classes.find(c => c.id === classId);
     const timestamp = Date.now();
-    const createdList: Student[] = newStudents.map((s, idx) => ({
-      ...s,
-      id: `stu-${s.rollNumber || timestamp + '-' + idx}`,
-      classId,
-      status: 'active',
-      avatar: s.avatar || `https://images.unsplash.com/photo-${1500000000000 + (idx % 10) * 1000000}?w=150&auto=format&fit=crop&q=80`,
-    }));
+    const createdList: Student[] = newStudents.map((s, idx) => {
+      const { session, admissionYear } = normalizeStudentSessionFields({
+        session: s.session,
+        admissionYear: s.admissionYear,
+      });
+      return {
+        ...s,
+        id: `stu-${s.rollNumber || timestamp + '-' + idx}`,
+        classId,
+        semester: s.semester || targetClass?.semester,
+        session,
+        admissionYear,
+        status: 'active',
+        avatar: s.avatar || `https://images.unsplash.com/photo-${1500000000000 + (idx % 10) * 1000000}?w=150&auto=format&fit=crop&q=80`,
+      };
+    });
 
     setStudents(prev => {
       const newRolls = new Set(createdList.map(item => item.rollNumber.toLowerCase()));
@@ -1219,7 +1239,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         Object.keys(cleanStu).forEach(k => cleanStu[k] === undefined && delete cleanStu[k]);
         batch.set(doc(db, 'students', stu.id), cleanStu);
       });
-      await batch.commit();
+      await Promise.race([
+        batch.commit(),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
     } catch (e) {
       console.warn('Firestore batch student import:', e);
     }
@@ -1232,9 +1255,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       throw new Error('Access Denied: Only Admin can enroll students.');
     }
 
+    const targetClass = classes.find(c => c.id === stu.classId);
+    const { session, admissionYear } = normalizeStudentSessionFields({
+      session: stu.session,
+      admissionYear: stu.admissionYear,
+    });
+
     const newStudent: Student = {
       ...stu,
       id: `stu-${stu.rollNumber || Date.now()}`,
+      semester: stu.semester || targetClass?.semester,
+      session,
+      admissionYear,
       status: 'active',
     };
 
@@ -1254,14 +1286,73 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!isAdmin) {
       throw new Error('Access Denied: Only Administrators can update official student profile records.');
     }
-    const cleanStu: any = { ...stu };
+    const { session, admissionYear } = normalizeStudentSessionFields({
+      session: stu.session,
+      admissionYear: stu.admissionYear,
+    });
+    const normalizedStu: Student = {
+      ...stu,
+      session,
+      admissionYear,
+    };
+    const cleanStu: any = { ...normalizedStu };
     Object.keys(cleanStu).forEach(k => cleanStu[k] === undefined && delete cleanStu[k]);
-    setStudents(prev => prev.map(s => (s.id === stu.id ? stu : s)));
+    setStudents(prev => prev.map(s => (s.id === normalizedStu.id ? normalizedStu : s)));
     try {
-      await setDoc(doc(db, 'students', stu.id), cleanStu, { merge: true });
+      await setDoc(doc(db, 'students', normalizedStu.id), cleanStu, { merge: true });
     } catch (e) {
       console.warn('Firestore update student:', e);
     }
+  };
+
+  const promoteStudents = async (
+    sourceClassId: string,
+    studentIds: string[],
+    targetClassId: string | null
+  ): Promise<PromotionPlanResult> => {
+    if (!isAdmin) {
+      throw new Error('Access Denied: Only Administrators can promote students to the next semester.');
+    }
+    const sourceClass = classes.find(c => c.id === sourceClassId);
+    if (!sourceClass) {
+      throw new Error('Source semester class could not be found.');
+    }
+    const targetClass = targetClassId ? classes.find(c => c.id === targetClassId) || null : null;
+    if (targetClassId && !targetClass) {
+      throw new Error('Destination semester class could not be found.');
+    }
+
+    const plan = buildPromotedStudentsPlan({
+      allStudents: students,
+      selectedStudentIds: studentIds,
+      sourceClass,
+      targetClass,
+      promotedBy: currentUser?.email || currentUser?.name,
+    });
+
+    if (plan.promotedStudents.length === 0) {
+      return plan;
+    }
+
+    const updatedMap = new Map(plan.promotedStudents.map(s => [s.id, s]));
+    setStudents(prev => prev.map(s => updatedMap.get(s.id) || s));
+
+    try {
+      const batch = writeBatch(db);
+      plan.promotedStudents.forEach(stu => {
+        const cleanStu: any = { ...stu };
+        Object.keys(cleanStu).forEach(k => cleanStu[k] === undefined && delete cleanStu[k]);
+        batch.set(doc(db, 'students', stu.id), cleanStu, { merge: true });
+      });
+      await Promise.race([
+        batch.commit(),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
+    } catch (e) {
+      console.warn('Firestore student promotion commit:', e);
+    }
+
+    return plan;
   };
 
   const deleteStudent = async (studentId: string) => {
@@ -1302,12 +1393,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
     const sessionId = sessionDetails.id || `bteb-sess-${resolvedPart}-${Date.now()}`;
     const partLabel = resolvedPart === 'practical' ? 'Practical' : 'Theory';
+    const targetClass = classes.find(c => c.id === sessionDetails.classId);
     const newSession: AttendanceSession = {
       id: sessionId,
       subjectId: sessionDetails.subjectId,
       classId: sessionDetails.classId,
       teacherId: sessionDetails.teacherId,
       part: resolvedPart,
+      ...(targetClass?.academicYear ? { academicYear: targetClass.academicYear } : {}),
       date: sessionDetails.date,
       timeSlot: sessionDetails.timeSlot || `${partLabel} Session`,
       topic: sessionDetails.topic || `BTEB ${partLabel} Class`,
@@ -1903,6 +1996,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         bulkImportStudents,
         addStudent,
         updateStudent,
+        promoteStudents,
         deleteStudent,
         saveAttendanceSession,
         getSessionByDate,

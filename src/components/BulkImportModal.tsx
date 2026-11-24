@@ -160,7 +160,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl max-w-6xl w-full p-6 shadow-xl border border-slate-200 my-8">
+      <div className="bg-white rounded-xl max-w-7xl w-full p-6 shadow-xl border border-slate-200 my-8">
         <div className="flex items-start justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center shrink-0">
@@ -275,7 +275,7 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               )}
             </p>
             <p className="text-[11px] text-slate-400 mt-1">
-              Columns: Roll Number, Registration Number, Name, Student Email, Gender, Date of Birth, Father Name, Mother Name, Phone, Guardian Phone
+              Columns: Roll Number, Registration Number, Name, Student Email, Gender, Date of Birth, Father Name, Mother Name, Phone, Guardian Phone, Session, Admission Year
             </p>
           </div>
         </div>
@@ -314,33 +314,37 @@ export const BulkImportModal: React.FC<BulkImportModalProps> = ({
               <table className="w-full text-left text-[11px] whitespace-nowrap">
                 <thead className="bg-slate-50 sticky top-0 text-[10px] uppercase font-semibold text-slate-500 border-b border-slate-200">
                   <tr>
-                    <th className="py-2 px-2.5">Board Roll</th>
-                    <th className="py-2 px-2.5">Reg No</th>
-                    <th className="py-2 px-2.5">Name</th>
-                    <th className="py-2 px-2.5">Student Email</th>
-                    <th className="py-2 px-2.5">Date of Birth</th>
-                    <th className="py-2 px-2.5">Father Name</th>
-                    <th className="py-2 px-2.5">Mother Name</th>
-                    <th className="py-2 px-2.5">Phone</th>
-                    <th className="py-2 px-2.5">Guardian Phone</th>
+                    <th className="py-2 px-2">Board Roll</th>
+                    <th className="py-2 px-2">Reg No</th>
+                    <th className="py-2 px-2">Name</th>
+                    <th className="py-2 px-2">Student Email</th>
+                    <th className="py-2 px-2">DOB</th>
+                    <th className="py-2 px-2">Father Name</th>
+                    <th className="py-2 px-2">Mother Name</th>
+                    <th className="py-2 px-2">Phone</th>
+                    <th className="py-2 px-2">Guardian Phone</th>
+                    <th className="py-2 px-2">Session</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {parseResult.students.map((stu, i) => (
                     <tr key={i} className="hover:bg-slate-50">
-                      <td className="py-2 px-2.5 font-mono font-semibold text-slate-700">
+                      <td className="py-2 px-2 font-mono font-semibold text-slate-700">
                         {stu.rollNumber}
                       </td>
-                      <td className="py-2 px-2.5 font-mono text-slate-500">
+                      <td className="py-2 px-2 font-mono text-slate-500">
                         {stu.registrationNumber || '—'}
                       </td>
-                      <td className="py-2 px-2.5 font-semibold text-slate-900">{stu.name}</td>
-                      <td className="py-2 px-2.5 text-slate-500">{stu.email}</td>
-                      <td className="py-2 px-2.5 font-mono text-slate-500">{stu.dateOfBirth || '—'}</td>
-                      <td className="py-2 px-2.5 text-slate-600">{stu.fatherName || '—'}</td>
-                      <td className="py-2 px-2.5 text-slate-600">{stu.motherName || '—'}</td>
-                      <td className="py-2 px-2.5 font-mono text-slate-500">{stu.phone || '—'}</td>
-                      <td className="py-2 px-2.5 font-mono text-slate-500">{stu.parentContact || '—'}</td>
+                      <td className="py-2 px-2 font-semibold text-slate-900">{stu.name}</td>
+                      <td className="py-2 px-2 text-slate-500">{stu.email}</td>
+                      <td className="py-2 px-2 font-mono text-slate-500">{stu.dateOfBirth || '—'}</td>
+                      <td className="py-2 px-2 text-slate-600">{stu.fatherName || '—'}</td>
+                      <td className="py-2 px-2 text-slate-600">{stu.motherName || '—'}</td>
+                      <td className="py-2 px-2 font-mono text-slate-500">{stu.phone || '—'}</td>
+                      <td className="py-2 px-2 font-mono text-slate-500">{stu.parentContact || '—'}</td>
+                      <td className="py-2 px-2 font-mono text-slate-700">
+                        {stu.session || (stu.admissionYear ? `${stu.admissionYear}` : '—')}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -6,6 +6,7 @@ import {
   buildStudentProfileDossier,
   validateStudentProfileUpdate,
 } from '../utils/studentProfileLogic';
+import { deriveSessionFromAdmissionYear } from '../utils/studentSessionLogic';
 import { generateStudentDossierPDF } from '../utils/pdfStudentDossier';
 import { formatResultStatusLabel } from '../utils/formFillupLogic';
 import {
@@ -653,6 +654,30 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                       'No institutional remarks recorded for this student yet.'}
                   </p>
                 </div>
+
+                {student.semesterHistory && student.semesterHistory.length > 0 && (
+                  <div className="pt-3 border-t border-slate-100">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
+                      Semester Progression History
+                    </p>
+                    <div className="space-y-1.5">
+                      {student.semesterHistory.map((entry, idx) => (
+                        <div
+                          key={`${entry.semester}-${idx}`}
+                          className="flex items-center justify-between text-xs px-2.5 py-1.5 rounded bg-slate-50 border border-slate-200/70"
+                        >
+                          <span className="font-semibold text-slate-800">
+                            {entry.semester} Semester
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-500">
+                            {entry.session ? `Session ${entry.session}` : ''}
+                            {entry.promotedAt ? ` · ${entry.promotedAt.slice(0, 10)}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1048,7 +1073,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     BTEB Registration No.
@@ -1065,11 +1090,35 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
+                    Admission Year
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2022"
+                    value={editDraft.admissionYear || ''}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const derived = deriveSessionFromAdmissionYear(val);
+                      const prevDerived = deriveSessionFromAdmissionYear(editDraft.admissionYear);
+                      setEditDraft({
+                        ...editDraft,
+                        admissionYear: val,
+                        session:
+                          derived && (!editDraft.session || editDraft.session === prevDerived)
+                            ? derived
+                            : editDraft.session,
+                      });
+                    }}
+                    className="w-full h-9 px-3 border border-slate-300 rounded-lg font-mono text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
                     Academic Session
                   </label>
                   <input
                     type="text"
-                    placeholder="e.g. 2022-2023"
+                    placeholder="e.g. 2022-23"
                     value={editDraft.session || ''}
                     onChange={e => setEditDraft({ ...editDraft, session: e.target.value })}
                     className="w-full h-9 px-3 border border-slate-300 rounded-lg font-mono text-slate-900"

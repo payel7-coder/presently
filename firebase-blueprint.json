@@ -77,6 +77,9 @@
         "motherName": { "type": "string", "description": "Mother full name" },
         "classId": { "type": "string", "description": "Class group ID" },
         "semester": { "type": "string", "description": "BTEB Semester" },
+        "session": { "type": "string", "description": "Permanent academic session from admission year (e.g. 2024-25)" },
+        "admissionYear": { "type": "string", "description": "Initial admission year (e.g. 2024)" },
+        "semesterHistory": { "type": "array", "description": "Completed semester promotion history while retaining fixed session" },
         "phone": { "type": "string", "description": "Student phone" },
         "parentContact": { "type": "string", "description": "Guardian phone number" },
         "status": { "type": "string", "enum": ["active", "inactive"] }
