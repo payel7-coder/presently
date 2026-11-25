@@ -111,20 +111,28 @@ export async function renderFormFillupInvoiceCanvas(
   const mergedLabelW = colW[0] + colW[1]; // 400
 
   // Title Header Block (Centered)
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#1e293b';
   ctx.textAlign = 'center';
 
-  ctx.font = `700 42px ${FONT_STACK}`;
-  ctx.fillText(invoice.instituteName, width / 2, 190, tableWidth);
+  ctx.font = `700 30px ${FONT_STACK}`;
+  ctx.fillText(invoice.instituteEnglishName, width / 2, 128, tableWidth);
 
-  ctx.font = `700 26px ${FONT_STACK}`;
-  ctx.fillText(invoice.subtitleLine, width / 2, 248, tableWidth);
+  ctx.font = `600 24px ${FONT_STACK}`;
+  ctx.fillStyle = '#334155';
+  ctx.fillText(invoice.departmentName, width / 2, 166, tableWidth);
 
-  ctx.font = `700 29px ${FONT_STACK}`;
-  ctx.fillText(invoice.statementTitle, width / 2, 306, tableWidth);
+  ctx.fillStyle = '#0f172a';
+  ctx.font = `700 40px ${FONT_STACK}`;
+  ctx.fillText(invoice.instituteName, width / 2, 224, tableWidth);
+
+  ctx.font = `700 25px ${FONT_STACK}`;
+  ctx.fillText(invoice.subtitleLine, width / 2, 276, tableWidth);
+
+  ctx.font = `700 28px ${FONT_STACK}`;
+  ctx.fillText(invoice.statementTitle, width / 2, 326, tableWidth);
 
   // Table Geometry
-  const tableStartY = 352;
+  const tableStartY = 374;
   const headerTopH = 74;
   const headerSubH = 70;
   const headerTotalH = headerTopH + headerSubH; // 144

@@ -3,6 +3,7 @@ import autoTable from 'jspdf-autotable';
 import { User } from '../types/attendance';
 import { formatResultStatusLabel } from './formFillupLogic';
 import { StudentProfileDossier } from './studentProfileLogic';
+import { drawInstitutionalPdfHeader } from './pdfHeader';
 
 export function generateStudentDossierPDF(
   dossier: StudentProfileDossier,
@@ -26,44 +27,22 @@ export function generateStudentDossierPDF(
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Institutional Dark Slate Header
-  doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, pageWidth, 30, 'F');
-  doc.setFillColor(5, 150, 105);
-  doc.rect(0, 0, pageWidth, 3, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('BANGLADESH TECHNICAL EDUCATION BOARD (BTEB)', pageWidth / 2, 11, {
-    align: 'center',
-  });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(203, 213, 225);
-  doc.text(
-    'Diploma in Computer Science & Technology (Probidhan 2022) — Official Student Academic Dossier',
-    pageWidth / 2,
-    18,
-    { align: 'center' }
-  );
-
-  doc.setFontSize(8);
-  doc.setTextColor(148, 163, 184);
-  doc.text(
-    `Generated: ${new Date().toISOString().split('T')[0]} · Authorized By: ${
+  const bannerHeight = drawInstitutionalPdfHeader(doc, {
+    reportTitle: 'OFFICIAL STUDENT ACADEMIC DOSSIER',
+    boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • DIPLOMA IN ENGINEERING (PROBIDHAN 2022)',
+    accentColor: [5, 150, 105],
+    titleColor: [110, 231, 183],
+    footerNote: `Generated: ${new Date().toISOString().split('T')[0]} · Authorized By: ${
       generatedBy?.name || 'Academic Registrar'
     }`,
-    pageWidth / 2,
-    24.5,
-    { align: 'center' }
-  );
+  });
 
   // Student Identity & Registrar Block
+  const identityY = bannerHeight + 10; // 46mm
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
-  doc.text(student.name, 14, 41);
+  doc.text(student.name, 14, identityY);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
@@ -73,12 +52,12 @@ export function generateStudentDossierPDF(
       student.registrationNumber || 'N/A'
     }  ·  Batch: ${classGroup?.name || student.classId}`,
     14,
-    47
+    identityY + 6
   );
 
   // Metadata Summary Table
   autoTable(doc, {
-    startY: 52,
+    startY: identityY + 11,
     theme: 'grid',
     styles: {
       fontSize: 8.5,

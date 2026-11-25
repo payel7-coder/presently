@@ -364,7 +364,7 @@ export const DownloadRegisterModal: React.FC<DownloadRegisterModalProps> = ({
               <span>BTEB Probidhan-2022 Standard A4 Landscape Format</span>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed">
-              Includes Board Roll, Registration, Technology Code 85, Course Teacher Signature, HOD Seal, and Principal Endorsement.
+              Includes Board Roll, Student Full Name, Technology Code 85, Course Teacher Signature, HOD Seal, and Principal Endorsement.
             </p>
           </div>
         </div>

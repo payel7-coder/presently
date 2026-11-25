@@ -236,6 +236,8 @@ test('generateAbsentListPDF builds valid Portrait A4 PDFs for absent entries and
   const outAbsences = docWithAbsences.output();
   assert.ok(outAbsences.includes('%PDF-'));
   assert.ok(outAbsences.length > 1000);
+  assert.ok(outAbsences.includes('Model Institute of Science and Technology'), 'Institute header should be present');
+  assert.ok(outAbsences.includes('Department of Computer Science & Technology'), 'Department header should be present');
 
   const docNil = generateAbsentListPDF({
     subjects: mockSubjects,

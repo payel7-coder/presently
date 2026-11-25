@@ -13,6 +13,7 @@ import {
   AbsentListFilterOptions,
   buildSubjectDateAbsentList,
 } from './attendanceLogic';
+import { drawInstitutionalPdfHeader } from './pdfHeader';
 
 export interface AbsentListPDFOptions {
   subjects: Subject[];
@@ -77,98 +78,78 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
   const pageHeight = doc.internal.pageSize.getHeight();
 
   // 1. Institutional Header
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, pageWidth, 29, 'F');
-
-  // Rose top accent stripe for Absent List Report
-  doc.setFillColor(225, 29, 72); // rose-600
-  doc.rect(0, 0, pageWidth, 3, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.text('BANGLADESH TECHNICAL EDUCATION BOARD (BTEB)', pageWidth / 2, 10.5, {
-    align: 'center',
-  });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text('DIPLOMA IN ENGINEERING • PROBIDHAN 2022 • CST (TECH CODE: 85)', pageWidth / 2, 16, {
-    align: 'center',
-  });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(253, 164, 175); // rose-300
-  doc.text('SUBJECT & DATE-WISE STUDENT ABSENT LIST', pageWidth / 2, 22.5, {
-    align: 'center',
+  const bannerHeight = drawInstitutionalPdfHeader(doc, {
+    reportTitle: 'SUBJECT & DATE-WISE STUDENT ABSENT LIST',
+    boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • PROBIDHAN 2022 • CST (TECH CODE: 85)',
+    accentColor: [225, 29, 72], // rose-600
+    titleColor: [253, 164, 175], // rose-300
   });
 
   // 2. Metadata Box
+  const metaY = bannerHeight + 4; // 37mm
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(10, 33, pageWidth - 20, 28, 2, 2, 'FD');
+  doc.roundedRect(10, metaY, pageWidth - 20, 28, 2, 2, 'FD');
 
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
 
   // Left Column
   doc.setFont('helvetica', 'bold');
-  doc.text('Subject:', 14, 39.5);
+  doc.text('Subject:', 14, metaY + 6.5);
   doc.setFont('helvetica', 'normal');
   const subjectText = selectedSubject
     ? `${selectedSubject.code} — ${selectedSubject.name}`
     : `All Assigned Subjects (${subjects.length})`;
-  doc.text(subjectText.slice(0, 52), 34, 39.5);
+  doc.text(subjectText.slice(0, 52), 34, metaY + 6.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Course Part:', 14, 45.5);
+  doc.text('Course Part:', 14, metaY + 12.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(partLabel, 34, 45.5);
+  doc.text(partLabel, 34, metaY + 12.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Class / Batch:', 14, 51.5);
+  doc.text('Class / Batch:', 14, metaY + 18.5);
   doc.setFont('helvetica', 'normal');
   const classText = selectedClass
     ? `${selectedClass.name} (${selectedClass.section})`
     : 'All Applicable Semesters';
-  doc.text(classText.slice(0, 52), 34, 51.5);
+  doc.text(classText.slice(0, 52), 34, metaY + 18.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Date Scope:', 14, 57.5);
+  doc.text('Date Scope:', 14, metaY + 24.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(result.dateScopeLabel, 34, 57.5);
+  doc.text(result.dateScopeLabel, 34, metaY + 24.5);
 
   // Right Column
   const col2X = pageWidth / 2 + 8;
   doc.setFont('helvetica', 'bold');
-  doc.text('Prepared By:', col2X, 39.5);
+  doc.text('Prepared By:', col2X, metaY + 6.5);
   doc.setFont('helvetica', 'normal');
   doc.text(
     requestedBy ? `${requestedBy.name} (${requestedBy.employeeId || 'Faculty'})` : 'Faculty Member',
     col2X + 26,
-    39.5
+    metaY + 6.5
   );
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Sessions Held:', col2X, 45.5);
+  doc.text('Sessions Held:', col2X, metaY + 12.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${result.totalMatchingSessions} session(s)`, col2X + 26, 45.5);
+  doc.text(`${result.totalMatchingSessions} session(s)`, col2X + 26, metaY + 12.5);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Total Absences:', col2X, 51.5);
+  doc.text('Total Absences:', col2X, metaY + 18.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(225, 29, 72);
-  doc.text(`${result.totalAbsentMarks} record(s)`, col2X + 26, 51.5);
+  doc.text(`${result.totalAbsentMarks} record(s)`, col2X + 26, metaY + 18.5);
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
-  doc.text('Unique Students:', col2X, 57.5);
+  doc.text('Unique Students:', col2X, metaY + 24.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${result.uniqueAbsentStudents} student(s)`, col2X + 26, 57.5);
+  doc.text(`${result.uniqueAbsentStudents} student(s)`, col2X + 26, metaY + 24.5);
 
-  let currentY = 66;
+  let currentY = metaY + 33;
 
   if (result.entries.length === 0) {
     // Clean empty-state box

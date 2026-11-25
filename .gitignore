@@ -9,6 +9,6 @@ coverage/
 .playwright-cli/
 .aistudio/
 teacher-dashboard.png
-data/
+/data/
 *.sqlite*
 public/assets/aistudio/

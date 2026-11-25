@@ -37,6 +37,7 @@ import {
 import { Student, Subject, ClassGroup, SubjectPart } from '../types/attendance';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
 import { DownloadAbsentListModal } from './DownloadAbsentListModal';
+import { PDF_DEPARTMENT_NAME, PDF_INSTITUTE_NAME } from '../utils/pdfHeader';
 
 interface ReportsAndTrendsProps {
   initialSubjectId?: string;
@@ -213,6 +214,15 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Print-Only Institutional Header */}
+      <div className="hidden print-only text-center border-b-2 border-slate-900 pb-4 mb-4">
+        <h2 className="text-lg font-bold text-slate-950">{PDF_INSTITUTE_NAME}</h2>
+        <p className="text-sm font-semibold text-slate-800">{PDF_DEPARTMENT_NAME}</p>
+        <p className="text-xs text-slate-600 mt-1">
+          Bangladesh Technical Education Board (BTEB) • Attendance Reports &amp; Trend Analysis
+        </p>
+      </div>
+
       {/* Editorial Header */}
       <div className="pb-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
         <div>

@@ -87,6 +87,8 @@ test('buildFormFillupInvoiceSummary reproduces exact reference photo totals (753
     },
   });
 
+  assert.equal(invoice.instituteEnglishName, 'Model Institute of Science and Technology');
+  assert.equal(invoice.departmentName, 'Department of Computer Science & Technology');
   assert.equal(invoice.technologyLabel, 'CST-7th');
   assert.equal(invoice.semester, '7th');
   assert.equal(invoice.includedStudentCount, 31);

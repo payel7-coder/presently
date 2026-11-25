@@ -11,6 +11,7 @@ import {
   normalizeResultInput,
   StudentResultInput,
 } from './formFillupLogic';
+import { PDF_DEPARTMENT_NAME, PDF_INSTITUTE_NAME } from './pdfHeader';
 
 export type InvoiceStudentScope = 'all' | 'paid_submitted';
 export type DelayFeeShareTarget = 'board' | 'institute';
@@ -46,6 +47,8 @@ export interface InvoiceLineMetric {
 }
 
 export interface FormFillupInvoiceData {
+  instituteEnglishName: string;
+  departmentName: string;
   instituteName: string;
   semester: string;
   examSession: string;
@@ -351,6 +354,8 @@ export function buildFormFillupInvoiceSummary(params: {
   const instituteTotalTk = orderedRows.reduce((sum, r) => sum + r.instituteShareTk, 0);
 
   return {
+    instituteEnglishName: PDF_INSTITUTE_NAME,
+    departmentName: PDF_DEPARTMENT_NAME,
     instituteName,
     semester: classGroup.semester,
     examSession,

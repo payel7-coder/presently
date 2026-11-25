@@ -350,7 +350,13 @@ export const FormFillupInvoiceModal: React.FC<FormFillupInvoiceModalProps> = ({
             >
               {/* Official Document Header */}
               <div className="text-center space-y-1 mb-5">
-                <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-950">
+                <p className="text-sm sm:text-base font-bold tracking-tight text-slate-800">
+                  {invoice.instituteEnglishName}
+                </p>
+                <p className="text-xs sm:text-sm font-semibold text-slate-600">
+                  {invoice.departmentName}
+                </p>
+                <h3 className="text-lg sm:text-xl font-bold tracking-tight text-slate-950 pt-1">
                   {invoice.instituteName}
                 </h3>
                 <p className="text-xs sm:text-sm font-bold text-slate-900">

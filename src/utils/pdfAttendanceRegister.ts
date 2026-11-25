@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Subject, ClassGroup, Student, AttendanceSession, AttendanceRecord, User, SubjectPart } from '../types/attendance';
+import { drawInstitutionalPdfHeader } from './pdfHeader';
 
 export interface PDFRegisterOptions {
   subject: Subject;
@@ -55,36 +56,21 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   const pageHeight = doc.internal.pageSize.getHeight();
 
   // 1. Institutional Header
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, pageWidth, 28, 'F');
-
-  // Emerald accent top border line
-  doc.setFillColor(16, 185, 129); // emerald-500
-  doc.rect(0, 0, pageWidth, 3, 'F');
-
-  // Institution title
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(14);
-  doc.text('BANGLADESH TECHNICAL EDUCATION BOARD (BTEB)', pageWidth / 2, 10, { align: 'center' });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
-  doc.setTextColor(203, 213, 225); // slate-300
-  doc.text('DIPLOMA IN ENGINEERING • PROBIDHAN 2022 (CURRICULUM-2022)', pageWidth / 2, 16, { align: 'center' });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(52, 211, 153); // emerald-400
   const subHeading = isBlankTemplate
     ? 'SEMESTER CONTINUOUS ATTENDANCE REGISTER (CLASSROOM LOG SHEET)'
     : 'OFFICIAL COURSE ATTENDANCE REGISTER & CONTINUOUS ASSESSMENT LEDGER';
-  doc.text(subHeading, pageWidth / 2, 22, { align: 'center' });
+  const bannerHeight = drawInstitutionalPdfHeader(doc, {
+    reportTitle: subHeading,
+    boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • DIPLOMA IN ENGINEERING • PROBIDHAN 2022',
+    accentColor: [16, 185, 129],
+    titleColor: [52, 211, 153],
+  });
 
   // 2. Metadata Box
+  const metaY = bannerHeight + 4; // 37mm
   doc.setFillColor(248, 250, 252); // slate-50
   doc.setDrawColor(226, 232, 240); // slate-200
-  doc.roundedRect(10, 32, pageWidth - 20, 26, 2, 2, 'FD');
+  doc.roundedRect(10, metaY, pageWidth - 20, 23, 2, 2, 'FD');
 
   doc.setFontSize(8.5);
   doc.setTextColor(15, 23, 42);
@@ -92,40 +78,40 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   // Left column
   const partLabel = part === 'practical' ? 'Practical' : part === 'theory' ? 'Theory' : 'Theory & Practical';
   doc.setFont('helvetica', 'bold');
-  doc.text('Course / Subject:', 14, 38);
+  doc.text('Course / Subject:', 14, metaY + 6);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${subject.name} [${partLabel}] (Code: ${subject.code}) - ${subject.credits || 3} Cr`, 45, 38);
+  doc.text(`${subject.name} [${partLabel}] (Code: ${subject.code}) - ${subject.credits || 3} Cr`, 45, metaY + 6);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Semester & Class:', 14, 44);
+  doc.text('Semester & Class:', 14, metaY + 12);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${classGroup.name} (${classGroup.semester} Semester) • Section: ${classGroup.section}`, 45, 44);
+  doc.text(`${classGroup.name} (${classGroup.semester} Semester) • Section: ${classGroup.section}`, 45, metaY + 12);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Technology / Dept:', 14, 50);
+  doc.text('Technology / Dept:', 14, metaY + 18);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${classGroup.department || 'Computer Science & Technology'} (Tech Code: 85)`, 45, 50);
+  doc.text(`${classGroup.department || 'Computer Science & Technology'} (Tech Code: 85)`, 45, metaY + 18);
 
   // Right column
   const col2X = pageWidth / 2 + 10;
   doc.setFont('helvetica', 'bold');
-  doc.text(part ? `${partLabel} Teacher:` : 'Course Teacher:', col2X, 38);
+  doc.text(part ? `${partLabel} Teacher:` : 'Course Teacher:', col2X, metaY + 6);
   doc.setFont('helvetica', 'normal');
   const teacherText = teacher ? `${teacher.name} (${teacher.employeeId || 'Faculty'})` : 'Institutional Faculty';
-  doc.text(teacherText, col2X + 30, 38);
+  doc.text(teacherText, col2X + 30, metaY + 6);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Academic Session:', col2X, 44);
+  doc.text('Academic Session:', col2X, metaY + 12);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${classGroup.academicYear || '2026-2027'} • Probidhan-2022`, col2X + 30, 44);
+  doc.text(`${classGroup.academicYear || '2026-2027'} • Probidhan-2022`, col2X + 30, metaY + 12);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Register Type:', col2X, 50);
+  doc.text('Register Type:', col2X, metaY + 18);
   doc.setFont('helvetica', 'normal');
   const regTypeText = isBlankTemplate
     ? `Blank Form for ${partLabel} Log (22 Class Slots)`
     : `Recorded ${partLabel} Ledger (${targetSessions.length} Classes • ${students.length} Enrolled)`;
-  doc.text(regTypeText, col2X + 30, 50);
+  doc.text(regTypeText, col2X + 30, metaY + 18);
 
   // Sort students by Roll number
   const sortedStudents = [...students].sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
@@ -135,8 +121,8 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   let bodyRows: string[][];
 
   if (isBlankTemplate) {
-    // Generate blank grid with 25 class columns
-    const blankHeaders = ['#', 'Roll No', 'Registration', 'Student Full Name'];
+    // Generate blank grid with 22 class columns
+    const blankHeaders = ['#', 'Roll No', 'Student Full Name'];
     for (let i = 1; i <= 22; i++) {
       blankHeaders.push(`${i}`);
     }
@@ -147,7 +133,6 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
       const row = [
         `${idx + 1}`,
         stu.rollNumber,
-        stu.registrationNumber || '-',
         stu.name,
       ];
       // 22 blank slots
@@ -161,7 +146,7 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   } else {
     // Build ledger with actual sessions (up to 20 recent/filtered sessions)
     const displaySessions = targetSessions.slice(-20);
-    const headers = ['#', 'Board Roll', 'Registration', 'Student Full Name'];
+    const headers = ['#', 'Board Roll', 'Student Full Name'];
 
     displaySessions.forEach(sess => {
       // Date label mm/dd
@@ -228,7 +213,6 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
       return [
         `${idx + 1}`,
         stu.rollNumber,
-        stu.registrationNumber || '-',
         stu.name,
         ...sessionMarks,
         `${totalHeld}`,
@@ -244,7 +228,7 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   autoTable(doc, {
     head: headRows,
     body: bodyRows,
-    startY: 61,
+    startY: metaY + 26,
     margin: { left: 10, right: 10, bottom: 35 },
     theme: 'grid',
     styles: {
@@ -270,8 +254,7 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' }, // Sl
       1: { cellWidth: 20, fontStyle: 'bold', halign: 'center' }, // Roll
-      2: { cellWidth: 24, halign: 'center' }, // Reg
-      3: { cellWidth: 38, halign: 'left', fontStyle: 'bold' }, // Name
+      2: { cellWidth: 42, halign: 'left', fontStyle: 'bold' }, // Name
     },
     didParseCell: (data) => {
       // Highlight absent marks in red and eligibility status

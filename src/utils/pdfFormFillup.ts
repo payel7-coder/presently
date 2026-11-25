@@ -13,6 +13,7 @@ import {
   formatResultStatusLabel,
   StudentResultInput,
 } from './formFillupLogic';
+import { drawInstitutionalPdfHeader } from './pdfHeader';
 
 export interface FormFillupPDFOptions {
   classGroup: ClassGroup;
@@ -63,74 +64,56 @@ export function generateFormFillupPDF(options: FormFillupPDFOptions): jsPDF {
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // Header Banner
-  doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, pageWidth, 27, 'F');
-  doc.setFillColor(5, 150, 105);
-  doc.rect(0, 0, pageWidth, 3, 'F');
-
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(13);
-  doc.text('BANGLADESH TECHNICAL EDUCATION BOARD (BTEB)', pageWidth / 2, 10, {
-    align: 'center',
-  });
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(203, 213, 225);
-  doc.text('DIPLOMA IN COMPUTER SCIENCE & TECHNOLOGY (85) • SEMESTER FINAL FORM FILL-UP FEE SCHEDULE', pageWidth / 2, 15.5, {
-    align: 'center',
-  });
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10);
-  doc.setTextColor(110, 231, 183);
-  doc.text(`${classGroup.name.toUpperCase()} (${classGroup.section})`, pageWidth / 2, 22, {
-    align: 'center',
+  const bannerHeight = drawInstitutionalPdfHeader(doc, {
+    reportTitle: `${classGroup.name.toUpperCase()} (${classGroup.section})`,
+    boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • DIPLOMA IN CST (85) • SEMESTER FINAL FORM FILL-UP FEE SCHEDULE',
+    accentColor: [5, 150, 105],
+    titleColor: [110, 231, 183],
   });
 
   // Metadata Box
+  const metaY = bannerHeight + 4; // 37mm
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(10, 31, pageWidth - 20, 20, 2, 2, 'FD');
+  doc.roundedRect(10, metaY, pageWidth - 20, 20, 2, 2, 'FD');
 
   doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Assigned Coordinator:', 14, 37.5);
+  doc.text('Assigned Coordinator:', 14, metaY + 6.5);
   doc.setFont('helvetica', 'normal');
   doc.text(
     coordinator ? `${coordinator.name} (${coordinator.email})` : 'Department Administration',
     49,
-    37.5
+    metaY + 6.5
   );
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Fee Rates (Tk):', 14, 44.5);
+  doc.text('Fee Rates (Tk):', 14, metaY + 13.5);
   doc.setFont('helvetica', 'normal');
   doc.text(
     `Exam: ${feeConfig.examFee} | Ref/Sub: ${feeConfig.referredExamFeePerSubject} | MS Reg: ${feeConfig.marksheetFeeRegular} | MS Ref/Sem: ${feeConfig.marksheetFeeReferredPerSemester} | Center Reg: ${feeConfig.centerFeeRegular} | Center Ref/Sem: ${feeConfig.centerFeeReferredPerSemester} | Prac/Sub: ${feeConfig.practicalFeePerSubject} | Qn: ${feeConfig.questionFee} | Delay: ${feeConfig.delayFee}`,
     39,
-    44.5
+    metaY + 13.5
   );
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Total Collectible:', pageWidth - 75, 37.5);
+  doc.text('Total Collectible:', pageWidth - 75, metaY + 6.5);
   doc.setFont('helvetica', 'normal');
   doc.text(
     `Tk ${batchSummary.totalCollectibleTk.toLocaleString()} (${batchSummary.totalStudents} Students)`,
     pageWidth - 46,
-    37.5
+    metaY + 6.5
   );
 
   doc.setFont('helvetica', 'bold');
-  doc.text('Collected / Paid:', pageWidth - 75, 44.5);
+  doc.text('Collected / Paid:', pageWidth - 75, metaY + 13.5);
   doc.setFont('helvetica', 'normal');
   doc.text(
     `Tk ${batchSummary.totalCollectedTk.toLocaleString()} (${batchSummary.paidOrSubmittedCount}/${batchSummary.totalStudents})`,
     pageWidth - 46,
-    44.5
+    metaY + 13.5
   );
 
   const tableBody = activeStudents.map(stu => {
@@ -173,7 +156,7 @@ export function generateFormFillupPDF(options: FormFillupPDFOptions): jsPDF {
   });
 
   autoTable(doc, {
-    startY: 55,
+    startY: metaY + 24,
     margin: { left: 10, right: 10 },
     head: [[
       'Roll',

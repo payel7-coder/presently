@@ -159,6 +159,12 @@ test('generateAttendanceRegisterPDF creates a valid landscape PDF for recorded a
   const pdfOutput = doc.output();
   assert.ok(pdfOutput.length > 1000, 'PDF output should contain valid binary stream');
   assert.ok(pdfOutput.includes('%PDF-'), 'PDF header should be present');
+  assert.ok(pdfOutput.includes('Model Institute of Science and Technology'), 'Institute header should be present');
+  assert.ok(pdfOutput.includes('Department of Computer Science & Technology'), 'Department header should be present');
+  assert.ok(pdfOutput.includes('Board Roll'), 'Board Roll column should be present');
+  assert.ok(pdfOutput.includes('Student Full Name'), 'Student Full Name column should be present');
+  assert.equal(pdfOutput.includes('(Registration)'), false, 'Registration column header must not be present');
+  assert.equal(pdfOutput.includes('1502148201'), false, 'Student registration numbers must not be present');
 });
 
 test('generateAttendanceRegisterPDF creates blank classroom log sheet format', () => {
@@ -176,6 +182,10 @@ test('generateAttendanceRegisterPDF creates blank classroom log sheet format', (
   const pdfOutput = doc.output();
   assert.ok(pdfOutput.length > 1000, 'Blank PDF output should contain valid stream');
   assert.ok(pdfOutput.includes('%PDF-'), 'PDF header should be present');
+  assert.ok(pdfOutput.includes('Roll No'), 'Roll No column should be present in blank template');
+  assert.ok(pdfOutput.includes('Student Full Name'), 'Student Full Name column should be present in blank template');
+  assert.equal(pdfOutput.includes('(Registration)'), false, 'Registration column header must not be present in blank template');
+  assert.equal(pdfOutput.includes('1502148201'), false, 'Student registration numbers must not be present in blank template');
 });
 
 test('generateAttendanceRegisterPDF filters sessions by date range', () => {
