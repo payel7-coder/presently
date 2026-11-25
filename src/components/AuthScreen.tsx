@@ -25,7 +25,6 @@ export const AuthScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'admin' | 'teacher'>('teacher');
   const [showPassword, setShowPassword] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -82,10 +81,10 @@ export const AuthScreen: React.FC = () => {
       if (authMode === 'signin') {
         await loginWithEmail(email.trim(), password);
       } else {
-        const result = await registerWithEmail(email.trim(), password, name.trim(), role);
+        const result = await registerWithEmail(email.trim(), password, name.trim());
         if (result.requiresApproval) {
           setSuccessNotice(
-            `Registration submitted for ${result.user.email} (${result.user.role === 'admin' ? 'Administrator' : 'Teacher'}). An administrator must approve your account before you can sign in.`
+            `Teacher registration submitted for ${result.user.email}. An administrator must approve your account before you can sign in.`
           );
           setAuthMode('signin');
           setPassword('');
@@ -184,14 +183,14 @@ export const AuthScreen: React.FC = () => {
                   {authMode === 'signin'
                     ? 'Sign in to your account'
                     : authMode === 'register'
-                      ? 'Register faculty account'
+                      ? 'Register teacher account'
                       : 'Reset your password'}
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">
                   {authMode === 'signin'
                     ? 'Enter your institutional email and password to continue'
                     : authMode === 'register'
-                      ? 'Create an institutional profile for your department role'
+                      ? 'Create a faculty profile pending administrator approval'
                       : 'Receive a Firebase password reset link via email'}
                 </p>
               </div>
@@ -266,72 +265,19 @@ export const AuthScreen: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="mt-6 space-y-4">
               {authMode === 'register' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Full Name <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. Engr. Payel Ahmed"
-                      value={name}
-                      onChange={e => setName(e.target.value)}
-                      className="w-full h-10 px-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Institutional Role <span className="text-rose-500">*</span>
-                    </label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <label
-                        className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          role === 'teacher'
-                            ? 'bg-emerald-50/60 border-emerald-600'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="role"
-                          checked={role === 'teacher'}
-                          onChange={() => setRole('teacher')}
-                          className="mt-0.5 accent-emerald-600"
-                        />
-                        <div>
-                          <span className="text-xs font-semibold text-slate-900 block">Teacher</span>
-                          <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
-                            Roll call &amp; assigned courses
-                          </span>
-                        </div>
-                      </label>
-
-                      <label
-                        className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          role === 'admin'
-                            ? 'bg-indigo-50/60 border-indigo-600'
-                            : 'bg-white border-slate-200 hover:border-slate-300'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="role"
-                          checked={role === 'admin'}
-                          onChange={() => setRole('admin')}
-                          className="mt-0.5 accent-indigo-600"
-                        />
-                        <div>
-                          <span className="text-xs font-semibold text-slate-900 block">Administrator</span>
-                          <span className="text-[11px] text-slate-500 leading-tight block mt-0.5">
-                            Allocations &amp; roster import
-                          </span>
-                        </div>
-                      </label>
-                    </div>
-                  </div>
-                </>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                    Full Name <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Engr. Mahmudul Hasan"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full h-10 px-3.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-colors"
+                  />
+                </div>
               )}
 
               <div>
@@ -448,7 +394,7 @@ export const AuthScreen: React.FC = () => {
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
                     <span>
-                      New registrations require administrator approval before your account can sign in.
+                      New accounts are registered as Teacher profiles and require administrator approval before sign-in. Only the Root User can grant Administrator privileges after approval.
                     </span>
                   </div>
                 </>

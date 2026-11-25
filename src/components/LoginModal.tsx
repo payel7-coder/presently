@@ -22,7 +22,6 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'admin' | 'teacher'>('teacher');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -62,10 +61,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         await loginWithEmail(email.trim(), password);
         onClose();
       } else {
-        const result = await registerWithEmail(email.trim(), password, name.trim(), role);
+        const result = await registerWithEmail(email.trim(), password, name.trim());
         if (result.requiresApproval) {
           setSuccessMsg(
-            `Registration submitted for ${result.user.email}. An administrator must approve this account before sign-in.`
+            `Teacher registration submitted for ${result.user.email}. An administrator must approve this account before sign-in.`
           );
           setMode('email-login');
           setPassword('');
@@ -154,34 +153,22 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
         <form onSubmit={handleEmailSubmit} className="mt-5 space-y-3.5">
           {mode === 'register' && (
-            <>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Engr. Asif Mahmud"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  System Role
-                </label>
-                <select
-                  value={role}
-                  onChange={e => setRole(e.target.value as any)}
-                  className="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs font-medium text-slate-900"
-                >
-                  <option value="teacher">Teacher (Attendance &amp; Reports)</option>
-                  <option value="admin">Administrator (Full Access &amp; Student Import)</option>
-                </select>
-              </div>
-            </>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Full Name
+              </label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. Engr. Asif Mahmud"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                className="w-full h-9 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+              />
+              <p className="text-[11px] text-slate-500 mt-1.5">
+                New accounts are registered as Teacher profiles and require approval before sign-in.
+              </p>
+            </div>
           )}
 
           <div>

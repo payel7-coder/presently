@@ -17,6 +17,7 @@ import {
   SubjectAssignment,
   SubjectPart,
   User,
+  UserRole,
 } from '../types/attendance';
 import {
   BTEB_CLASSES,
@@ -29,6 +30,9 @@ import {
   getPendingUsers,
   getApprovedTeachers,
   isPrimaryAdminEmail,
+  isRootUser as checkIsRootUser,
+  resolveRegistrationRole,
+  validateUserRoleChange,
   resolveRollCallForSave,
   RollCallDraftEntry,
 } from '../utils/attendanceLogic';
@@ -111,9 +115,10 @@ interface AttendanceContextType {
   // Permissions & Auth
   isAuthenticated: boolean;
   isAdmin: boolean;
+  isRootUser: boolean;
   canImportStudents: boolean;
   loginWithEmail: (email: string, pass: string) => Promise<User>;
-  registerWithEmail: (email: string, pass: string, name: string, role: 'admin' | 'teacher') => Promise<RegisterResult>;
+  registerWithEmail: (email: string, pass: string, name: string) => Promise<RegisterResult>;
   requestPasswordReset: (email: string) => Promise<string>;
   verifyActiveSession: () => Promise<boolean>;
   logout: () => Promise<void>;
@@ -126,9 +131,10 @@ interface AttendanceContextType {
   setDailyClassTarget: (target: number) => Promise<void>;
   updateCurrentUserProfile: (input: UserProfileEditableInput) => Promise<User>;
 
-  // Admin actions (Restricted)
+  // Admin & Root User actions (Restricted)
   addTeacher: (teacher: NewTeacherInput) => Promise<User>;
   deleteTeacher: (teacherId: string) => Promise<void>;
+  setUserRole: (userId: string, nextRole: UserRole) => Promise<void>;
   approveUserRegistration: (userId: string) => Promise<void>;
   rejectUserRegistration: (userId: string, removeRecord?: boolean) => Promise<void>;
   assignSubjectToTeacher: (subjectId: string, teacherId: string, classId: string, part: SubjectPart) => Promise<void>;
@@ -482,21 +488,40 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
   }, [accessToken, currentUser, verifyActiveSession]);
 
-  // Guard active session against live approval revocation or rejection
+  // Guard active session against live approval revocation or role changes
   useEffect(() => {
-    if (!currentUser || isPrimaryAdminEmail(currentUser.email)) return;
+    if (!currentUser) return;
     const syncedUser = users.find(
       u => u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase()
     );
-    if (syncedUser && !evaluateLoginAccess(syncedUser).allowed) {
+    if (!isPrimaryAdminEmail(currentUser.email) && syncedUser && !evaluateLoginAccess(syncedUser).allowed) {
       setAccessToken(null);
       setCurrentUserState(null);
       signOut(auth).catch(() => {});
+      return;
+    }
+    if (
+      syncedUser &&
+      !isPrimaryAdminEmail(currentUser.email) &&
+      syncedUser.role !== currentUser.role
+    ) {
+      const updatedSessionUser: User = {
+        ...currentUser,
+        role: syncedUser.role,
+        title: syncedUser.title || currentUser.title,
+      };
+      setCurrentUserState(updatedSessionUser);
+      try {
+        localStorage.setItem('presently_active_user', JSON.stringify(updatedSessionUser));
+      } catch {
+        // Ignore storage restrictions
+      }
     }
   }, [users, currentUser]);
 
   const isAuthenticated = Boolean(currentUser && accessToken);
-  const isAdmin = currentUser?.role === 'admin';
+  const isRootUser = checkIsRootUser(currentUser);
+  const isAdmin = currentUser?.role === 'admin' || isRootUser;
   const canImportStudents = Boolean(isAdmin);
 
   const teachers = getApprovedTeachers(users);
@@ -599,13 +624,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const buildInstitutionalProfile = (cleanEmail: string, uid: string): User => {
-    const isDesignatedAdmin =
-      cleanEmail === 'payelahmed70@gmail.com' ||
-      cleanEmail.includes('admin') ||
-      cleanEmail.includes('principal');
-    const role: 'admin' | 'teacher' = isDesignatedAdmin ? 'admin' : 'teacher';
+    const isRoot = isPrimaryAdminEmail(cleanEmail);
+    const role: UserRole = resolveRegistrationRole(cleanEmail);
 
-    if (cleanEmail === 'payelahmed70@gmail.com') {
+    if (isRoot) {
       return {
         id: uid,
         name: 'Engr. Payel Ahmed',
@@ -614,7 +636,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
         department: 'Polytechnic Administration & Academic Affairs',
         employeeId: 'BTEB-DIR-70',
-        title: 'Academic Director & BTEB Coordinator',
+        title: 'Root User & Academic Director',
       };
     }
 
@@ -623,12 +645,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       name: cleanEmail.split('@')[0],
       email: cleanEmail,
       role,
-      avatar: role === 'admin'
-        ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
       department: 'Computer Science & Technology',
-      employeeId: role === 'admin' ? `BTEB-ADM-${uid.slice(-4)}` : `BTEB-TCH-${uid.slice(-4)}`,
-      title: role === 'admin' ? 'Institutional Administrator' : 'Instructor (Computer Technology)',
+      employeeId: `BTEB-TCH-${uid.slice(-4)}`,
+      title: 'Instructor (Computer Technology)',
       dailyClassTarget: 4,
     };
   };
@@ -737,7 +757,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const cleanUser: any = { ...hydrated };
       Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-      await setDoc(doc(db, 'users', hydrated.id), cleanUser, { merge: true });
+      await Promise.race([
+        setDoc(doc(db, 'users', hydrated.id), cleanUser, { merge: true }),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
     } catch (err) {
       console.warn('Firestore user profile sync error:', err);
     }
@@ -807,8 +830,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const registerWithEmail = async (
     email: string,
     pass: string,
-    name: string,
-    role: 'admin' | 'teacher'
+    name: string
   ): Promise<RegisterResult> => {
     const emailValidation = validateEmailAddress(email);
     if (!emailValidation.valid) {
@@ -842,6 +864,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     const isPrimary = isPrimaryAdminEmail(cleanEmail);
+    const assignedRole: UserRole = resolveRegistrationRole(cleanEmail);
     const approvalStatus = existing
       ? resolveUserApprovalStatus(existing)
       : isPrimary
@@ -856,6 +879,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         ? {
             ...existing,
             name: name.trim() || existing.name,
+            role: isPrimary ? 'admin' : existing.role || 'teacher',
             firebaseAuthUid: cred.user.uid,
             approvalStatus,
           }
@@ -864,20 +888,19 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             firebaseAuthUid: cred.user.uid,
             name: name.trim(),
             email: cleanEmail,
-            role: isPrimary ? 'admin' : role,
-            avatar:
-              isPrimary || role === 'admin'
-                ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
-                : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-            department: 'Computer Science & Technology',
-            employeeId:
-              isPrimary || role === 'admin'
-                ? `ADM-${Date.now().toString().slice(-4)}`
-                : `BTEB-${Date.now().toString().slice(-4)}`,
-            title:
-              isPrimary || role === 'admin'
-                ? 'Institutional Administrator'
-                : 'Instructor (Computer Technology)',
+            role: assignedRole,
+            avatar: isPrimary
+              ? 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+              : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+            department: isPrimary
+              ? 'Polytechnic Administration & Academic Affairs'
+              : 'Computer Science & Technology',
+            employeeId: isPrimary
+              ? 'BTEB-DIR-70'
+              : `BTEB-${Date.now().toString().slice(-4)}`,
+            title: isPrimary
+              ? 'Root User & Academic Director'
+              : 'Instructor (Computer Technology)',
             dailyClassTarget: 4,
             approvalStatus,
             registeredAt,
@@ -888,7 +911,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       try {
         const cleanUser: any = { ...newUser };
         Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-        await setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true });
+        await Promise.race([
+          setDoc(doc(db, 'users', newUser.id), cleanUser, { merge: true }),
+          new Promise<void>(resolve => setTimeout(resolve, 1500)),
+        ]);
       } catch (err) {
         console.warn('Firestore user write error:', err);
       }
@@ -1034,7 +1060,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const cleanUser: any = { ...newTeacher };
       Object.keys(cleanUser).forEach(k => cleanUser[k] === undefined && delete cleanUser[k]);
-      await setDoc(doc(db, 'users', newTeacher.id), cleanUser);
+      await Promise.race([
+        setDoc(doc(db, 'users', newTeacher.id), cleanUser),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
     } catch (e) {
       console.warn('Firestore addTeacher error:', e);
     }
@@ -1047,6 +1076,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       throw new Error('Access Denied: Only Administrator can remove faculty members.');
     }
 
+    const target = users.find(u => u.id === teacherId);
+    if (target && checkIsRootUser(target)) {
+      throw new Error('The Root User account cannot be removed.');
+    }
+    if (target?.role === 'admin' && !isRootUser) {
+      throw new Error('Only the Root User can remove an Administrator account.');
+    }
+
     const teacherAssignments = assignments.filter(a => a.teacherId === teacherId);
     setUsers(prev => prev.filter(u => u.id !== teacherId));
     setAssignments(prev => prev.filter(a => a.teacherId !== teacherId));
@@ -1057,9 +1094,72 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       teacherAssignments.forEach(a => {
         batch.delete(doc(db, 'assignments', a.id));
       });
-      await batch.commit();
+      await Promise.race([
+        batch.commit(),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
     } catch (e) {
       console.warn('Firestore deleteTeacher error:', e);
+    }
+  };
+
+  const setUserRole = async (userId: string, nextRole: UserRole): Promise<void> => {
+    const targetUser = users.find(u => u.id === userId);
+    const validation = validateUserRoleChange({
+      actor: currentUser,
+      targetUser,
+      nextRole,
+    });
+    if (!validation.valid || !targetUser) {
+      throw new Error(validation.error || 'Unable to update user role.');
+    }
+
+    const nowIso = new Date().toISOString();
+    const roleUpdatedBy = currentUser?.email || currentUser?.name || 'Root User';
+    const nextTitle =
+      nextRole === 'admin'
+        ? !targetUser.title || targetUser.title === 'Instructor (Computer Technology)'
+          ? 'Institutional Administrator'
+          : targetUser.title
+        : !targetUser.title || targetUser.title === 'Institutional Administrator'
+          ? 'Instructor (Computer Technology)'
+          : targetUser.title;
+
+    const patch: Partial<User> = {
+      role: nextRole,
+      approvalStatus: 'approved',
+      approvedAt: targetUser.approvedAt || nowIso,
+      approvedBy: targetUser.approvedBy || roleUpdatedBy,
+      roleUpdatedAt: nowIso,
+      roleUpdatedBy,
+      title: nextTitle,
+    };
+
+    const targetEmail = targetUser.email.trim().toLowerCase();
+    const matchingUsers = users.filter(
+      u => u.id === userId || u.email.trim().toLowerCase() === targetEmail
+    );
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId || u.email.trim().toLowerCase() === targetEmail
+          ? { ...u, ...patch }
+          : u
+      )
+    );
+
+    try {
+      const batch = writeBatch(db);
+      const idsToUpdate = matchingUsers.length > 0 ? matchingUsers.map(u => u.id) : [userId];
+      idsToUpdate.forEach(id => {
+        batch.set(doc(db, 'users', id), patch, { merge: true });
+      });
+      await Promise.race([
+        batch.commit(),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
+    } catch (e) {
+      console.warn('Firestore setUserRole error:', e);
     }
   };
 
@@ -1068,27 +1168,34 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       throw new Error('Access Denied: Only Administrator can approve registrations.');
     }
 
+    const target = users.find(u => u.id === userId);
+    const resolvedRole: UserRole =
+      target && isPrimaryAdminEmail(target.email) ? 'admin' : 'teacher';
     const approvedAt = new Date().toISOString();
     const approvedBy = currentUser?.email || currentUser?.name || 'Admin';
 
     setUsers(prev =>
       prev.map(u =>
         u.id === userId
-          ? { ...u, approvalStatus: 'approved', approvedAt, approvedBy }
+          ? { ...u, role: resolvedRole, approvalStatus: 'approved', approvedAt, approvedBy }
           : u
       )
     );
 
     try {
-      await setDoc(
-        doc(db, 'users', userId),
-        {
-          approvalStatus: 'approved',
-          approvedAt,
-          approvedBy,
-        },
-        { merge: true }
-      );
+      await Promise.race([
+        setDoc(
+          doc(db, 'users', userId),
+          {
+            role: resolvedRole,
+            approvalStatus: 'approved',
+            approvedAt,
+            approvedBy,
+          },
+          { merge: true }
+        ),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
     } catch (e) {
       console.warn('Firestore approveUserRegistration error:', e);
     }
@@ -1099,10 +1206,18 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       throw new Error('Access Denied: Only Administrator can decline registrations.');
     }
 
+    const target = users.find(u => u.id === userId);
+    if (target && checkIsRootUser(target)) {
+      throw new Error('The Root User account cannot be declined or removed.');
+    }
+
     if (removeRecord) {
       setUsers(prev => prev.filter(u => u.id !== userId));
       try {
-        await deleteDoc(doc(db, 'users', userId));
+        await Promise.race([
+          deleteDoc(doc(db, 'users', userId)),
+          new Promise<void>(resolve => setTimeout(resolve, 1500)),
+        ]);
       } catch (e) {
         console.warn('Firestore delete rejected user error:', e);
       }
@@ -1118,11 +1233,14 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
 
     try {
-      await setDoc(
-        doc(db, 'users', userId),
-        { approvalStatus: 'rejected' },
-        { merge: true }
-      );
+      await Promise.race([
+        setDoc(
+          doc(db, 'users', userId),
+          { approvalStatus: 'rejected' },
+          { merge: true }
+        ),
+        new Promise<void>(resolve => setTimeout(resolve, 1500)),
+      ]);
     } catch (e) {
       console.warn('Firestore rejectUserRegistration error:', e);
     }
@@ -1974,6 +2092,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         formFillupRecords,
         isAuthenticated,
         isAdmin,
+        isRootUser,
         canImportStudents,
         loginWithEmail,
         registerWithEmail,
@@ -1988,6 +2107,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateCurrentUserProfile,
         addTeacher,
         deleteTeacher,
+        setUserRole,
         approveUserRegistration,
         rejectUserRegistration,
         assignSubjectToTeacher,

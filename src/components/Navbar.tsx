@@ -31,7 +31,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenBulkImport,
   onOpenLoginModal,
 }) => {
-  const { currentUser, resetToDefaultBTEBData, canImportStudents, isAdmin, logout, pendingUsers } =
+  const { currentUser, resetToDefaultBTEBData, canImportStudents, isAdmin, isRootUser, logout, pendingUsers } =
     useAttendance();
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -175,12 +175,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </span>
                   <span
                     className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded shrink-0 ${
-                      currentUser.role === 'admin'
-                        ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'
-                        : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                      isRootUser
+                        ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                        : currentUser.role === 'admin'
+                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
                     }`}
                   >
-                    {currentUser.role}
+                    {isRootUser ? 'Root' : currentUser.role}
                   </span>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -196,7 +198,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                       {currentUser.email}
                     </p>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      {isAdmin ? 'Administrator · Full System Access' : 'Faculty · Course Attendance & Reports'}
+                      {isRootUser
+                        ? 'Root User · System & Role Control'
+                        : isAdmin
+                          ? 'Administrator · Academic & Roster Control'
+                          : 'Faculty · Course Attendance & Reports'}
                     </p>
                   </div>
 

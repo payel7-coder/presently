@@ -16,7 +16,9 @@
         "approvalStatus": { "type": "string", "enum": ["approved", "pending", "rejected"], "description": "Administrator approval status for self-registered accounts" },
         "registeredAt": { "type": "string", "description": "ISO timestamp when registration was submitted" },
         "approvedAt": { "type": "string", "description": "ISO timestamp when administrator approved the account" },
-        "approvedBy": { "type": "string", "description": "Email or name of administrator who approved the account" }
+        "approvedBy": { "type": "string", "description": "Email or name of administrator who approved the account" },
+        "roleUpdatedAt": { "type": "string", "description": "ISO timestamp when the root user updated admin privileges" },
+        "roleUpdatedBy": { "type": "string", "description": "Email of the root user who updated admin privileges" }
       },
       "required": ["uid", "name", "email", "role"]
     },

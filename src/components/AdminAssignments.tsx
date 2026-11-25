@@ -1,7 +1,12 @@
 import React, { useState } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
-import { SubjectPart } from '../types/attendance';
-import { validateSubjectPartAssignment } from '../utils/attendanceLogic';
+import { SubjectPart, UserRole } from '../types/attendance';
+import {
+  ROOT_USER_EMAIL,
+  getDirectoryUsersSorted,
+  isRootUser as checkIsRootUser,
+  validateSubjectPartAssignment,
+} from '../utils/attendanceLogic';
 import { Avatar } from './Avatar';
 import {
   School,
@@ -18,7 +23,9 @@ import {
   X,
   UserCheck,
   Clock,
-  ShieldCheck
+  ShieldCheck,
+  UserCog,
+  Lock
 } from 'lucide-react';
 
 interface AdminAssignmentsProps {
@@ -33,8 +40,10 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
     subjects,
     classes,
     assignments,
+    isRootUser,
     addTeacher,
     deleteTeacher,
+    setUserRole,
     approveUserRegistration,
     rejectUserRegistration,
     assignSubjectToTeacher,
@@ -46,8 +55,10 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
 
   const [selectedSemesterFilter, setSelectedSemesterFilter] = useState<string>('all');
   const [subjectSearch, setSubjectSearch] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'matrix' | 'faculty' | 'approvals'>('matrix');
+  const [roleSearch, setRoleSearch] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'matrix' | 'faculty' | 'roles' | 'approvals'>('matrix');
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
 
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedTeacherId, setSelectedTeacherId] = useState('');
@@ -214,13 +225,43 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
   };
 
   const rejectedUsers = users.filter(u => u.approvalStatus === 'rejected');
+  const directoryUsers = getDirectoryUsersSorted(users);
+  const adminCount = directoryUsers.filter(u => u.role === 'admin').length;
+  const filteredDirectoryUsers = directoryUsers.filter(u => {
+    const q = roleSearch.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.employeeId || '').toLowerCase().includes(q) ||
+      (u.department || '').toLowerCase().includes(q)
+    );
+  });
+
+  const handleSetUserRole = async (userId: string, nextRole: UserRole) => {
+    const target = users.find(u => u.id === userId);
+    setRoleError(null);
+    setProcessingUserId(userId);
+    try {
+      await setUserRole(userId, nextRole);
+      showSuccess(
+        nextRole === 'admin'
+          ? `Granted Administrator access to "${target?.name || target?.email || 'User'}".`
+          : `Reverted "${target?.name || target?.email || 'User'}" to Teacher role.`
+      );
+    } catch (err: any) {
+      setRoleError(err?.message || 'Unable to update user role.');
+    } finally {
+      setProcessingUserId(null);
+    }
+  };
 
   const handleApproveUser = async (userId: string) => {
     const target = users.find(u => u.id === userId);
     setProcessingUserId(userId);
     try {
       await approveUserRegistration(userId);
-      showSuccess(`Approved registration for "${target?.name || target?.email || 'User'}". They can now sign in.`);
+      showSuccess(`Approved teacher registration for "${target?.name || target?.email || 'User'}". They can now sign in.`);
     } finally {
       setProcessingUserId(null);
     }
@@ -330,7 +371,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                 {pendingUsers.length} New {pendingUsers.length === 1 ? 'Registration' : 'Registrations'} Awaiting Approval
               </h2>
               <p className="text-xs text-amber-800 mt-0.5 leading-relaxed">
-                New faculty or administrator sign-ups cannot access the workspace until reviewed and approved by an administrator.
+                New faculty sign-ups cannot access the workspace until reviewed and approved by an administrator.
               </p>
             </div>
           </div>
@@ -405,6 +446,18 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
             </button>
             <button
               type="button"
+              onClick={() => setViewMode('roles')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+                viewMode === 'roles'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <UserCog className="w-3.5 h-3.5 text-slate-700" />
+              <span>Admins &amp; Roles ({adminCount})</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setViewMode('approvals')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'approvals'
@@ -430,6 +483,19 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                 placeholder="Search subject code or name..."
                 value={subjectSearch}
                 onChange={e => setSubjectSearch(e.target.value)}
+                className="w-full h-9 pl-8 pr-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
+              />
+            </div>
+          )}
+
+          {viewMode === 'roles' && (
+            <div className="relative w-full md:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search users by name or email..."
+                value={roleSearch}
+                onChange={e => setRoleSearch(e.target.value)}
                 className="w-full h-9 pl-8 pr-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600/20 focus:border-indigo-600"
               />
             </div>
@@ -751,8 +817,196 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
             );
           })}
         </div>
+      ) : viewMode === 'roles' ? (
+        /* VIEW 3: Root User & Administrator Role Access */
+        <div className="space-y-4">
+          <div
+            className={`rounded-xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              isRootUser
+                ? 'bg-amber-50/70 border-amber-200'
+                : 'bg-slate-50 border-slate-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-9 h-9 rounded-lg border flex items-center justify-center shrink-0 ${
+                  isRootUser
+                    ? 'bg-amber-100 border-amber-200 text-amber-800'
+                    : 'bg-white border-slate-200 text-slate-600'
+                }`}
+              >
+                {isRootUser ? <ShieldCheck className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+              </div>
+              <div>
+                <h2 className="text-xs font-bold text-slate-900">
+                  {isRootUser
+                    ? 'Root User Role Management Active'
+                    : 'Administrator Role Assignment (Root User Only)'}
+                </h2>
+                <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
+                  {isRootUser ? (
+                    <>
+                      Signed in as the single Root User (<span className="font-mono font-semibold text-slate-800">{ROOT_USER_EMAIL}</span>). Promote approved teachers to Administrator or revoke Administrator privileges below.
+                    </>
+                  ) : (
+                    <>
+                      Only the single Root User (<span className="font-mono font-semibold text-slate-800">{ROOT_USER_EMAIL}</span>) can grant or revoke Administrator access. Self-registration is limited to Teacher accounts.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 text-xs tabular-nums">
+              <span className="px-2.5 py-1 rounded-md bg-white border border-slate-200 font-semibold text-slate-700">
+                1 Root User
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-indigo-50 border border-indigo-200 font-semibold text-indigo-700">
+                {adminCount} {adminCount === 1 ? 'Admin' : 'Admins'}
+              </span>
+            </div>
+          </div>
+
+          {roleError && (
+            <div
+              role="alert"
+              className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-center justify-between gap-2"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                <span className="font-medium">{roleError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRoleError(null)}
+                className="p-1 text-rose-600 hover:text-rose-800"
+                aria-label="Dismiss error"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Approved Institutional Accounts ({filteredDirectoryUsers.length})
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  All self-registered users enter as Teachers after approval. Only the Root User can elevate an account to Administrator.
+                </p>
+              </div>
+              {pendingUsers.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('approvals')}
+                  className="text-xs font-semibold text-amber-700 hover:text-amber-800 hover:underline self-start sm:self-auto"
+                >
+                  Review {pendingUsers.length} pending request(s) →
+                </button>
+              )}
+            </div>
+
+            {filteredDirectoryUsers.length === 0 ? (
+              <div className="p-10 text-center">
+                <p className="text-xs font-medium text-slate-500">
+                  No approved accounts match your search filter.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {filteredDirectoryUsers.map(member => {
+                  const memberIsRoot = checkIsRootUser(member);
+                  const isBusy = processingUserId === member.id;
+                  const roleChangedAt = member.roleUpdatedAt
+                    ? new Date(member.roleUpdatedAt).toLocaleDateString(undefined, {
+                        dateStyle: 'medium',
+                      })
+                    : null;
+
+                  return (
+                    <div
+                      key={member.id}
+                      data-testid={`user-role-row-${member.email}`}
+                      className="p-4 sm:px-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-slate-50/60 transition-colors"
+                    >
+                      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                        <Avatar src={member.avatar} name={member.name} size="lg" />
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm font-bold text-slate-900 truncate">
+                              {member.name}
+                            </h3>
+                            <span
+                              className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${
+                                memberIsRoot
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : member.role === 'admin'
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              }`}
+                            >
+                              {memberIsRoot
+                                ? 'Root User'
+                                : member.role === 'admin'
+                                  ? 'Administrator'
+                                  : 'Teacher'}
+                            </span>
+                          </div>
+                          <p className="text-xs font-mono text-slate-600 mt-0.5 truncate">
+                            {member.email}
+                          </p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">
+                            {member.department} · {member.employeeId}
+                            {roleChangedAt && !memberIsRoot ? ` · Role updated ${roleChangedAt}` : ''}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                        {memberIsRoot ? (
+                          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold">
+                            <Lock className="w-3.5 h-3.5" />
+                            <span>Permanent Root User</span>
+                          </span>
+                        ) : isRootUser ? (
+                          member.role === 'teacher' ? (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleSetUserRole(member.id, 'admin')}
+                              className="h-9 px-3.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>{isBusy ? 'Updating...' : 'Make Admin'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={isBusy}
+                              onClick={() => handleSetUserRole(member.id, 'teacher')}
+                              className="h-9 px-3.5 rounded-lg border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors disabled:opacity-50 whitespace-nowrap"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              <span>{isBusy ? 'Updating...' : 'Remove Admin'}</span>
+                            </button>
+                          )
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 text-xs font-medium">
+                            <Lock className="w-3 h-3" />
+                            <span>Root User Only</span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
       ) : (
-        /* VIEW 3: Pending Registration Approvals */
+        /* VIEW 4: Pending Registration Approvals */
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -761,7 +1015,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                   Pending Registration Requests ({pendingUsers.length})
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Review newly registered faculty or administrator accounts before granting workspace sign-in access.
+                  Review newly registered teacher accounts before granting workspace sign-in access. Approved accounts start as Teacher; only the Root User can grant Administrator access.
                 </p>
               </div>
             </div>
@@ -801,14 +1055,8 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                             <h3 className="text-sm font-bold text-slate-900 truncate">
                               {applicant.name}
                             </h3>
-                            <span
-                              className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border ${
-                                applicant.role === 'admin'
-                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                              }`}
-                            >
-                              {applicant.role === 'admin' ? 'Administrator' : 'Teacher'}
+                            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded border bg-emerald-50 text-emerald-700 border-emerald-200">
+                              Teacher
                             </span>
                             <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200">
                               Pending Approval

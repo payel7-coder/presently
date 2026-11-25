@@ -29,6 +29,8 @@ export interface User {
   registeredAt?: string;
   approvedAt?: string;
   approvedBy?: string;
+  roleUpdatedAt?: string;
+  roleUpdatedBy?: string;
   firebaseAuthUid?: string;
 }
 

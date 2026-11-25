@@ -17,6 +17,12 @@ import {
   getApprovedTeachers,
   buildInitialRollCallDraft,
   resolveRollCallForSave,
+  ROOT_USER_EMAIL,
+  isRootUser,
+  resolveRegistrationRole,
+  canManageAdminRoles,
+  validateUserRoleChange,
+  getDirectoryUsersSorted,
 } from './attendanceLogic';
 import { ClassGroup, Student, AttendanceSession, AttendanceRecord, Subject, SubjectAssignment, User } from '../types/attendance';
 
@@ -775,4 +781,101 @@ test('resolveRollCallForSave counts all unmarked and missing students as absent'
   assert.equal(resolved.resolvedStatuses.s4.status, 'absent');
   assert.equal(resolved.resolvedStatuses.s4.remarks, 'No call');
   assert.equal(resolved.resolvedStatuses.s5.status, 'absent');
+});
+
+test('resolveRegistrationRole strictly grants admin only to the single Root User and defaults all other registrants to teacher', () => {
+  assert.equal(resolveRegistrationRole(ROOT_USER_EMAIL), 'admin');
+  assert.equal(resolveRegistrationRole('  PAYELAHMED70@GMAIL.COM  '), 'admin');
+  assert.equal(resolveRegistrationRole('teacher@polytechnic.edu.bd'), 'teacher');
+  assert.equal(resolveRegistrationRole('admin@polytechnic.edu.bd'), 'teacher');
+  assert.equal(resolveRegistrationRole('principal@polytechnic.edu.bd'), 'teacher');
+  assert.equal(resolveRegistrationRole(''), 'teacher');
+  assert.equal(resolveRegistrationRole(null), 'teacher');
+});
+
+test('isRootUser and validateUserRoleChange allow only the single Root User to promote or demote admins', () => {
+  const rootUser: User = {
+    id: 'root-1',
+    name: 'Engr. Payel Ahmed',
+    email: ROOT_USER_EMAIL,
+    role: 'admin',
+    department: 'Administration',
+    employeeId: 'DIR-01',
+    avatar: '',
+    approvalStatus: 'approved',
+    firebaseAuthUid: 'fb-root-1',
+  };
+  const promotedAdmin: User = {
+    id: 'adm-2',
+    name: 'Promoted Admin',
+    email: 'admin.two@polytechnic.edu.bd',
+    role: 'admin',
+    department: 'CST',
+    employeeId: 'BTEB-101',
+    avatar: '',
+    approvalStatus: 'approved',
+  };
+  const teacher: User = {
+    id: 'tch-1',
+    name: 'Faculty Member',
+    email: 'faculty@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'BTEB-202',
+    avatar: '',
+    approvalStatus: 'approved',
+  };
+  const rejectedUser: User = {
+    id: 'tch-rej',
+    name: 'Declined User',
+    email: 'declined@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'BTEB-303',
+    avatar: '',
+    approvalStatus: 'rejected',
+  };
+
+  assert.equal(isRootUser(rootUser), true);
+  assert.equal(isRootUser(promotedAdmin), false);
+  assert.equal(isRootUser(teacher), false);
+
+  assert.equal(canManageAdminRoles(rootUser), true);
+  assert.equal(canManageAdminRoles(promotedAdmin), false);
+  assert.equal(canManageAdminRoles(teacher), false);
+
+  // Root User can promote an approved teacher to admin
+  assert.equal(
+    validateUserRoleChange({ actor: rootUser, targetUser: teacher, nextRole: 'admin' }).valid,
+    true
+  );
+
+  // Root User can demote a non-root admin back to teacher
+  assert.equal(
+    validateUserRoleChange({ actor: rootUser, targetUser: promotedAdmin, nextRole: 'teacher' }).valid,
+    true
+  );
+
+  // Root User cannot demote themselves
+  const selfDemote = validateUserRoleChange({ actor: rootUser, targetUser: rootUser, nextRole: 'teacher' });
+  assert.equal(selfDemote.valid, false);
+  assert.ok(selfDemote.error?.toLowerCase().includes('permanent'));
+
+  // Regular (non-root) Admin cannot promote or demote anyone
+  const nonRootPromote = validateUserRoleChange({ actor: promotedAdmin, targetUser: teacher, nextRole: 'admin' });
+  assert.equal(nonRootPromote.valid, false);
+  assert.ok(nonRootPromote.error?.toLowerCase().includes('root user'));
+
+  // Teacher cannot promote anyone
+  const teacherPromote = validateUserRoleChange({ actor: teacher, targetUser: teacher, nextRole: 'admin' });
+  assert.equal(teacherPromote.valid, false);
+
+  // Rejected user cannot be promoted without approval
+  const promoteRejected = validateUserRoleChange({ actor: rootUser, targetUser: rejectedUser, nextRole: 'admin' });
+  assert.equal(promoteRejected.valid, false);
+
+  // Directory sorting puts Root User first, then Administrators, then Teachers alphabetically, deduplicating matching emails
+  const duplicateRoot: User = { ...rootUser, id: 'root-dup', firebaseAuthUid: undefined };
+  const sorted = getDirectoryUsersSorted([teacher, promotedAdmin, rejectedUser, duplicateRoot, rootUser]);
+  assert.deepEqual(sorted.map(u => u.id), ['root-1', 'adm-2', 'tch-1']);
 });

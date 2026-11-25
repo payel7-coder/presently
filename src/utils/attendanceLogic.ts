@@ -11,6 +11,7 @@ import {
   SubjectPart,
   User,
   UserApprovalStatus,
+  UserRole,
 } from '../types/attendance';
 import { normalizeStudentSessionFields } from './studentSessionLogic';
 
@@ -1005,14 +1006,84 @@ export function buildSubjectDateAbsentList(params: {
 }
 
 export const PRIMARY_ADMIN_EMAIL = 'payelahmed70@gmail.com';
+export const ROOT_USER_EMAIL = PRIMARY_ADMIN_EMAIL;
 
 export function isPrimaryAdminEmail(email?: string | null): boolean {
   return Boolean(email && email.trim().toLowerCase() === PRIMARY_ADMIN_EMAIL);
 }
 
 /**
+ * Returns true strictly for the single system Root User account.
+ */
+export function isRootUser(user?: Pick<User, 'email'> | null): boolean {
+  return isPrimaryAdminEmail(user?.email);
+}
+
+/**
+ * Resolves the role assigned during self-registration.
+ * Only the single Root User receives 'admin' upon initial account creation;
+ * all self-registered accounts are unconditionally created as 'teacher'.
+ */
+export function resolveRegistrationRole(email?: string | null): UserRole {
+  return isPrimaryAdminEmail(email) ? 'admin' : 'teacher';
+}
+
+/**
+ * Only the single Root User may promote a user to Administrator or revoke Administrator privileges.
+ */
+export function canManageAdminRoles(actor?: Pick<User, 'email' | 'role'> | null): boolean {
+  return isRootUser(actor);
+}
+
+export interface RoleChangeValidationResult {
+  valid: boolean;
+  error?: string;
+}
+
+/**
+ * Validates whether an actor is permitted to change a target user's role ('admin' <-> 'teacher').
+ */
+export function validateUserRoleChange(params: {
+  actor?: Pick<User, 'id' | 'email' | 'role'> | null;
+  targetUser?: Pick<User, 'id' | 'email' | 'role' | 'approvalStatus'> | null;
+  nextRole: UserRole;
+}): RoleChangeValidationResult {
+  const { actor, targetUser, nextRole } = params;
+
+  if (!actor || !isRootUser(actor)) {
+    return {
+      valid: false,
+      error: 'Access Denied: Only the Root User can grant or revoke Administrator access.',
+    };
+  }
+
+  if (!targetUser) {
+    return {
+      valid: false,
+      error: 'Target user profile could not be found.',
+    };
+  }
+
+  if (isRootUser(targetUser) && nextRole !== 'admin') {
+    return {
+      valid: false,
+      error: 'The Root User account has permanent Administrator privileges and cannot be demoted.',
+    };
+  }
+
+  if (resolveUserApprovalStatus(targetUser) === 'rejected') {
+    return {
+      valid: false,
+      error: 'Declined accounts must be approved before Administrator privileges can be granted.',
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Resolves the effective approval status of a user account.
- * - Primary institutional admin is always approved.
+ * - Primary institutional admin (Root User) is always approved.
  * - Legacy user profiles created before admin-approval tracking (undefined approvalStatus) default to 'approved'.
  */
 export function resolveUserApprovalStatus(
@@ -1072,11 +1143,43 @@ export function evaluateLoginAccess(
   };
 }
 
+function deduplicateUsersByEmail(users: User[]): User[] {
+  const byEmail = new Map<string, User>();
+  const scoreUser = (u: User): number => {
+    let score = 0;
+    if (u.firebaseAuthUid) score += 4;
+    if (u.role === 'admin') score += 2;
+    if (u.roleUpdatedAt || u.approvedAt) score += 1;
+    return score;
+  };
+
+  users.forEach(u => {
+    const key = (u.email || u.id).trim().toLowerCase();
+    const existing = byEmail.get(key);
+    if (!existing) {
+      byEmail.set(key, u);
+      return;
+    }
+    const existingScore = scoreUser(existing);
+    const nextScore = scoreUser(u);
+    if (
+      nextScore > existingScore ||
+      (nextScore === existingScore &&
+        (u.roleUpdatedAt || u.approvedAt || u.registeredAt || '') >
+          (existing.roleUpdatedAt || existing.approvedAt || existing.registeredAt || ''))
+    ) {
+      byEmail.set(key, u);
+    }
+  });
+
+  return Array.from(byEmail.values());
+}
+
 /**
  * Returns self-registered accounts awaiting administrator approval (newest first).
  */
 export function getPendingUsers(users: User[]): User[] {
-  return users
+  return deduplicateUsersByEmail(users)
     .filter(u => resolveUserApprovalStatus(u) === 'pending')
     .sort((a, b) => (b.registeredAt || '').localeCompare(a.registeredAt || ''));
 }
@@ -1085,7 +1188,23 @@ export function getPendingUsers(users: User[]): User[] {
  * Returns only approved teachers eligible for subject assignments and roster display.
  */
 export function getApprovedTeachers(users: User[]): User[] {
-  return users.filter(u => u.role === 'teacher' && resolveUserApprovalStatus(u) === 'approved');
+  return deduplicateUsersByEmail(users).filter(
+    u => u.role === 'teacher' && resolveUserApprovalStatus(u) === 'approved'
+  );
+}
+
+/**
+ * Returns approved directory users sorted with Root User first, then Administrators, then Teachers.
+ */
+export function getDirectoryUsersSorted(users: User[]): User[] {
+  return deduplicateUsersByEmail(users)
+    .filter(u => resolveUserApprovalStatus(u) === 'approved')
+    .sort((a, b) => {
+      const aRoot = isRootUser(a) ? 0 : a.role === 'admin' ? 1 : 2;
+      const bRoot = isRootUser(b) ? 0 : b.role === 'admin' ? 1 : 2;
+      if (aRoot !== bRoot) return aRoot - bRoot;
+      return (a.name || a.email).localeCompare(b.name || b.email);
+    });
 }
 
 export interface RollCallDraftEntry {
