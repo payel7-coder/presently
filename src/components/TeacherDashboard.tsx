@@ -21,7 +21,8 @@ import {
   ClipboardList,
   UserX,
   Receipt,
-  UserCog
+  UserCog,
+  Pencil
 } from 'lucide-react';
 import { calculateSessionSummary, calculateDailyClassTargetProgress } from '../utils/attendanceLogic';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
@@ -29,7 +30,7 @@ import { DownloadAbsentListModal } from './DownloadAbsentListModal';
 import { Subject, ClassGroup, SubjectPart } from '../types/attendance';
 
 interface TeacherDashboardProps {
-  onStartAttendance: (subjectId: string, part?: SubjectPart) => void;
+  onStartAttendance: (subjectId: string, part?: SubjectPart, date?: string) => void;
   onViewReports: (subjectId: string, part?: SubjectPart) => void;
   onOpenAssignments?: (subjectId?: string, part?: SubjectPart) => void;
   onOpenFormFillup?: (classId?: string) => void;
@@ -466,22 +467,27 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             {targetProgress.conductedSessions.length > 0 && (
               <div>
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-                  Logged Today
+                  Logged Today (Click to Edit)
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {targetProgress.conductedSessions.map((session) => {
                     const match = teacherAssignments.find(a => a.subject.id === session.subjectId);
                     const sPart = session.part === 'practical' ? 'Practical' : 'Theory';
+                    const subjectCode = match ? match.subject.code : 'Course';
                     return (
-                      <span
+                      <button
                         key={session.id}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-medium tabular-nums"
+                        type="button"
+                        onClick={() => onStartAttendance(session.subjectId, session.part || 'theory', session.date)}
+                        title={`Edit ${subjectCode} ${sPart} attendance for ${session.date}`}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-medium tabular-nums transition-colors"
                       >
                         <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="font-mono font-semibold">{match ? match.subject.code : 'Course'}</span>
+                        <span className="font-mono font-semibold">{subjectCode}</span>
                         <span className="text-emerald-700">· {sPart}</span>
                         <span className="text-emerald-700">({session.presentCount}/{session.totalStudents})</span>
-                      </span>
+                        <Pencil className="w-3 h-3 text-emerald-700 ml-0.5" />
+                      </button>
                     );
                   })}
                 </div>
@@ -682,11 +688,24 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                   <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => onStartAttendance(subject.id, part)}
-                      className="flex-1 h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                      onClick={() => onStartAttendance(subject.id, part, todaySession ? today : undefined)}
+                      className={`flex-1 h-9 inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                        todaySession
+                          ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
                     >
-                      <span>Take Attendance</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
+                      {todaySession ? (
+                        <>
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Edit Attendance</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Take Attendance</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
                     </button>
                     {onOpenAssignments && (
                       <button

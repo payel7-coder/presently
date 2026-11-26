@@ -1292,6 +1292,284 @@ export function resolveRollCallForSave(
   };
 }
 
+/**
+ * Checks whether an authenticated user is authorized to edit an existing attendance session.
+ * - Administrators may edit any recorded session.
+ * - Teachers may edit sessions belonging to their assigned (subjectId, part) or sessions they logged.
+ */
+export function canEditAttendanceSession(
+  actor: Pick<User, 'id' | 'role'> | null | undefined,
+  session: Pick<AttendanceSession, 'subjectId' | 'part' | 'teacherId'> | null | undefined,
+  assignments: SubjectAssignment[]
+): boolean {
+  if (!actor || !session) return false;
+  if (actor.role === 'admin') return true;
+  const sessionPart: SubjectPart = session.part || 'theory';
+  if (session.teacherId === actor.id) return true;
+  return assignments.some(
+    a =>
+      a.teacherId === actor.id &&
+      a.subjectId === session.subjectId &&
+      (a.part || 'theory') === sessionPart
+  );
+}
 
+/**
+ * Detects whether another session already exists for the same (subjectId, part, date)
+ * excluding the session currently being edited.
+ */
+export function findConflictingSessionOnDate(
+  sessions: AttendanceSession[],
+  params: {
+    subjectId: string;
+    part: SubjectPart;
+    date: string;
+    excludeSessionId?: string;
+  }
+): AttendanceSession | undefined {
+  const { subjectId, part, date, excludeSessionId } = params;
+  return sessions.find(
+    s =>
+      s.subjectId === subjectId &&
+      (s.part || 'theory') === part &&
+      s.date === date &&
+      s.id !== excludeSessionId
+  );
+}
 
+/**
+ * Builds the complete student roster for editing a recorded attendance session,
+ * combining active class students with any students who already have saved records in that session.
+ */
+export function buildSessionEditRoster(
+  classStudents: Student[],
+  sessionRecords: AttendanceRecord[] = [],
+  allStudents: Student[] = []
+): Student[] {
+  const byId = new Map<string, Student>();
+  classStudents.forEach(s => byId.set(s.id, s));
 
+  if (sessionRecords.length > 0 && allStudents.length > 0) {
+    const allMap = new Map(allStudents.map(s => [s.id, s]));
+    sessionRecords.forEach(rec => {
+      if (!byId.has(rec.studentId)) {
+        const historicalStudent = allMap.get(rec.studentId);
+        if (historicalStudent) {
+          byId.set(historicalStudent.id, historicalStudent);
+        }
+      }
+    });
+  }
+
+  return Array.from(byId.values()).sort((a, b) =>
+    a.rollNumber.localeCompare(b.rollNumber, undefined, { numeric: true })
+  );
+}
+
+/**
+ * Recalculates exact session totals from a session's attendance records.
+ */
+export function recalculateSessionCountsFromRecords(sessionRecords: AttendanceRecord[]): {
+  totalStudents: number;
+  presentCount: number;
+  absentCount: number;
+  lateCount: number;
+  excusedCount: number;
+} {
+  let presentCount = 0;
+  let absentCount = 0;
+  let lateCount = 0;
+  let excusedCount = 0;
+
+  sessionRecords.forEach(r => {
+    switch (r.status) {
+      case 'present':
+        presentCount++;
+        break;
+      case 'absent':
+        absentCount++;
+        break;
+      case 'late':
+        lateCount++;
+        break;
+      case 'excused':
+        excusedCount++;
+        break;
+    }
+  });
+
+  return {
+    totalStudents: sessionRecords.length,
+    presentCount,
+    absentCount,
+    lateCount,
+    excusedCount,
+  };
+}
+
+/**
+ * Builds the normalized session + records payload when creating or editing an attendance session.
+ * When editing an existing session, preserves original `createdAt` and `teacherId` while stamping
+ * `updatedAt` and `updatedBy`.
+ */
+export function buildUpdatedSessionPayload(params: {
+  existingSession?: AttendanceSession;
+  existingRecords?: AttendanceRecord[];
+  sessionDetails: {
+    id?: string;
+    subjectId: string;
+    classId: string;
+    teacherId: string;
+    part?: SubjectPart;
+    academicYear?: string;
+    date: string;
+    timeSlot?: string;
+    topic?: string;
+  };
+  targetStudents: Student[];
+  draftStatuses: Record<string, RollCallDraftEntry>;
+  actor?: Pick<User, 'email' | 'name'> | null;
+  nowIso?: string;
+}): {
+  session: AttendanceSession;
+  records: AttendanceRecord[];
+  removedRecordIds: string[];
+} {
+  const {
+    existingSession,
+    existingRecords = [],
+    sessionDetails,
+    targetStudents,
+    draftStatuses,
+    actor,
+    nowIso = new Date().toISOString(),
+  } = params;
+
+  const resolvedPart: SubjectPart = sessionDetails.part || existingSession?.part || 'theory';
+  const partLabel = resolvedPart === 'practical' ? 'Practical' : 'Theory';
+  const sessionId = existingSession?.id || sessionDetails.id || `bteb-sess-${resolvedPart}-${Date.now()}`;
+  const resolved = resolveRollCallForSave(targetStudents, draftStatuses);
+  const existingRecordByStudent = new Map(existingRecords.map(r => [r.studentId, r]));
+  const studentIds = Object.keys(resolved.resolvedStatuses);
+  const isEditing = Boolean(existingSession);
+
+  const session: AttendanceSession = {
+    id: sessionId,
+    subjectId: sessionDetails.subjectId,
+    classId: sessionDetails.classId,
+    teacherId: existingSession?.teacherId || sessionDetails.teacherId,
+    part: resolvedPart,
+    ...(sessionDetails.academicYear || existingSession?.academicYear
+      ? { academicYear: sessionDetails.academicYear || existingSession?.academicYear }
+      : {}),
+    date: sessionDetails.date,
+    timeSlot: sessionDetails.timeSlot || existingSession?.timeSlot || `${partLabel} Session`,
+    topic: sessionDetails.topic?.trim() || existingSession?.topic || `BTEB ${partLabel} Class`,
+    totalStudents: resolved.totalStudents,
+    presentCount: resolved.presentCount,
+    absentCount: resolved.absentCount,
+    lateCount: resolved.lateCount,
+    excusedCount: resolved.excusedCount,
+    createdAt: existingSession?.createdAt || nowIso,
+    isSubmitted: true,
+    ...(isEditing
+      ? {
+          updatedAt: nowIso,
+          updatedBy: actor?.email || actor?.name || 'Faculty',
+        }
+      : {}),
+  };
+
+  const nextRecords: AttendanceRecord[] = studentIds.map(studentId => {
+    const data = resolved.resolvedStatuses[studentId];
+    const prevRec = existingRecordByStudent.get(studentId);
+    const rec: AttendanceRecord = {
+      id: prevRec?.id || `rec-${sessionId}-${studentId}`,
+      sessionId,
+      studentId,
+      status: data.status,
+      markedAt: prevRec?.markedAt || nowIso,
+    };
+    if (isEditing) {
+      rec.updatedAt = nowIso;
+    }
+    if (data.remarks) {
+      rec.remarks = data.remarks;
+    }
+    return rec;
+  });
+
+  const nextRecordIdSet = new Set(nextRecords.map(r => r.id));
+  const removedRecordIds = existingRecords
+    .filter(r => !nextRecordIdSet.has(r.id))
+    .map(r => r.id);
+
+  return {
+    session,
+    records: nextRecords,
+    removedRecordIds,
+  };
+}
+
+/**
+ * Builds an atomic single-student record update alongside recalculated session counts.
+ */
+export function buildSingleRecordUpdatePlan(params: {
+  session: AttendanceSession;
+  sessionRecords: AttendanceRecord[];
+  studentId: string;
+  status: AttendanceStatus;
+  remarks?: string;
+  actor?: Pick<User, 'email' | 'name'> | null;
+  nowIso?: string;
+}): {
+  updatedSession: AttendanceSession;
+  updatedRecord: AttendanceRecord;
+} {
+  const {
+    session,
+    sessionRecords,
+    studentId,
+    status,
+    remarks,
+    actor,
+    nowIso = new Date().toISOString(),
+  } = params;
+
+  const existingRecord = sessionRecords.find(r => r.studentId === studentId);
+  const trimmedRemarks = remarks?.trim();
+
+  const updatedRecord: AttendanceRecord = {
+    id: existingRecord?.id || `rec-${session.id}-${studentId}`,
+    sessionId: session.id,
+    studentId,
+    status,
+    markedAt: existingRecord?.markedAt || nowIso,
+    updatedAt: nowIso,
+  };
+  if (trimmedRemarks) {
+    updatedRecord.remarks = trimmedRemarks;
+  }
+
+  const nextSessionRecords = [
+    ...sessionRecords.filter(r => r.studentId !== studentId),
+    updatedRecord,
+  ];
+  const counts = recalculateSessionCountsFromRecords(nextSessionRecords);
+
+  const updatedSession: AttendanceSession = {
+    ...session,
+    totalStudents: Math.max(session.totalStudents, counts.totalStudents),
+    presentCount: counts.presentCount,
+    absentCount: counts.absentCount,
+    lateCount: counts.lateCount,
+    excusedCount: counts.excusedCount,
+    updatedAt: nowIso,
+    updatedBy: actor?.email || actor?.name || 'Faculty',
+  };
+
+  return {
+    updatedSession,
+    updatedRecord,
+  };
+}

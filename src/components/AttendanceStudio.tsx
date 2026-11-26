@@ -17,10 +17,13 @@ import {
   FileText,
   UserX,
   AlertCircle,
-  X
+  X,
+  History,
+  Pencil
 } from 'lucide-react';
 import {
   buildInitialRollCallDraft,
+  buildSessionEditRoster,
   calculateStudentAttendanceStats,
   resolveRollCallForSave,
   RollCallDraftEntry,
@@ -31,12 +34,14 @@ import { DownloadAbsentListModal } from './DownloadAbsentListModal';
 interface AttendanceStudioProps {
   initialSubjectId?: string;
   initialPart?: SubjectPart;
+  initialDate?: string;
   onNavigateToReports: (subjectId?: string, part?: SubjectPart) => void;
 }
 
 export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   initialSubjectId,
   initialPart,
+  initialDate,
   onNavigateToReports,
 }) => {
   const {
@@ -89,7 +94,17 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   }, [assignedSubjects, initialSubjectId, initialPart, selectedAssignmentId]);
 
   const today = useMemo(() => new Date().toISOString().split('T')[0], []);
-  const [sessionDate, setSessionDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [sessionDate, setSessionDate] = useState<string>(
+    () => initialDate || new Date().toISOString().split('T')[0]
+  );
+
+  useEffect(() => {
+    if (initialDate) {
+      setSessionDate(initialDate);
+      setJustSubmitted(false);
+    }
+  }, [initialDate, initialSubjectId, initialPart]);
+
   const isFutureDate = sessionDate > today;
   const [topic, setTopic] = useState<string>('');
 
@@ -99,9 +114,26 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   const activePart: SubjectPart = activeAssignment?.assignment.part || 'theory';
   const activeSubjectId = activeSubject?.id || '';
 
+  const matchingSession = useMemo(() => {
+    if (!activeSubjectId || !sessionDate) return undefined;
+    return getSessionByDate(activeSubjectId, sessionDate, activePart);
+  }, [activeSubjectId, sessionDate, activePart, sessions, getSessionByDate]);
+
+  const recordedSubjectSessions = useMemo(() => {
+    if (!activeSubjectId) return [];
+    return sessions
+      .filter(s => s.subjectId === activeSubjectId && (s.part || 'theory') === activePart)
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [sessions, activeSubjectId, activePart]);
+
   const classStudents = useMemo(() => {
-    return activeClass ? getClassStudents(activeClass.id) : [];
-  }, [activeClass, getClassStudents]);
+    const activeRoster = activeClass ? getClassStudents(activeClass.id) : [];
+    if (matchingSession) {
+      const existingRecs = getSessionRecords(matchingSession.id);
+      return buildSessionEditRoster(activeRoster, existingRecs, students);
+    }
+    return activeRoster;
+  }, [activeClass, getClassStudents, matchingSession, getSessionRecords, students]);
 
   const [statuses, setStatuses] = useState<Record<string, RollCallDraftEntry>>({});
   const [existingSessionId, setExistingSessionId] = useState<string | null>(null);
@@ -114,6 +146,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   const [remarkInput, setRemarkInput] = useState('');
 
   const [justSubmitted, setJustSubmitted] = useState(false);
+  const [wasEditSubmission, setWasEditSubmission] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [submittedSessionInfo, setSubmittedSessionInfo] = useState<{
     present: number;
     absent: number;
@@ -128,18 +162,25 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   useEffect(() => {
     if (!activeSubjectId || !sessionDate || classStudents.length === 0) return;
 
-    const existing = getSessionByDate(activeSubjectId, sessionDate, activePart);
-    if (existing) {
-      setExistingSessionId(existing.id);
-      setTopic(existing.topic || '');
-      const existingRecs = getSessionRecords(existing.id);
+    setSaveError(null);
+    if (matchingSession) {
+      setExistingSessionId(matchingSession.id);
+      setTopic(matchingSession.topic || '');
+      const existingRecs = getSessionRecords(matchingSession.id);
       setStatuses(buildInitialRollCallDraft(classStudents, existingRecs));
     } else {
       setExistingSessionId(null);
       setTopic('');
       setStatuses(buildInitialRollCallDraft(classStudents));
     }
-  }, [activeSubjectId, activePart, sessionDate, classStudents.length]);
+  }, [
+    activeSubjectId,
+    activePart,
+    sessionDate,
+    classStudents.length,
+    matchingSession?.id,
+    matchingSession?.updatedAt,
+  ]);
 
   const setStudentStatus = (studentId: string, status: AttendanceStatus) => {
     setStatuses(prev => ({
@@ -223,6 +264,8 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   const handleSaveAttendance = async () => {
     if (!activeSubject || !activeClass || isFutureDate) return;
 
+    setSaveError(null);
+    const isEditingExisting = Boolean(existingSessionId);
     try {
       const resolved = resolveRollCallForSave(classStudents, statuses);
       const partLabel = activePart === 'practical' ? 'Practical' : 'Theory';
@@ -241,6 +284,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
       setStatuses(resolved.resolvedStatuses);
       setExistingSessionId(saved.id);
+      setWasEditSubmission(isEditingExisting);
       if (statusFilter === 'unmarked') {
         setStatusFilter('all');
       }
@@ -252,8 +296,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
         rate: stats.rate,
       });
       setJustSubmitted(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving attendance:', err);
+      setSaveError(err?.message || 'Unable to save attendance changes. Please try again.');
     }
   };
 
@@ -292,17 +337,19 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               {existingSessionId && (
                 <>
                   <span>·</span>
-                  <span className="inline-flex items-center gap-1 text-sky-700 font-medium">
+                  <span className="inline-flex items-center gap-1 text-sky-700 font-semibold">
                     <FileCheck className="w-3.5 h-3.5" /> Editing Existing Session
                   </span>
                 </>
               )}
             </div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
-              Take Student Attendance
+              {existingSessionId ? 'Edit Recorded Attendance' : 'Take Student Attendance'}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Select a course part, toggle P / A / L / E attendance marks, and commit directly to Firestore.
+              {existingSessionId
+                ? `Modifying saved roll call for ${sessionDate}. Toggle P / A / L / E marks or remarks and click Update Attendance.`
+                : 'Select a course part, toggle P / A / L / E attendance marks, and commit directly to Firestore.'}
             </p>
           </div>
 
@@ -422,6 +469,79 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             />
           </div>
         </div>
+
+        {recordedSubjectSessions.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <History className="w-4 h-4 text-slate-500 shrink-0" />
+              <span className="font-semibold text-slate-800">
+                Edit Past / Recorded Session ({recordedSubjectSessions.length}):
+              </span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {recordedSubjectSessions.slice(0, 4).map(sess => {
+                  const isCurrent = sess.date === sessionDate;
+                  return (
+                    <button
+                      key={sess.id}
+                      type="button"
+                      onClick={() => {
+                        setSessionDate(sess.date);
+                        setJustSubmitted(false);
+                      }}
+                      className={`h-7 px-2.5 rounded-md border text-[11px] font-medium tabular-nums inline-flex items-center gap-1.5 transition-colors ${
+                        isCurrent
+                          ? 'bg-slate-900 text-white border-slate-900'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <Pencil className="w-3 h-3" />
+                      <span className="font-mono">{sess.date}</span>
+                      <span className={isCurrent ? 'text-slate-300' : 'text-slate-500'}>
+                        ({sess.presentCount}/{sess.totalStudents})
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <select
+                aria-label="Select recorded attendance date to edit"
+                value={existingSessionId || ''}
+                onChange={e => {
+                  const picked = recordedSubjectSessions.find(s => s.id === e.target.value);
+                  if (picked) {
+                    setSessionDate(picked.date);
+                    setJustSubmitted(false);
+                  }
+                }}
+                className="h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 max-w-[240px]"
+              >
+                <option value="">Jump to recorded date...</option>
+                {recordedSubjectSessions.map(sess => (
+                  <option key={sess.id} value={sess.id}>
+                    {sess.date} — {sess.presentCount}/{sess.totalStudents} Present
+                    {sess.topic ? ` · ${sess.topic}` : ''}
+                  </option>
+                ))}
+              </select>
+
+              {sessionDate !== today && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSessionDate(today);
+                    setJustSubmitted(false);
+                  }}
+                  className="h-8 px-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap"
+                >
+                  Today ({today})
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {isFutureDate && (
           <div className="mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-800">
@@ -549,6 +669,26 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
         </div>
       </div>
 
+      {saveError && (
+        <div
+          role="alert"
+          className="bg-rose-50 border border-rose-200 text-rose-800 rounded-xl p-4 flex items-center justify-between gap-3 text-xs font-medium"
+        >
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{saveError}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSaveError(null)}
+            className="text-rose-700 hover:text-rose-900 p-1"
+            aria-label="Dismiss error"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Confirmation Banner */}
       {justSubmitted && submittedSessionInfo && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-950 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -556,7 +696,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
               <h3 className="font-semibold text-sm text-emerald-950">
-                Attendance recorded successfully
+                {wasEditSubmission
+                  ? 'Attendance changes saved successfully'
+                  : 'Attendance recorded successfully'}
               </h3>
               <p className="text-xs text-emerald-800 tabular-nums mt-0.5">
                 {activeSubject?.name} ({activePart === 'practical' ? 'Practical' : 'Theory'}) · {sessionDate} — {submittedSessionInfo.present} Present, {submittedSessionInfo.absent} Absent ({submittedSessionInfo.rate}%)

@@ -113,6 +113,7 @@ export interface AttendanceRecord {
   status: AttendanceStatus;
   remarks?: string;
   markedAt: string;
+  updatedAt?: string;
 }
 
 export interface AttendanceSession {
@@ -131,6 +132,8 @@ export interface AttendanceSession {
   lateCount: number;
   excusedCount: number;
   createdAt: string;
+  updatedAt?: string;
+  updatedBy?: string;
   isSubmitted: boolean;
 }
 

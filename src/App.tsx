@@ -52,6 +52,7 @@ function AttendanceApp() {
   React.useEffect(() => {
     setActiveSubjectId(undefined);
     setActiveSubjectPart(undefined);
+    setActiveAttendanceDate(undefined);
     setActiveFormFillupClassId(undefined);
     setActiveProfileStudentId(undefined);
     if (!currentUser) {
@@ -64,6 +65,7 @@ function AttendanceApp() {
   // Selected subject & part when transitioning into studio or reports
   const [activeSubjectId, setActiveSubjectId] = useState<string | undefined>(undefined);
   const [activeSubjectPart, setActiveSubjectPart] = useState<SubjectPart | undefined>(undefined);
+  const [activeAttendanceDate, setActiveAttendanceDate] = useState<string | undefined>(undefined);
   const [activeFormFillupClassId, setActiveFormFillupClassId] = useState<string | undefined>(undefined);
   const [activeProfileStudentId, setActiveProfileStudentId] = useState<string | undefined>(undefined);
 
@@ -92,9 +94,10 @@ function AttendanceApp() {
     return <AuthScreen />;
   }
 
-  const handleStartAttendance = (subjectId?: string, part?: SubjectPart) => {
+  const handleStartAttendance = (subjectId?: string, part?: SubjectPart, date?: string) => {
     setActiveSubjectId(subjectId);
     setActiveSubjectPart(part);
+    setActiveAttendanceDate(date);
     setActiveTab('take-attendance');
   };
 
@@ -153,6 +156,7 @@ function AttendanceApp() {
               <AttendanceStudio
                 initialSubjectId={activeSubjectId}
                 initialPart={activeSubjectPart}
+                initialDate={activeAttendanceDate}
                 onNavigateToReports={handleViewReports}
               />
             )}

@@ -13,12 +13,15 @@ import {
   Flame,
   FileText,
   UserX,
-  X
+  X,
+  Pencil,
+  Calendar
 } from 'lucide-react';
 import {
   calculateSessionSummary,
   calculateStudentAttendanceStats,
   calculateWeeklyStudentAttendanceSummary,
+  canEditAttendanceSession,
   exportAttendanceToCSV,
   getRoleBasedVisibilityScope,
   WeeklyStudentAttendancePoint,
@@ -34,9 +37,17 @@ import {
   ReferenceLine,
   Cell,
 } from 'recharts';
-import { Student, Subject, ClassGroup, SubjectPart } from '../types/attendance';
+import {
+  AttendanceSession,
+  AttendanceStatus,
+  ClassGroup,
+  Student,
+  Subject,
+  SubjectPart,
+} from '../types/attendance';
 import { DownloadRegisterModal } from './DownloadRegisterModal';
 import { DownloadAbsentListModal } from './DownloadAbsentListModal';
+import { EditAttendanceModal } from './EditAttendanceModal';
 import { PDF_DEPARTMENT_NAME, PDF_INSTITUTE_NAME } from '../utils/pdfHeader';
 
 interface ReportsAndTrendsProps {
@@ -49,7 +60,18 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   initialSubjectId,
   initialPart,
 }) => {
-  const { subjects, classes, assignments, students, sessions, records, users, currentUser, isAdmin } = useAttendance();
+  const {
+    subjects,
+    classes,
+    assignments,
+    students,
+    sessions,
+    records,
+    users,
+    currentUser,
+    isAdmin,
+    updateStudentSessionRecord,
+  } = useAttendance();
 
   const roleScope = useMemo(
     () =>
@@ -95,6 +117,12 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   const [noticeSentBanner, setNoticeSentBanner] = useState<string | null>(null);
   const [pdfModalSubject, setPdfModalSubject] = useState<{ subject: Subject; classGroup: ClassGroup } | null>(null);
   const [isAbsentListModalOpen, setIsAbsentListModalOpen] = useState<boolean>(false);
+  const [editingModalTarget, setEditingModalTarget] = useState<{
+    session: AttendanceSession;
+    highlightStudentId?: string;
+  } | null>(null);
+  const [showAllRecordedSessions, setShowAllRecordedSessions] = useState<boolean>(false);
+  const [inlineUpdatingSessionId, setInlineUpdatingSessionId] = useState<string | null>(null);
 
   const handleOpenPdfRegister = () => {
     let targetSub = visibleSubjects.find(s => s.id === selectedSubjectId);
@@ -164,6 +192,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
 
   const chronologicalSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => a.date.localeCompare(b.date));
+  }, [filteredSessions]);
+
+  const recentSessionsDesc = useMemo(() => {
+    return [...filteredSessions].sort((a, b) => {
+      const dateCmp = b.date.localeCompare(a.date);
+      if (dateCmp !== 0) return dateCmp;
+      return (b.updatedAt || b.createdAt || '').localeCompare(a.updatedAt || a.createdAt || '');
+    });
   }, [filteredSessions]);
 
   const weeklySummary = useMemo(() => {
@@ -742,6 +778,140 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
         </div>
       )}
 
+      {/* Recorded Attendance Sessions Ledger (Editable by Admin & Assigned Teachers) */}
+      <div
+        data-testid="recorded-sessions-card"
+        className="bg-white rounded-xl border border-slate-200 overflow-hidden no-print"
+      >
+        <div className="p-4 sm:px-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-emerald-600" />
+              <span>Recorded Attendance Sessions ({recentSessionsDesc.length})</span>
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Review saved roll calls and edit attendance marks, remarks, date, or lesson topic.
+            </p>
+          </div>
+          {recentSessionsDesc.length > 8 && (
+            <button
+              type="button"
+              onClick={() => setShowAllRecordedSessions(prev => !prev)}
+              className="h-8 px-3 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 self-start sm:self-auto whitespace-nowrap"
+            >
+              {showAllRecordedSessions
+                ? 'Show Recent 8'
+                : `Show All (${recentSessionsDesc.length})`}
+            </button>
+          )}
+        </div>
+
+        {recentSessionsDesc.length === 0 ? (
+          <div className="py-8 px-4 text-center text-xs text-slate-400">
+            No recorded attendance sessions match your current filters.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs tabular-nums">
+              <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Course &amp; Part</th>
+                  <th className="py-3 px-4">Class</th>
+                  <th className="py-3 px-4">Lesson / Topic</th>
+                  <th className="py-3 px-4 text-center">P / A / L / E</th>
+                  <th className="py-3 px-4 text-right">Rate</th>
+                  <th className="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {(showAllRecordedSessions
+                  ? recentSessionsDesc
+                  : recentSessionsDesc.slice(0, 8)
+                ).map(sess => {
+                  const sub =
+                    visibleSubjects.find(s => s.id === sess.subjectId) ||
+                    subjects.find(s => s.id === sess.subjectId);
+                  const cls =
+                    visibleClasses.find(c => c.id === sess.classId) ||
+                    classes.find(c => c.id === sess.classId);
+                  const part: SubjectPart = sess.part || 'theory';
+                  const total = sess.totalStudents || 1;
+                  const effective =
+                    sess.presentCount + sess.lateCount * 0.75 + sess.excusedCount;
+                  const rate = Math.round((effective / total) * 100);
+                  const editable = canEditAttendanceSession(currentUser, sess, assignments);
+
+                  return (
+                    <tr key={sess.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">
+                        <div>{sess.date}</div>
+                        {sess.updatedAt && (
+                          <div className="text-[10px] font-sans font-medium text-sky-700">
+                            Edited
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-mono font-semibold text-slate-900">
+                            {sub?.code || 'Course'}
+                          </span>
+                          <span
+                            className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                              part === 'practical'
+                                ? 'bg-emerald-50 text-emerald-700'
+                                : 'bg-indigo-50 text-indigo-700'
+                            }`}
+                          >
+                            {part === 'practical' ? 'Practical' : 'Theory'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate max-w-[200px] mt-0.5">
+                          {sub?.name || 'Subject'}
+                        </p>
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">
+                        {cls?.name || 'Class'}
+                      </td>
+                      <td className="py-3 px-4 text-slate-600 max-w-[220px] truncate">
+                        {sess.topic || '—'}
+                      </td>
+                      <td className="py-3 px-4 text-center whitespace-nowrap">
+                        <span className="font-semibold text-emerald-700">{sess.presentCount}</span>
+                        <span className="text-slate-300 mx-1">/</span>
+                        <span className="font-semibold text-rose-600">{sess.absentCount}</span>
+                        <span className="text-slate-300 mx-1">/</span>
+                        <span className="font-semibold text-amber-600">{sess.lateCount}</span>
+                        <span className="text-slate-300 mx-1">/</span>
+                        <span className="font-semibold text-sky-700">{sess.excusedCount}</span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                        {rate}%
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {editable ? (
+                          <button
+                            type="button"
+                            onClick={() => setEditingModalTarget({ session: sess })}
+                            className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap"
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Edit Attendance</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">Read Only</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Student Attendance Ledger Table */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
         <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -936,6 +1106,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                       <th className="py-2.5 px-3">Subject</th>
                       <th className="py-2.5 px-3">Status</th>
                       <th className="py-2.5 px-3">Remarks</th>
+                      <th className="py-2.5 px-3 text-right">Edit</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -947,11 +1118,13 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                           r => r.sessionId === session.id && r.studentId === drilldownStudent.id
                         );
                         const sub = visibleSubjects.find(s => s.id === session.subjectId) || subjects.find(s => s.id === session.subjectId);
-                        const status = rec?.status || 'present';
+                        const status: AttendanceStatus = rec?.status || 'present';
+                        const canEdit = canEditAttendanceSession(currentUser, session, assignments);
+                        const isUpdatingRow = inlineUpdatingSessionId === session.id;
 
                         return (
                           <tr key={session.id} className="hover:bg-slate-50">
-                            <td className="py-2.5 px-3 font-mono text-slate-700">
+                            <td className="py-2.5 px-3 font-mono text-slate-700 whitespace-nowrap">
                               {session.date}
                             </td>
                             <td className="py-2.5 px-3 font-medium text-slate-800">
@@ -967,22 +1140,78 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                               </span>
                             </td>
                             <td className="py-2.5 px-3">
-                              <span
-                                className={`inline-flex items-center text-[11px] font-semibold capitalize px-2 py-0.5 rounded ${
-                                  status === 'present'
-                                    ? 'bg-emerald-50 text-emerald-700'
-                                    : status === 'absent'
-                                    ? 'bg-rose-50 text-rose-700'
-                                    : status === 'late'
-                                    ? 'bg-amber-50 text-amber-700'
-                                    : 'bg-sky-50 text-sky-700'
-                                }`}
-                              >
-                                {status}
-                              </span>
+                              {canEdit ? (
+                                <select
+                                  aria-label={`Attendance status for ${drilldownStudent.name} on ${session.date}`}
+                                  value={status}
+                                  disabled={isUpdatingRow}
+                                  onChange={async e => {
+                                    const nextStatus = e.target.value as AttendanceStatus;
+                                    setInlineUpdatingSessionId(session.id);
+                                    try {
+                                      await updateStudentSessionRecord(
+                                        session.id,
+                                        drilldownStudent.id,
+                                        nextStatus,
+                                        rec?.remarks
+                                      );
+                                      setNoticeSentBanner(
+                                        `Updated ${drilldownStudent.name}'s ${sub?.code || ''} status on ${session.date} to ${nextStatus}.`
+                                      );
+                                    } finally {
+                                      setInlineUpdatingSessionId(null);
+                                    }
+                                  }}
+                                  className={`h-7 px-2 rounded border text-[11px] font-semibold capitalize focus:outline-none focus:ring-2 focus:ring-emerald-600/20 ${
+                                    status === 'present'
+                                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                                      : status === 'absent'
+                                      ? 'bg-rose-50 border-rose-200 text-rose-700'
+                                      : status === 'late'
+                                      ? 'bg-amber-50 border-amber-200 text-amber-700'
+                                      : 'bg-sky-50 border-sky-200 text-sky-700'
+                                  }`}
+                                >
+                                  <option value="present">Present</option>
+                                  <option value="absent">Absent</option>
+                                  <option value="late">Late</option>
+                                  <option value="excused">Excused</option>
+                                </select>
+                              ) : (
+                                <span
+                                  className={`inline-flex items-center text-[11px] font-semibold capitalize px-2 py-0.5 rounded ${
+                                    status === 'present'
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : status === 'absent'
+                                      ? 'bg-rose-50 text-rose-700'
+                                      : status === 'late'
+                                      ? 'bg-amber-50 text-amber-700'
+                                      : 'bg-sky-50 text-sky-700'
+                                  }`}
+                                >
+                                  {status}
+                                </span>
+                              )}
                             </td>
                             <td className="py-2.5 px-3 text-slate-500">
                               {rec?.remarks || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              {canEdit && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setEditingModalTarget({
+                                      session,
+                                      highlightStudentId: drilldownStudent.id,
+                                    })
+                                  }
+                                  className="h-7 px-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded text-[11px] font-semibold inline-flex items-center gap-1 whitespace-nowrap"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                  <span>Full Session</span>
+                                </button>
+                              )}
                             </td>
                           </tr>
                         );
@@ -1077,6 +1306,21 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           defaultPart={selectedPartFilter}
           defaultClassId={selectedClassId}
           isAdmin={isAdmin}
+        />
+      )}
+
+      {editingModalTarget && (
+        <EditAttendanceModal
+          isOpen={Boolean(editingModalTarget)}
+          session={editingModalTarget.session}
+          highlightStudentId={editingModalTarget.highlightStudentId}
+          onClose={() => setEditingModalTarget(null)}
+          onSaved={updated => {
+            const sub = subjects.find(s => s.id === updated.subjectId);
+            setNoticeSentBanner(
+              `Saved attendance changes for ${sub?.code || 'Course'} (${updated.part === 'practical' ? 'Practical' : 'Theory'}) on ${updated.date} (${updated.presentCount}/${updated.totalStudents} Present).`
+            );
+          }}
         />
       )}
     </div>

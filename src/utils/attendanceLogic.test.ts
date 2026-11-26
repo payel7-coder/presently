@@ -23,6 +23,11 @@ import {
   canManageAdminRoles,
   validateUserRoleChange,
   getDirectoryUsersSorted,
+  canEditAttendanceSession,
+  findConflictingSessionOnDate,
+  buildSessionEditRoster,
+  buildUpdatedSessionPayload,
+  buildSingleRecordUpdatePlan,
 } from './attendanceLogic';
 import { ClassGroup, Student, AttendanceSession, AttendanceRecord, Subject, SubjectAssignment, User } from '../types/attendance';
 
@@ -879,3 +884,249 @@ test('isRootUser and validateUserRoleChange allow only the single Root User to p
   const sorted = getDirectoryUsersSorted([teacher, promotedAdmin, rejectedUser, duplicateRoot, rootUser]);
   assert.deepEqual(sorted.map(u => u.id), ['root-1', 'adm-2', 'tch-1']);
 });
+
+test('canEditAttendanceSession enforces Admin and assigned Teacher part permissions', () => {
+  const admin: User = {
+    id: 'adm-1',
+    name: 'Admin',
+    email: 'admin@polytechnic.edu.bd',
+    role: 'admin',
+    department: 'Admin',
+    employeeId: 'A-1',
+    avatar: '',
+  };
+  const theoryTeacher: User = {
+    id: 'tch-1',
+    name: 'Theory Teacher',
+    email: 't1@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'T-1',
+    avatar: '',
+  };
+  const practicalTeacher: User = {
+    id: 'tch-2',
+    name: 'Practical Teacher',
+    email: 't2@polytechnic.edu.bd',
+    role: 'teacher',
+    department: 'CST',
+    employeeId: 'T-2',
+    avatar: '',
+  };
+  const assignments: SubjectAssignment[] = [
+    {
+      id: 'a1',
+      subjectId: 'sub-28542',
+      classId: 'c4',
+      teacherId: 'tch-1',
+      part: 'theory',
+      academicYear: '2026',
+      assignedAt: '2026-09-01',
+    },
+    {
+      id: 'a2',
+      subjectId: 'sub-28542',
+      classId: 'c4',
+      teacherId: 'tch-2',
+      part: 'practical',
+      academicYear: '2026',
+      assignedAt: '2026-09-01',
+    },
+  ];
+  const theorySession: AttendanceSession = {
+    id: 'sess-theory',
+    subjectId: 'sub-28542',
+    classId: 'c4',
+    teacherId: 'tch-1',
+    part: 'theory',
+    date: '2026-11-20',
+    totalStudents: 2,
+    presentCount: 2,
+    absentCount: 0,
+    lateCount: 0,
+    excusedCount: 0,
+    createdAt: '2026-11-20T09:00:00.000Z',
+    isSubmitted: true,
+  };
+
+  assert.equal(canEditAttendanceSession(admin, theorySession, assignments), true);
+  assert.equal(canEditAttendanceSession(theoryTeacher, theorySession, assignments), true);
+  assert.equal(canEditAttendanceSession(practicalTeacher, theorySession, assignments), false);
+  assert.equal(canEditAttendanceSession(null, theorySession, assignments), false);
+});
+
+test('findConflictingSessionOnDate detects duplicate date collisions while excluding the edited session', () => {
+  const sessions: AttendanceSession[] = [
+    {
+      id: 'sess-1',
+      subjectId: 'sub-1',
+      classId: 'c1',
+      teacherId: 't1',
+      part: 'theory',
+      date: '2026-11-18',
+      totalStudents: 2,
+      presentCount: 2,
+      absentCount: 0,
+      lateCount: 0,
+      excusedCount: 0,
+      createdAt: '',
+      isSubmitted: true,
+    },
+    {
+      id: 'sess-2',
+      subjectId: 'sub-1',
+      classId: 'c1',
+      teacherId: 't1',
+      part: 'theory',
+      date: '2026-11-19',
+      totalStudents: 2,
+      presentCount: 1,
+      absentCount: 1,
+      lateCount: 0,
+      excusedCount: 0,
+      createdAt: '',
+      isSubmitted: true,
+    },
+  ];
+
+  // Moving sess-2 to 2026-11-18 collides with sess-1
+  const conflict = findConflictingSessionOnDate(sessions, {
+    subjectId: 'sub-1',
+    part: 'theory',
+    date: '2026-11-18',
+    excludeSessionId: 'sess-2',
+  });
+  assert.equal(conflict?.id, 'sess-1');
+
+  // Keeping sess-2 on 2026-11-19 does not conflict with itself
+  const selfCheck = findConflictingSessionOnDate(sessions, {
+    subjectId: 'sub-1',
+    part: 'theory',
+    date: '2026-11-19',
+    excludeSessionId: 'sess-2',
+  });
+  assert.equal(selfCheck, undefined);
+
+  // Different part (practical) on 2026-11-18 does not conflict with theory
+  const otherPart = findConflictingSessionOnDate(sessions, {
+    subjectId: 'sub-1',
+    part: 'practical',
+    date: '2026-11-18',
+    excludeSessionId: 'sess-2',
+  });
+  assert.equal(otherPart, undefined);
+});
+
+test('buildUpdatedSessionPayload preserves createdAt/teacherId, updates counts, and includes historical recorded students', () => {
+  const s1: Student = { id: 's1', rollNumber: '621001', name: 'One', email: '1@s.edu', gender: 'Male', classId: 'c1', status: 'active' };
+  const s2: Student = { id: 's2', rollNumber: '621002', name: 'Two', email: '2@s.edu', gender: 'Female', classId: 'c1', status: 'active' };
+  const s3Inactive: Student = { id: 's3', rollNumber: '621003', name: 'Three', email: '3@s.edu', gender: 'Male', classId: 'c1', status: 'inactive' };
+
+  const existingSession: AttendanceSession = {
+    id: 'sess-orig',
+    subjectId: 'sub-1',
+    classId: 'c1',
+    teacherId: 'tch-original',
+    part: 'theory',
+    date: '2026-11-15',
+    topic: 'Original Topic',
+    totalStudents: 3,
+    presentCount: 3,
+    absentCount: 0,
+    lateCount: 0,
+    excusedCount: 0,
+    createdAt: '2026-11-15T08:30:00.000Z',
+    isSubmitted: true,
+  };
+  const existingRecords: AttendanceRecord[] = [
+    { id: 'rec-sess-orig-s1', sessionId: 'sess-orig', studentId: 's1', status: 'present', markedAt: '2026-11-15T08:30:00.000Z' },
+    { id: 'rec-sess-orig-s2', sessionId: 'sess-orig', studentId: 's2', status: 'present', markedAt: '2026-11-15T08:30:00.000Z' },
+    { id: 'rec-sess-orig-s3', sessionId: 'sess-orig', studentId: 's3', status: 'present', markedAt: '2026-11-15T08:30:00.000Z' },
+  ];
+
+  const editRoster = buildSessionEditRoster([s1, s2], existingRecords, [s1, s2, s3Inactive]);
+  assert.deepEqual(editRoster.map(s => s.id), ['s1', 's2', 's3']);
+
+  const payload = buildUpdatedSessionPayload({
+    existingSession,
+    existingRecords,
+    sessionDetails: {
+      id: 'sess-orig',
+      subjectId: 'sub-1',
+      classId: 'c1',
+      teacherId: 'admin-editor',
+      part: 'theory',
+      date: '2026-11-15',
+      topic: 'Updated Lecture Topic',
+    },
+    targetStudents: editRoster,
+    draftStatuses: {
+      s1: { status: 'absent', remarks: 'Medical leave' },
+      s2: { status: 'late', remarks: '10m late' },
+      s3: { status: 'present' },
+    },
+    actor: { email: 'payelahmed70@gmail.com', name: 'Engr. Payel Ahmed' },
+    nowIso: '2026-11-24T12:00:00.000Z',
+  });
+
+  assert.equal(payload.session.createdAt, '2026-11-15T08:30:00.000Z');
+  assert.equal(payload.session.teacherId, 'tch-original');
+  assert.equal(payload.session.updatedAt, '2026-11-24T12:00:00.000Z');
+  assert.equal(payload.session.updatedBy, 'payelahmed70@gmail.com');
+  assert.equal(payload.session.topic, 'Updated Lecture Topic');
+  assert.equal(payload.session.totalStudents, 3);
+  assert.equal(payload.session.presentCount, 1);
+  assert.equal(payload.session.absentCount, 1);
+  assert.equal(payload.session.lateCount, 1);
+  assert.equal(payload.session.excusedCount, 0);
+
+  const recS1 = payload.records.find(r => r.studentId === 's1');
+  assert.equal(recS1?.markedAt, '2026-11-15T08:30:00.000Z');
+  assert.equal(recS1?.updatedAt, '2026-11-24T12:00:00.000Z');
+  assert.equal(recS1?.status, 'absent');
+  assert.equal(recS1?.remarks, 'Medical leave');
+});
+
+test('buildSingleRecordUpdatePlan updates one student status and recalculates session counts accurately', () => {
+  const session: AttendanceSession = {
+    id: 'sess-1',
+    subjectId: 'sub-1',
+    classId: 'c1',
+    teacherId: 'tch-1',
+    part: 'practical',
+    date: '2026-11-20',
+    totalStudents: 2,
+    presentCount: 1,
+    absentCount: 1,
+    lateCount: 0,
+    excusedCount: 0,
+    createdAt: '2026-11-20T10:00:00.000Z',
+    isSubmitted: true,
+  };
+  const sessionRecords: AttendanceRecord[] = [
+    { id: 'rec-sess-1-s1', sessionId: 'sess-1', studentId: 's1', status: 'present', markedAt: '2026-11-20T10:00:00.000Z' },
+    { id: 'rec-sess-1-s2', sessionId: 'sess-1', studentId: 's2', status: 'absent', markedAt: '2026-11-20T10:00:00.000Z' },
+  ];
+
+  const { updatedSession, updatedRecord } = buildSingleRecordUpdatePlan({
+    session,
+    sessionRecords,
+    studentId: 's2',
+    status: 'excused',
+    remarks: 'Approved lab makeup',
+    actor: { email: 'tch1@polytechnic.edu.bd', name: 'Teacher One' },
+    nowIso: '2026-11-24T14:00:00.000Z',
+  });
+
+  assert.equal(updatedRecord.status, 'excused');
+  assert.equal(updatedRecord.remarks, 'Approved lab makeup');
+  assert.equal(updatedRecord.markedAt, '2026-11-20T10:00:00.000Z');
+  assert.equal(updatedRecord.updatedAt, '2026-11-24T14:00:00.000Z');
+  assert.equal(updatedSession.presentCount, 1);
+  assert.equal(updatedSession.absentCount, 0);
+  assert.equal(updatedSession.excusedCount, 1);
+  assert.equal(updatedSession.lateCount, 0);
+  assert.equal(updatedSession.updatedAt, '2026-11-24T14:00:00.000Z');
+  assert.equal(updatedSession.updatedBy, 'tch1@polytechnic.edu.bd');
+});
+

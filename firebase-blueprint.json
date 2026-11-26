@@ -99,11 +99,15 @@
         "part": { "type": "string", "enum": ["theory", "practical"], "description": "Subject part (theory or practical)" },
         "date": { "type": "string", "description": "Session date YYYY-MM-DD" },
         "timeSlot": { "type": "string", "description": "Session period" },
+        "topic": { "type": "string", "description": "Lesson or session topic" },
         "totalStudents": { "type": "number", "description": "Total students" },
         "presentCount": { "type": "number", "description": "Count present" },
         "absentCount": { "type": "number", "description": "Count absent" },
         "lateCount": { "type": "number", "description": "Count late" },
-        "excusedCount": { "type": "number", "description": "Count excused" }
+        "excusedCount": { "type": "number", "description": "Count excused" },
+        "createdAt": { "type": "string", "description": "ISO creation timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when attendance session was last edited" },
+        "updatedBy": { "type": "string", "description": "Email or name of faculty/admin who last edited the session" }
       },
       "required": ["subjectId", "classId", "date", "teacherId"]
     },
@@ -116,7 +120,8 @@
         "studentId": { "type": "string", "description": "Student ID" },
         "status": { "type": "string", "enum": ["present", "absent", "late", "excused"] },
         "remarks": { "type": "string", "description": "Reason notes" },
-        "markedAt": { "type": "string", "description": "Timestamp" }
+        "markedAt": { "type": "string", "description": "Timestamp" },
+        "updatedAt": { "type": "string", "description": "ISO timestamp when record was last edited" }
       },
       "required": ["sessionId", "studentId", "status"]
     },

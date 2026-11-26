@@ -33,8 +33,12 @@ import {
   isRootUser as checkIsRootUser,
   resolveRegistrationRole,
   validateUserRoleChange,
-  resolveRollCallForSave,
   RollCallDraftEntry,
+  canEditAttendanceSession,
+  findConflictingSessionOnDate,
+  buildSessionEditRoster,
+  buildUpdatedSessionPayload,
+  buildSingleRecordUpdatePlan,
 } from '../utils/attendanceLogic';
 import {
   validateCourseworkInput,
@@ -61,6 +65,10 @@ import {
   normalizeStudentSessionFields,
   PromotionPlanResult,
 } from '../utils/studentSessionLogic';
+import {
+  createDevPreviewDataset,
+  getDevPreviewRole,
+} from '../utils/devPreviewFixture';
 import { db, auth } from '../firebase/config';
 import {
   collection,
@@ -164,6 +172,12 @@ interface AttendanceContextType {
     },
     studentStatuses: Record<string, RollCallDraftEntry>
   ) => Promise<AttendanceSession>;
+  updateStudentSessionRecord: (
+    sessionId: string,
+    studentId: string,
+    status: AttendanceStatus,
+    remarks?: string
+  ) => Promise<AttendanceSession>;
 
   getSessionByDate: (subjectId: string, date: string, part?: SubjectPart) => AttendanceSession | undefined;
   getSessionRecords: (sessionId: string) => AttendanceRecord[];
@@ -228,7 +242,16 @@ const STATIC_SESSION_TOKEN = 'firebase-auth-session';
 const AttendanceContext = createContext<AttendanceContextType | undefined>(undefined);
 
 export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const devPreviewRole = getDevPreviewRole();
+  const isDevPreview = devPreviewRole !== null;
+  const devPreviewDataRef = useRef(
+    devPreviewRole ? createDevPreviewDataset(devPreviewRole) : null
+  );
+
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
+    if (devPreviewDataRef.current) {
+      return devPreviewDataRef.current.currentUser;
+    }
     try {
       const saved = localStorage.getItem('presently_active_user');
       return saved ? (JSON.parse(saved) as User) : null;
@@ -237,6 +260,9 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   });
   const [accessToken, setAccessTokenState] = useState<string | null>(() => {
+    if (devPreviewDataRef.current) {
+      return STATIC_SESSION_TOKEN;
+    }
     try {
       return localStorage.getItem('presently_active_user') ? STATIC_SESSION_TOKEN : null;
     } catch {
@@ -246,13 +272,21 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const accessTokenRef = useRef<string | null>(accessToken);
   const isAuthTransitionRef = useRef(false);
 
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<User[]>(() => devPreviewDataRef.current?.users || []);
   const [classes, setClasses] = useState<ClassGroup[]>(BTEB_CLASSES);
   const [subjects, setSubjects] = useState<Subject[]>(BTEB_CURRICULUM_2022_SUBJECTS);
-  const [assignments, setAssignments] = useState<SubjectAssignment[]>([]);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [sessions, setSessions] = useState<AttendanceSession[]>([]);
-  const [records, setRecords] = useState<AttendanceRecord[]>([]);
+  const [assignments, setAssignments] = useState<SubjectAssignment[]>(
+    () => devPreviewDataRef.current?.assignments || []
+  );
+  const [students, setStudents] = useState<Student[]>(
+    () => devPreviewDataRef.current?.students || []
+  );
+  const [sessions, setSessions] = useState<AttendanceSession[]>(
+    () => devPreviewDataRef.current?.sessions || []
+  );
+  const [records, setRecords] = useState<AttendanceRecord[]>(
+    () => devPreviewDataRef.current?.records || []
+  );
   const [courseworkAssignments, setCourseworkAssignments] = useState<CourseworkAssignment[]>([]);
   const [studentEvaluations, setStudentEvaluations] = useState<StudentAssignmentEvaluation[]>([]);
   const [formFillupResponsibilities, setFormFillupResponsibilities] = useState<FormFillupResponsibility[]>([]);
@@ -285,6 +319,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Real-time Firestore Listeners (Firestore is the single source of truth, including empty states)
   useEffect(() => {
+    if (isDevPreview) return;
     let unsubClasses: () => void;
     let unsubSubjects: () => void;
     let unsubAssignments: () => void;
@@ -673,6 +708,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   // Synchronize React session state with Firebase Auth persistence
   useEffect(() => {
+    if (isDevPreview) return;
     const unsubAuth = onAuthStateChanged(auth, async fbUser => {
       if (isAuthTransitionRef.current) return;
 
@@ -1485,7 +1521,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // Teacher / Admin: 1-Click Roll Call save
+  // Teacher / Admin: Create or Edit Roll Call Attendance Session
   const saveAttendanceSession = async (
     sessionDetails: {
       id?: string;
@@ -1499,77 +1535,176 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     },
     studentStatuses: Record<string, RollCallDraftEntry>
   ) => {
+    if (!currentUser) {
+      throw new Error('Authentication required to save attendance.');
+    }
+
     const todayStr = new Date().toISOString().split('T')[0];
+    if (!sessionDetails.date) {
+      throw new Error('Validation Error: Session date is required.');
+    }
     if (sessionDetails.date > todayStr) {
       throw new Error(`Validation Error: Attendance cannot be taken for tomorrow or future dates (${sessionDetails.date}). Please select today (${todayStr}) or a previous class date.`);
     }
 
     const resolvedPart: SubjectPart = sessionDetails.part || 'theory';
-    const classStudents = getClassStudents(sessionDetails.classId);
-    const resolved = resolveRollCallForSave(classStudents, studentStatuses);
-    const studentIds = Object.keys(resolved.resolvedStatuses);
 
-    const sessionId = sessionDetails.id || `bteb-sess-${resolvedPart}-${Date.now()}`;
-    const partLabel = resolvedPart === 'practical' ? 'Practical' : 'Theory';
-    const targetClass = classes.find(c => c.id === sessionDetails.classId);
-    const newSession: AttendanceSession = {
-      id: sessionId,
-      subjectId: sessionDetails.subjectId,
-      classId: sessionDetails.classId,
-      teacherId: sessionDetails.teacherId,
-      part: resolvedPart,
-      ...(targetClass?.academicYear ? { academicYear: targetClass.academicYear } : {}),
-      date: sessionDetails.date,
-      timeSlot: sessionDetails.timeSlot || `${partLabel} Session`,
-      topic: sessionDetails.topic || `BTEB ${partLabel} Class`,
-      totalStudents: resolved.totalStudents,
-      presentCount: resolved.presentCount,
-      absentCount: resolved.absentCount,
-      lateCount: resolved.lateCount,
-      excusedCount: resolved.excusedCount,
-      createdAt: new Date().toISOString(),
-      isSubmitted: true,
-    };
+    // Match explicit session being edited, or fall back to existing session on same subject/part/date to avoid duplicates
+    const explicitExisting = sessionDetails.id
+      ? sessions.find(s => s.id === sessionDetails.id)
+      : undefined;
+    const sameDateExisting = sessions.find(
+      s =>
+        s.subjectId === sessionDetails.subjectId &&
+        (s.part || 'theory') === resolvedPart &&
+        s.date === sessionDetails.date
+    );
 
-    const newRecords: AttendanceRecord[] = studentIds.map(studentId => {
-      const data = resolved.resolvedStatuses[studentId];
-      const rec: AttendanceRecord = {
-        id: `rec-${sessionId}-${studentId}`,
-        sessionId,
-        studentId,
-        status: data.status,
-        markedAt: new Date().toISOString(),
-      };
-      if (data.remarks) {
-        rec.remarks = data.remarks;
+    if (explicitExisting) {
+      const collision = findConflictingSessionOnDate(sessions, {
+        subjectId: sessionDetails.subjectId,
+        part: resolvedPart,
+        date: sessionDetails.date,
+        excludeSessionId: explicitExisting.id,
+      });
+      if (collision) {
+        throw new Error(
+          `An attendance session for this course part already exists on ${sessionDetails.date}. Open that session directly to edit it.`
+        );
       }
-      return rec;
+    }
+
+    const existingSession = explicitExisting || sameDateExisting;
+
+    if (existingSession) {
+      if (!canEditAttendanceSession(currentUser, existingSession, assignments)) {
+        throw new Error('Access Denied: You do not have permission to edit this attendance session.');
+      }
+    } else if (!isAdmin) {
+      const hasAssignment = assignments.some(
+        a =>
+          a.teacherId === currentUser.id &&
+          a.subjectId === sessionDetails.subjectId &&
+          (a.part || 'theory') === resolvedPart
+      );
+      if (!hasAssignment) {
+        throw new Error('Access Denied: You can only record attendance for your assigned course parts.');
+      }
+    }
+
+    const classStudents = getClassStudents(sessionDetails.classId);
+    const existingRecords = existingSession ? getSessionRecords(existingSession.id) : [];
+    const targetStudents = buildSessionEditRoster(classStudents, existingRecords, students);
+    const targetClass = classes.find(c => c.id === sessionDetails.classId);
+
+    const { session: newSession, records: newRecords, removedRecordIds } = buildUpdatedSessionPayload({
+      existingSession,
+      existingRecords,
+      sessionDetails: {
+        ...sessionDetails,
+        part: resolvedPart,
+        academicYear: targetClass?.academicYear,
+      },
+      targetStudents,
+      draftStatuses: studentStatuses,
+      actor: currentUser,
     });
 
+    const removedSet = new Set(removedRecordIds);
     setSessions(prev => {
-      const filtered = prev.filter(s => s.id !== sessionId);
+      const filtered = prev.filter(s => s.id !== newSession.id);
       return [newSession, ...filtered];
     });
 
     setRecords(prev => {
-      const filtered = prev.filter(r => r.sessionId !== sessionId);
+      const filtered = prev.filter(r => r.sessionId !== newSession.id && !removedSet.has(r.id));
       return [...filtered, ...newRecords];
     });
 
-    try {
-      const batch = writeBatch(db);
-      batch.set(doc(db, 'sessions', newSession.id), newSession);
-      newRecords.forEach(r => {
-        const cleanRec: any = { ...r };
-        Object.keys(cleanRec).forEach(k => cleanRec[k] === undefined && delete cleanRec[k]);
-        batch.set(doc(db, 'records', r.id), cleanRec);
-      });
-      await batch.commit();
-    } catch (e) {
-      console.warn('Firestore attendance commit:', e);
+    if (!isDevPreview) {
+      try {
+        const batch = writeBatch(db);
+        const cleanSession: Record<string, unknown> = { ...newSession };
+        Object.keys(cleanSession).forEach(k => cleanSession[k] === undefined && delete cleanSession[k]);
+        batch.set(doc(db, 'sessions', newSession.id), cleanSession);
+        removedRecordIds.forEach(remId => {
+          batch.delete(doc(db, 'records', remId));
+        });
+        newRecords.forEach(r => {
+          const cleanRec: Record<string, unknown> = { ...r };
+          Object.keys(cleanRec).forEach(k => cleanRec[k] === undefined && delete cleanRec[k]);
+          batch.set(doc(db, 'records', r.id), cleanRec);
+        });
+        await Promise.race([
+          batch.commit(),
+          new Promise<void>(resolve => setTimeout(resolve, 2500)),
+        ]);
+      } catch (e) {
+        console.warn('Firestore attendance commit:', e);
+      }
     }
 
     return newSession;
+  };
+
+  // Teacher / Admin: Quick single-student record edit with automatic session summary recalculation
+  const updateStudentSessionRecord = async (
+    sessionId: string,
+    studentId: string,
+    status: AttendanceStatus,
+    remarks?: string
+  ): Promise<AttendanceSession> => {
+    if (!currentUser) {
+      throw new Error('Authentication required to edit attendance records.');
+    }
+
+    const targetSession = sessions.find(s => s.id === sessionId);
+    if (!targetSession) {
+      throw new Error('Attendance session could not be found.');
+    }
+
+    if (!canEditAttendanceSession(currentUser, targetSession, assignments)) {
+      throw new Error('Access Denied: You do not have permission to edit this attendance record.');
+    }
+
+    const sessionRecords = records.filter(r => r.sessionId === sessionId);
+    const { updatedSession, updatedRecord } = buildSingleRecordUpdatePlan({
+      session: targetSession,
+      sessionRecords,
+      studentId,
+      status,
+      remarks,
+      actor: currentUser,
+    });
+
+    setSessions(prev => prev.map(s => (s.id === sessionId ? updatedSession : s)));
+    setRecords(prev => {
+      const exists = prev.some(r => r.id === updatedRecord.id);
+      if (exists) {
+        return prev.map(r => (r.id === updatedRecord.id ? updatedRecord : r));
+      }
+      return [...prev, updatedRecord];
+    });
+
+    if (!isDevPreview) {
+      try {
+        const batch = writeBatch(db);
+        const cleanSession: Record<string, unknown> = { ...updatedSession };
+        Object.keys(cleanSession).forEach(k => cleanSession[k] === undefined && delete cleanSession[k]);
+        const cleanRecord: Record<string, unknown> = { ...updatedRecord };
+        Object.keys(cleanRecord).forEach(k => cleanRecord[k] === undefined && delete cleanRecord[k]);
+        batch.set(doc(db, 'sessions', updatedSession.id), cleanSession);
+        batch.set(doc(db, 'records', updatedRecord.id), cleanRecord);
+        await Promise.race([
+          batch.commit(),
+          new Promise<void>(resolve => setTimeout(resolve, 2500)),
+        ]);
+      } catch (e) {
+        console.warn('Firestore single record attendance update:', e);
+      }
+    }
+
+    return updatedSession;
   };
 
   const getSessionByDate = (subjectId: string, date: string, part?: SubjectPart) => {
@@ -2119,6 +2254,7 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         promoteStudents,
         deleteStudent,
         saveAttendanceSession,
+        updateStudentSessionRecord,
         getSessionByDate,
         getSessionRecords,
         createCourseworkAssignment,

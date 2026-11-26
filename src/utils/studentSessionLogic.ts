@@ -16,7 +16,7 @@ export const SEMESTER_SEQUENCE = [
 ] as const;
 
 export function deriveSessionFromAdmissionYear(admissionYear?: string): string | undefined {
-  const cleaned = admissionYear?.trim();
+  const cleaned = admissionYear != null ? String(admissionYear).trim() : '';
   if (!cleaned) return undefined;
 
   // Already looks like a range such as 2022-23 or 2022-2023
@@ -33,7 +33,7 @@ export function deriveSessionFromAdmissionYear(admissionYear?: string): string |
 }
 
 export function deriveAdmissionYearFromSession(session?: string): string | undefined {
-  const cleaned = session?.trim();
+  const cleaned = session != null ? String(session).trim() : '';
   if (!cleaned) return undefined;
   const yearMatch = cleaned.match(/\b(19\d{2}|20\d{2})\b/);
   return yearMatch ? yearMatch[1] : undefined;
@@ -43,8 +43,9 @@ export function normalizeStudentSessionFields(input: {
   session?: string;
   admissionYear?: string;
 }): { session?: string; admissionYear?: string } {
-  const rawSession = input.session?.trim() || undefined;
-  const rawAdmYear = input.admissionYear?.trim() || undefined;
+  const rawSession = input.session != null ? String(input.session).trim() || undefined : undefined;
+  const rawAdmYear =
+    input.admissionYear != null ? String(input.admissionYear).trim() || undefined : undefined;
 
   let session = rawSession;
   let admissionYear = rawAdmYear;

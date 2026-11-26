@@ -1,14 +1,16 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useAttendance } from '../context/AttendanceContext';
-import { Student } from '../types/attendance';
+import { AttendanceSession, Student } from '../types/attendance';
 import { Avatar } from './Avatar';
 import {
   buildStudentProfileDossier,
   validateStudentProfileUpdate,
 } from '../utils/studentProfileLogic';
+import { canEditAttendanceSession } from '../utils/attendanceLogic';
 import { deriveSessionFromAdmissionYear } from '../utils/studentSessionLogic';
 import { generateStudentDossierPDF } from '../utils/pdfStudentDossier';
 import { formatResultStatusLabel } from '../utils/formFillupLogic';
+import { EditAttendanceModal } from './EditAttendanceModal';
 import {
   ArrowLeft,
   GraduationCap,
@@ -71,6 +73,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const [editError, setEditError] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
+  const [editingAttendanceSession, setEditingAttendanceSession] = useState<AttendanceSession | null>(null);
 
   useEffect(() => {
     setSaveNotice(null);
@@ -892,43 +895,60 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               </div>
             ) : (
               <div className="divide-y divide-slate-100 max-h-[460px] overflow-y-auto">
-                {attendanceHistory.slice(0, 40).map(entry => (
-                  <div
-                    key={entry.recordId}
-                    className="px-5 py-3 flex items-center justify-between gap-4 text-xs"
-                  >
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold text-slate-900">
-                          {entry.date}
-                        </span>
-                        <span className="text-slate-300">·</span>
-                        <span className="font-mono text-slate-600">{entry.subjectCode}</span>
-                        <span className="text-slate-700 font-medium truncate">
-                          {entry.subjectName}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                        {entry.part === 'practical' ? 'Practical' : 'Theory'}
-                        {entry.topic ? ` · Topic: ${entry.topic}` : ''}
-                        {entry.remarks ? ` · Note: ${entry.remarks}` : ''}
-                      </p>
-                    </div>
-                    <span
-                      className={`font-semibold capitalize shrink-0 ${
-                        entry.status === 'present'
-                          ? 'text-emerald-700'
-                          : entry.status === 'absent'
-                          ? 'text-rose-700'
-                          : entry.status === 'late'
-                          ? 'text-amber-700'
-                          : 'text-slate-600'
-                      }`}
+                {attendanceHistory.slice(0, 40).map(entry => {
+                  const matchedSession = sessions.find(s => s.id === entry.sessionId);
+                  const canEdit = canEditAttendanceSession(currentUser, matchedSession, assignments);
+                  return (
+                    <div
+                      key={entry.recordId}
+                      className="px-5 py-3 flex items-center justify-between gap-4 text-xs"
                     >
-                      {entry.status}
-                    </span>
-                  </div>
-                ))}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-slate-900">
+                            {entry.date}
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-mono text-slate-600">{entry.subjectCode}</span>
+                          <span className="text-slate-700 font-medium truncate">
+                            {entry.subjectName}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                          {entry.part === 'practical' ? 'Practical' : 'Theory'}
+                          {entry.topic ? ` · Topic: ${entry.topic}` : ''}
+                          {entry.remarks ? ` · Note: ${entry.remarks}` : ''}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span
+                          className={`font-semibold capitalize ${
+                            entry.status === 'present'
+                              ? 'text-emerald-700'
+                              : entry.status === 'absent'
+                              ? 'text-rose-700'
+                              : entry.status === 'late'
+                              ? 'text-amber-700'
+                              : 'text-slate-600'
+                          }`}
+                        >
+                          {entry.status}
+                        </span>
+                        {canEdit && matchedSession && (
+                          <button
+                            type="button"
+                            onClick={() => setEditingAttendanceSession(matchedSession)}
+                            className="h-7 px-2 bg-white hover:bg-slate-50 border border-slate-200 rounded text-[11px] font-semibold text-slate-700 inline-flex items-center gap-1"
+                            aria-label={`Edit attendance on ${entry.date} for ${entry.subjectCode}`}
+                          >
+                            <Pencil className="w-3 h-3" />
+                            <span>Edit</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1352,6 +1372,20 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {editingAttendanceSession && (
+        <EditAttendanceModal
+          isOpen={Boolean(editingAttendanceSession)}
+          session={editingAttendanceSession}
+          highlightStudentId={student.id}
+          onClose={() => setEditingAttendanceSession(null)}
+          onSaved={updated => {
+            setSaveNotice(
+              `Updated attendance record on ${updated.date} (${updated.presentCount}/${updated.totalStudents} Present).`
+            );
+          }}
+        />
       )}
     </div>
   );
