@@ -16,6 +16,7 @@
   body {
     background-color: #f8fafc;
     color: #0f172a;
+    overflow-x: clip;
   }
 
   button:not(:disabled),
@@ -27,6 +28,15 @@
   table {
     font-variant-numeric: tabular-nums;
   }
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

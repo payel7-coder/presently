@@ -62,18 +62,16 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
   const bannerHeight = drawInstitutionalPdfHeader(doc, {
     reportTitle: subHeading,
     boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • DIPLOMA IN ENGINEERING • PROBIDHAN 2022',
-    accentColor: [16, 185, 129],
-    titleColor: [52, 211, 153],
   });
 
-  // 2. Metadata Box
+  // 2. Metadata Box (Clean Minimalist Border)
   const metaY = bannerHeight + 4; // 37mm
-  doc.setFillColor(248, 250, 252); // slate-50
-  doc.setDrawColor(226, 232, 240); // slate-200
-  doc.roundedRect(10, metaY, pageWidth - 20, 23, 2, 2, 'FD');
+  doc.setDrawColor(140, 140, 140);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(10, metaY, pageWidth - 20, 23, 1.5, 1.5, 'D');
 
   doc.setFontSize(8.5);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
 
   // Left column
   const partLabel = part === 'practical' ? 'Practical' : part === 'theory' ? 'Theory' : 'Theory & Practical';
@@ -236,20 +234,18 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
       cellPadding: 1.5,
       halign: 'center',
       valign: 'middle',
-      textColor: [15, 23, 42],
-      lineColor: [203, 213, 225],
+      textColor: [0, 0, 0],
+      fillColor: [255, 255, 255],
+      lineColor: [170, 170, 170],
       lineWidth: 0.15,
     },
     headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: [255, 255, 255],
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
       fontStyle: 'bold',
       fontSize: 7.5,
-      lineWidth: 0.2,
-      lineColor: [51, 65, 85],
-    },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252],
+      lineWidth: 0.25,
+      lineColor: [0, 0, 0],
     },
     columnStyles: {
       0: { cellWidth: 8, halign: 'center' }, // Sl
@@ -257,26 +253,16 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
       2: { cellWidth: 42, halign: 'left', fontStyle: 'bold' }, // Name
     },
     didParseCell: (data) => {
-      // Highlight absent marks in red and eligibility status
       if (data.section === 'body') {
         const val = String(data.cell.raw);
-        if (val === 'A') {
-          data.cell.styles.textColor = [225, 29, 72]; // rose-600
+        if (val === 'A' || val === 'Discollegiate' || val === 'Non-Collegiate') {
+          data.cell.styles.textColor = [0, 0, 0];
           data.cell.styles.fontStyle = 'bold';
-        } else if (val === 'P') {
-          data.cell.styles.textColor = [5, 150, 105]; // emerald-600
-        } else if (val === 'L') {
-          data.cell.styles.textColor = [217, 119, 6]; // amber-600
-        } else if (val === 'Discollegiate') {
-          data.cell.styles.textColor = [225, 29, 72];
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [255, 241, 242];
-        } else if (val === 'Non-Collegiate') {
-          data.cell.styles.textColor = [180, 83, 9];
-          data.cell.styles.fontStyle = 'bold';
-          data.cell.styles.fillColor = [254, 243, 199];
         } else if (val === 'Eligible (Reg)') {
-          data.cell.styles.textColor = [4, 120, 87];
+          data.cell.styles.textColor = [0, 0, 0];
+          data.cell.styles.fontStyle = 'bold';
+        } else if (val === 'L') {
+          data.cell.styles.textColor = [50, 50, 50];
           data.cell.styles.fontStyle = 'bold';
         }
       }
@@ -298,47 +284,47 @@ export function generateAttendanceRegisterPDF(options: PDFRegisterOptions): jsPD
 
       // 1. Teacher Signature
       const sig1X = 10;
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(60, 60, 60);
       doc.line(sig1X, sigY, sig1X + sigWidth, sigY);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text('Course Teacher Signature', sig1X + sigWidth / 2, sigY + 4, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(80, 80, 80);
       doc.text(`${teacher?.name || 'Subject Instructor'} • Date: ________`, sig1X + sigWidth / 2, sigY + 8, { align: 'center' });
 
       // 2. HOD Signature
       const sig2X = sig1X + sigWidth + spacing;
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(60, 60, 60);
       doc.line(sig2X, sigY, sig2X + sigWidth, sigY);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text('Head of Department (CST)', sig2X + sigWidth / 2, sigY + 4, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(80, 80, 80);
       doc.text('Verification & Seal • Date: ________', sig2X + sigWidth / 2, sigY + 8, { align: 'center' });
 
       // 3. Principal Signature
       const sig3X = sig2X + sigWidth + spacing;
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(60, 60, 60);
       doc.line(sig3X, sigY, sig3X + sigWidth, sigY);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text('Principal / Academic In-charge', sig3X + sigWidth / 2, sigY + 4, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(80, 80, 80);
       doc.text('Approved for BTEB Board Exam', sig3X + sigWidth / 2, sigY + 8, { align: 'center' });
     }
 
     // Bottom tracking banner
     doc.setFontSize(6.5);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
     doc.text(
       `Generated via Presently • BTEB Probidhan-2022 Official Ledger • Technology: CST (85) • Date: ${new Date().toLocaleDateString('en-GB')}`,

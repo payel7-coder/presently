@@ -14,9 +14,9 @@ export interface InstitutionalHeaderOptions {
 }
 
 /**
- * Draws the shared institutional dark-slate banner at the top of jsPDF reports
- * and returns the banner height in millimeters so callers can offset metadata
- * blocks and AutoTables cleanly without overlaps.
+ * Draws a clean, minimalist black-and-white institutional header at the top of jsPDF reports
+ * (transparent/white paper background, zero banner fill) and returns the header height
+ * in millimeters so callers can offset metadata blocks and AutoTables cleanly.
  */
 export function drawInstitutionalPdfHeader(
   doc: jsPDF,
@@ -25,53 +25,50 @@ export function drawInstitutionalPdfHeader(
   const {
     reportTitle,
     boardSubtitle = PDF_BOARD_SUBTITLE,
-    accentColor = [16, 185, 129], // emerald-500
-    titleColor = [52, 211, 153], // emerald-400
     footerNote,
   } = options;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const isLandscape = pageWidth > doc.internal.pageSize.getHeight();
   const bannerHeight = footerNote ? 36 : 33;
-
-  // Dark slate header background
-  doc.setFillColor(15, 23, 42); // slate-900
-  doc.rect(0, 0, pageWidth, bannerHeight, 'F');
-
-  // Top accent stripe
-  doc.setFillColor(accentColor[0], accentColor[1], accentColor[2]);
-  doc.rect(0, 0, pageWidth, 3, 'F');
+  const marginX = 10;
 
   // Line 1: Institute Name
-  doc.setTextColor(255, 255, 255);
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(isLandscape ? 14.5 : 13.5);
-  doc.text(PDF_INSTITUTE_NAME, pageWidth / 2, 10, { align: 'center' });
+  doc.text(PDF_INSTITUTE_NAME, pageWidth / 2, 10.5, { align: 'center' });
 
   // Line 2: Department Name
-  doc.setTextColor(226, 232, 240); // slate-200
+  doc.setTextColor(20, 20, 20);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(isLandscape ? 11 : 10);
+  doc.setFontSize(isLandscape ? 10.5 : 10);
   doc.text(PDF_DEPARTMENT_NAME, pageWidth / 2, 16, { align: 'center' });
 
   // Line 3: BTEB Subtitle
-  doc.setTextColor(203, 213, 225); // slate-300
+  doc.setTextColor(80, 80, 80);
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(isLandscape ? 8.5 : 8);
-  doc.text(boardSubtitle, pageWidth / 2, 21.8, { align: 'center' });
+  doc.setFontSize(isLandscape ? 8 : 7.5);
+  doc.text(boardSubtitle, pageWidth / 2, 21.2, { align: 'center' });
 
   // Line 4: Report Title
-  doc.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(isLandscape ? 10 : 9.5);
-  doc.text(reportTitle, pageWidth / 2, 28, { align: 'center' });
+  doc.text(reportTitle, pageWidth / 2, 27.2, { align: 'center' });
 
   if (footerNote) {
-    doc.setTextColor(148, 163, 184); // slate-400
+    doc.setTextColor(90, 90, 90);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
-    doc.text(footerNote, pageWidth / 2, 32.2, { align: 'center' });
+    doc.text(footerNote, pageWidth / 2, 31.6, { align: 'center' });
   }
+
+  // Clean minimalist black hairline divider
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(0.35);
+  doc.line(marginX, bannerHeight - 1.5, pageWidth - marginX, bannerHeight - 1.5);
+  doc.setLineWidth(0.2);
 
   return bannerHeight;
 }

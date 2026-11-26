@@ -77,22 +77,20 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
 
-  // 1. Institutional Header
+  // 1. Institutional Header (Minimalist B&W)
   const bannerHeight = drawInstitutionalPdfHeader(doc, {
     reportTitle: 'SUBJECT & DATE-WISE STUDENT ABSENT LIST',
     boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • PROBIDHAN 2022 • CST (TECH CODE: 85)',
-    accentColor: [225, 29, 72], // rose-600
-    titleColor: [253, 164, 175], // rose-300
   });
 
   // 2. Metadata Box
   const metaY = bannerHeight + 4; // 37mm
-  doc.setFillColor(248, 250, 252);
-  doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(10, metaY, pageWidth - 20, 28, 2, 2, 'FD');
+  doc.setDrawColor(140, 140, 140);
+  doc.setLineWidth(0.2);
+  doc.roundedRect(10, metaY, pageWidth - 20, 28, 1.5, 1.5, 'D');
 
   doc.setFontSize(8);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
 
   // Left Column
   doc.setFont('helvetica', 'bold');
@@ -140,10 +138,10 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
   doc.setFont('helvetica', 'bold');
   doc.text('Total Absences:', col2X, metaY + 18.5);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(225, 29, 72);
+  doc.setTextColor(0, 0, 0);
   doc.text(`${result.totalAbsentMarks} record(s)`, col2X + 26, metaY + 18.5);
 
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
   doc.text('Unique Students:', col2X, metaY + 24.5);
   doc.setFont('helvetica', 'normal');
@@ -152,19 +150,19 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
   let currentY = metaY + 33;
 
   if (result.entries.length === 0) {
-    // Clean empty-state box
-    doc.setFillColor(236, 253, 245); // emerald-50
-    doc.setDrawColor(167, 243, 208); // emerald-200
-    doc.roundedRect(10, currentY, pageWidth - 20, 22, 2, 2, 'FD');
+    // Clean minimalist empty-state box
+    doc.setDrawColor(140, 140, 140);
+    doc.setLineWidth(0.2);
+    doc.roundedRect(10, currentY, pageWidth - 20, 22, 1.5, 1.5, 'D');
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setTextColor(6, 95, 70);
+    doc.setTextColor(0, 0, 0);
     doc.text('No Absent Students Recorded', pageWidth / 2, currentY + 9, { align: 'center' });
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
-    doc.setTextColor(4, 120, 87);
+    doc.setTextColor(70, 70, 70);
     const emptyMsg =
       result.totalMatchingSessions === 0
         ? `No attendance sessions were found for "${subjectText}" (${result.dateScopeLabel}).`
@@ -197,19 +195,19 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
         fontSize: 7.5,
         cellPadding: 2,
         valign: 'middle',
-        textColor: [15, 23, 42],
-        lineColor: [226, 232, 240],
-        lineWidth: 0.2,
+        textColor: [0, 0, 0],
+        fillColor: [255, 255, 255],
+        lineColor: [170, 170, 170],
+        lineWidth: 0.15,
       },
       headStyles: {
-        fillColor: [15, 23, 42],
-        textColor: [255, 255, 255],
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
         fontStyle: 'bold',
         fontSize: 7.5,
         halign: 'left',
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
+        lineColor: [0, 0, 0],
+        lineWidth: 0.25,
       },
       columnStyles: {
         0: { cellWidth: 8, halign: 'center' },
@@ -220,11 +218,6 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
         5: { cellWidth: 28, halign: 'left' },
         6: { cellWidth: 28, halign: 'left' },
       },
-      didParseCell: data => {
-        if (data.section === 'body' && data.column.index === 3) {
-          data.cell.styles.textColor = [225, 29, 72];
-        }
-      },
     });
 
     currentY = ((doc as any).lastAutoTable?.finalY || currentY) + 6;
@@ -234,7 +227,7 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
   if (result.sessionSummaries.length > 0 && currentY < pageHeight - 60) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
-    doc.setTextColor(15, 23, 42);
+    doc.setTextColor(0, 0, 0);
     doc.text('Session-Wise Attendance Summary', 10, currentY);
 
     autoTable(doc, {
@@ -256,22 +249,25 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
         fontSize: 7,
         cellPadding: 1.5,
         valign: 'middle',
-        textColor: [51, 65, 85],
-        lineColor: [226, 232, 240],
+        textColor: [0, 0, 0],
+        fillColor: [255, 255, 255],
+        lineColor: [170, 170, 170],
         lineWidth: 0.15,
       },
       headStyles: {
-        fillColor: [51, 65, 85],
-        textColor: [255, 255, 255],
+        fillColor: [255, 255, 255],
+        textColor: [0, 0, 0],
         fontStyle: 'bold',
         fontSize: 7,
+        lineColor: [0, 0, 0],
+        lineWidth: 0.25,
       },
       columnStyles: {
         0: { cellWidth: 22, halign: 'center' },
         2: { cellWidth: 18, halign: 'center' },
         4: { cellWidth: 13, halign: 'center' },
         5: { cellWidth: 14, halign: 'center' },
-        6: { cellWidth: 14, halign: 'center', fontStyle: 'bold', textColor: [225, 29, 72] },
+        6: { cellWidth: 14, halign: 'center', fontStyle: 'bold', textColor: [0, 0, 0] },
         7: { cellWidth: 12, halign: 'center' },
       },
     });
@@ -287,37 +283,37 @@ export function generateAbsentListPDF(options: AbsentListPDFOptions): jsPDF {
       const sigWidth = 60;
 
       // Left signature: Course Teacher
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(60, 60, 60);
       doc.line(14, sigY, 14 + sigWidth, sigY);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text('Course Teacher Signature', 14 + sigWidth / 2, sigY + 4, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(80, 80, 80);
       doc.text(`${requestedBy?.name || 'Instructor'} • Date: ________`, 14 + sigWidth / 2, sigY + 8, {
         align: 'center',
       });
 
       // Right signature: Head of Department
       const rightX = pageWidth - 14 - sigWidth;
-      doc.setDrawColor(100, 116, 139);
+      doc.setDrawColor(60, 60, 60);
       doc.line(rightX, sigY, rightX + sigWidth, sigY);
       doc.setFontSize(8);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(15, 23, 42);
+      doc.setTextColor(0, 0, 0);
       doc.text('Head of Department (CST)', rightX + sigWidth / 2, sigY + 4, { align: 'center' });
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(7);
-      doc.setTextColor(100, 116, 139);
+      doc.setTextColor(80, 80, 80);
       doc.text('Verification & Follow-up • Date: ________', rightX + sigWidth / 2, sigY + 8, {
         align: 'center',
       });
     }
 
     doc.setFontSize(6.5);
-    doc.setTextColor(148, 163, 184);
+    doc.setTextColor(100, 100, 100);
     doc.setFont('helvetica', 'normal');
     doc.text(
       `Generated via Presently • Subject & Date-Wise Absent List • BTEB Probidhan 2022 • ${new Date().toLocaleDateString('en-GB')}`,

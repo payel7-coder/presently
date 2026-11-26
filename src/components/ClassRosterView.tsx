@@ -136,16 +136,16 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6">
       {/* Editorial Header */}
-      <div className="pb-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="pb-5 sm:pb-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="font-semibold text-emerald-700">Student Directory</span>
             <span>·</span>
             <span>Official Class Enrollment</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Class Rosters &amp; Student Management
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -153,38 +153,38 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+        <div className="w-full md:w-auto shrink-0">
           {currentUser?.role === 'admin' ? (
-            <>
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
               <button
                 type="button"
                 disabled={classStudents.length === 0}
                 onClick={() => setShowPromoteModal(true)}
-                className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-emerald-50 hover:bg-emerald-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-50 hover:bg-emerald-100 disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
               >
-                <GraduationCap className="w-3.5 h-3.5" />
+                <GraduationCap className="w-3.5 h-3.5 shrink-0" />
                 <span>Promote Semester</span>
               </button>
               <button
                 type="button"
                 onClick={() => onOpenBulkImport(selectedClassId)}
-                className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                 <span>Bulk CSV Import</span>
               </button>
               <button
                 type="button"
                 onClick={() => setShowAddModal(true)}
-                className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+                className="col-span-2 sm:col-span-1 h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
               >
-                <Plus className="w-3.5 h-3.5" />
+                <Plus className="w-3.5 h-3.5 shrink-0" />
                 <span>Add Single Student</span>
               </button>
-            </>
+            </div>
           ) : (
             <div className="h-9 inline-flex items-center gap-2 px-3 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium border border-slate-200">
-              <Shield className="w-3.5 h-3.5 text-slate-500" />
+              <Shield className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>Student registration managed by administration</span>
             </div>
           )}
@@ -201,7 +201,7 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 tabular-nums">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 tabular-nums">
           {visibleClasses.map(c => {
             const isSelected = c.id === selectedClassId;
             const count = students.filter(s => s.classId === c.id).length;
@@ -283,110 +283,97 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
-                  <tr>
-                    <th className="py-3 px-4">Board Roll</th>
-                    <th className="py-3 px-4">Reg No</th>
-                    <th className="py-3 px-4">Student</th>
-                    <th className="py-3 px-4">Session</th>
-                    <th className="py-3 px-4">Gender</th>
-                    <th className="py-3 px-4">Contact</th>
-                    <th className="py-3 px-4">Parent / Guardian</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredStudents.map(student => {
-                    const normalizedSess = normalizeStudentSessionFields({
-                      session: student.session,
-                      admissionYear: student.admissionYear,
-                    });
-                    return (
-                    <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 font-mono font-semibold text-slate-800">
-                        {student.rollNumber}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-500">
-                        {student.registrationNumber || '—'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
+            <>
+              {/* Mobile Student Cards */}
+              <div className="md:hidden divide-y divide-slate-100 tabular-nums">
+                {filteredStudents.map(student => {
+                  const normalizedSess = normalizeStudentSessionFields({
+                    session: student.session,
+                    admissionYear: student.admissionYear,
+                  });
+                  return (
+                    <div key={student.id} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2.5 min-w-0">
                           <Avatar src={student.avatar} name={student.name} size="sm" />
-                          <div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono text-xs font-semibold text-slate-800">
+                                #{student.rollNumber}
+                              </span>
+                              {normalizedSess.session && (
+                                <span className="text-[11px] text-slate-500 font-mono">
+                                  · {normalizedSess.session}
+                                </span>
+                              )}
+                            </div>
                             {onViewStudentProfile ? (
                               <button
                                 type="button"
                                 onClick={() => onViewStudentProfile(student.id)}
-                                className="font-semibold text-slate-900 hover:text-emerald-700 hover:underline text-left block"
+                                className="text-sm font-semibold text-slate-900 hover:text-emerald-700 text-left block truncate max-w-full mt-0.5"
                               >
                                 {student.name}
                               </button>
                             ) : (
-                              <span className="font-semibold text-slate-900 block">
+                              <p className="text-sm font-semibold text-slate-900 truncate mt-0.5">
                                 {student.name}
-                              </span>
+                              </p>
                             )}
-                            <span className="text-[11px] text-slate-400">{student.email}</span>
+                            <p className="text-[11px] text-slate-500 truncate">{student.email}</p>
                           </div>
                         </div>
-                      </td>
-                      <td className="py-3 px-4">
-                        {normalizedSess.session ? (
-                          <div>
-                            <span className="font-mono font-semibold text-slate-800 block">
-                              {normalizedSess.session}
-                            </span>
-                            {normalizedSess.admissionYear && (
-                              <span className="text-[11px] text-slate-400 block">
-                                Adm. {normalizedSess.admissionYear}
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600">{student.gender}</td>
-                      <td className="py-3 px-4 text-slate-600 font-mono">
-                        {student.phone || '—'}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span className="text-slate-700 font-mono block">
-                          {student.parentContact || student.parentEmail || '—'}
-                        </span>
-                        {(student.fatherName || student.motherName) && (
-                          <span className="text-[11px] text-slate-400 block">
-                            {[student.fatherName, student.motherName].filter(Boolean).join(' / ')}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
+
                         <span
-                          className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded border ${
+                          className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded border shrink-0 ${
                             student.status === 'active'
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
                               : 'bg-slate-100 text-slate-600 border-slate-200'
                           }`}
                         >
-                          <CheckCircle2 className="w-3 h-3" />{' '}
+                          <CheckCircle2 className="w-3 h-3" />
                           {student.status === 'active'
                             ? 'Active'
                             : student.academicStanding || 'Inactive'}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-1.5">
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] bg-slate-50/70 rounded-lg p-2.5 border border-slate-100">
+                        <div className="min-w-0">
+                          <span className="text-slate-400 block">Reg No</span>
+                          <span className="font-mono text-slate-700 truncate block">
+                            {student.registrationNumber || '—'}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-slate-400 block">Contact</span>
+                          <span className="font-mono text-slate-700 truncate block">
+                            {student.phone || '—'}
+                          </span>
+                        </div>
+                        <div className="min-w-0 col-span-2">
+                          <span className="text-slate-400 block">Guardian</span>
+                          <span className="text-slate-700 truncate block">
+                            {student.parentContact || student.parentEmail || '—'}
+                            {(student.fatherName || student.motherName) && (
+                              <span className="text-slate-400">
+                                {' '}· {[student.fatherName, student.motherName].filter(Boolean).join(' / ')}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      </div>
+
+                      {(onViewStudentProfile || currentUser?.role === 'admin') && (
+                        <div className="flex items-center gap-2 pt-0.5">
                           {onViewStudentProfile && (
                             <button
                               type="button"
                               onClick={() => onViewStudentProfile(student.id)}
-                              className="h-7 px-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 transition-colors whitespace-nowrap"
+                              className="flex-1 h-10 px-3 bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
                               aria-label={`View profile for ${student.name}`}
                             >
-                              <UserIcon className="w-3 h-3 text-emerald-600" />
+                              <UserIcon className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                               <span>View Profile</span>
                             </button>
                           )}
@@ -394,7 +381,7 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
                             <button
                               type="button"
                               onClick={() => deleteStudent(student.id)}
-                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                              className="h-10 w-10 inline-flex items-center justify-center text-slate-500 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 rounded-lg transition-colors shrink-0"
                               title="Delete student"
                               aria-label={`Delete ${student.name}`}
                             >
@@ -402,13 +389,140 @@ export const ClassRosterView: React.FC<ClassRosterViewProps> = ({
                             </button>
                           )}
                         </div>
-                      </td>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4">Board Roll</th>
+                      <th className="py-3 px-4">Reg No</th>
+                      <th className="py-3 px-4">Student</th>
+                      <th className="py-3 px-4">Session</th>
+                      <th className="py-3 px-4">Gender</th>
+                      <th className="py-3 px-4">Contact</th>
+                      <th className="py-3 px-4">Parent / Guardian</th>
+                      <th className="py-3 px-4">Status</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredStudents.map(student => {
+                      const normalizedSess = normalizeStudentSessionFields({
+                        session: student.session,
+                        admissionYear: student.admissionYear,
+                      });
+                      return (
+                      <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-800">
+                          {student.rollNumber}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-500">
+                          {student.registrationNumber || '—'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar src={student.avatar} name={student.name} size="sm" />
+                            <div>
+                              {onViewStudentProfile ? (
+                                <button
+                                  type="button"
+                                  onClick={() => onViewStudentProfile(student.id)}
+                                  className="font-semibold text-slate-900 hover:text-emerald-700 hover:underline text-left block"
+                                >
+                                  {student.name}
+                                </button>
+                              ) : (
+                                <span className="font-semibold text-slate-900 block">
+                                  {student.name}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-slate-400">{student.email}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4">
+                          {normalizedSess.session ? (
+                            <div>
+                              <span className="font-mono font-semibold text-slate-800 block">
+                                {normalizedSess.session}
+                              </span>
+                              {normalizedSess.admissionYear && (
+                                <span className="text-[11px] text-slate-400 block">
+                                  Adm. {normalizedSess.admissionYear}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">{student.gender}</td>
+                        <td className="py-3 px-4 text-slate-600 font-mono">
+                          {student.phone || '—'}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="text-slate-700 font-mono block">
+                            {student.parentContact || student.parentEmail || '—'}
+                          </span>
+                          {(student.fatherName || student.motherName) && (
+                            <span className="text-[11px] text-slate-400 block">
+                              {[student.fatherName, student.motherName].filter(Boolean).join(' / ')}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded border ${
+                              student.status === 'active'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                            }`}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />{' '}
+                            {student.status === 'active'
+                              ? 'Active'
+                              : student.academicStanding || 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <div className="inline-flex items-center justify-end gap-1.5">
+                            {onViewStudentProfile && (
+                              <button
+                                type="button"
+                                onClick={() => onViewStudentProfile(student.id)}
+                                className="h-7 px-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[11px] font-semibold inline-flex items-center gap-1 transition-colors whitespace-nowrap"
+                                aria-label={`View profile for ${student.name}`}
+                              >
+                                <UserIcon className="w-3 h-3 text-emerald-600" />
+                                <span>View Profile</span>
+                              </button>
+                            )}
+                            {currentUser?.role === 'admin' && (
+                              <button
+                                type="button"
+                                onClick={() => deleteStudent(student.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                title="Delete student"
+                                aria-label={`Delete ${student.name}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

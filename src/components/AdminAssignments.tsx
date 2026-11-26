@@ -283,16 +283,16 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6">
       {/* Editorial Header */}
-      <div className="pb-6 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+      <div className="pb-5 sm:pb-6 border-b border-slate-200 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div className="max-w-xl">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="font-semibold text-indigo-700">Academic Director Portal</span>
             <span>·</span>
             <span>BTEB Probidhan 2022</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Faculty &amp; Subject Part Allocations
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -300,22 +300,22 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start xl:self-auto shrink-0">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full xl:w-auto shrink-0">
           <button
             type="button"
             onClick={() => setShowFreshDbConfirm(true)}
-            className="h-9 inline-flex items-center gap-1.5 px-3 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
             title="Wipe sessions, records, students, and assignments"
           >
-            <Trash2 className="w-3.5 h-3.5" />
+            <Trash2 className="w-3.5 h-3.5 shrink-0" />
             <span>Fresh Database</span>
           </button>
           <button
             type="button"
             onClick={() => setShowAddSubjectModal(true)}
-            className="h-9 inline-flex items-center gap-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
           >
-            <Plus className="w-3.5 h-3.5 text-slate-500" />
+            <Plus className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <span>Add Course</span>
           </button>
           <button
@@ -324,18 +324,18 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
               setTeacherError(null);
               setShowAddTeacherModal(true);
             }}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
           >
-            <UserPlus className="w-3.5 h-3.5" />
+            <UserPlus className="w-3.5 h-3.5 shrink-0" />
             <span>Add Teacher</span>
           </button>
           <button
             type="button"
             onClick={() => openAssignModal()}
             disabled={teachers.length === 0}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
           >
-            <School className="w-3.5 h-3.5" />
+            <School className="w-3.5 h-3.5 shrink-0" />
             <span>Assign Subject Part</span>
           </button>
         </div>
@@ -378,7 +378,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
           <button
             type="button"
             onClick={() => setViewMode('approvals')}
-            className="shrink-0 h-9 inline-flex items-center gap-1.5 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
+            className="shrink-0 h-9 inline-flex items-center justify-center gap-1.5 px-3.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap"
           >
             <UserCheck className="w-3.5 h-3.5" />
             <span>Review Requests ({pendingUsers.length})</span>
@@ -408,7 +408,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
               setTeacherError(null);
               setShowAddTeacherModal(true);
             }}
-            className="shrink-0 h-9 inline-flex items-center gap-1.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
+            className="shrink-0 h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-4 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Add First Teacher</span>
@@ -417,56 +417,59 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
       )}
 
       {/* View Mode & Semester Filter Bar */}
-      <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center bg-slate-100 p-1 rounded-lg self-start tabular-nums gap-1">
+      <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200 space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="grid grid-cols-2 sm:inline-flex items-center bg-slate-100 p-1 rounded-xl sm:rounded-lg w-full lg:w-auto tabular-nums gap-1">
             <button
               type="button"
               onClick={() => setViewMode('matrix')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+              className={`min-h-[38px] sm:min-h-0 flex items-center justify-center sm:justify-start gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'matrix'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Course Theory &amp; Practical Matrix ({filteredSubjects.length})</span>
+              <BookOpen className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+              <span className="sm:hidden">Courses ({filteredSubjects.length})</span>
+              <span className="hidden sm:inline">Course Theory &amp; Practical Matrix ({filteredSubjects.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('faculty')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+              className={`min-h-[38px] sm:min-h-0 flex items-center justify-center sm:justify-start gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'faculty'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <Users className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Faculty Directory &amp; Workload ({teachers.length})</span>
+              <Users className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="sm:hidden">Faculty ({teachers.length})</span>
+              <span className="hidden sm:inline">Faculty Directory &amp; Workload ({teachers.length})</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('roles')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+              className={`min-h-[38px] sm:min-h-0 flex items-center justify-center sm:justify-start gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'roles'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <UserCog className="w-3.5 h-3.5 text-slate-700" />
+              <UserCog className="w-3.5 h-3.5 text-slate-700 shrink-0" />
               <span>Admins &amp; Roles ({adminCount})</span>
             </button>
             <button
               type="button"
               onClick={() => setViewMode('approvals')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
+              className={`min-h-[38px] sm:min-h-0 flex items-center justify-center sm:justify-start gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-md text-xs font-semibold transition-colors whitespace-nowrap ${
                 viewMode === 'approvals'
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              <UserCheck className="w-3.5 h-3.5 text-amber-600" />
-              <span>Pending Approvals</span>
+              <UserCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              <span className="sm:hidden">Approvals</span>
+              <span className="hidden sm:inline">Pending Approvals</span>
               {pendingUsers.length > 0 && (
                 <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold">
                   {pendingUsers.length}
@@ -476,7 +479,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
           </div>
 
           {viewMode === 'matrix' && (
-            <div className="relative w-full md:w-64">
+            <div className="relative w-full lg:w-64">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -489,7 +492,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
           )}
 
           {viewMode === 'roles' && (
-            <div className="relative w-full md:w-64">
+            <div className="relative w-full lg:w-64">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -503,15 +506,15 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
         </div>
 
         {viewMode === 'matrix' && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-3 border-t border-slate-100 tabular-nums">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-3 border-t border-slate-100 tabular-nums">
             <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5 shrink-0 mr-1">
               <Layers className="w-3.5 h-3.5 text-slate-400" />
-              Semesters:
+              <span className="hidden sm:inline">Semesters:</span>
             </span>
             <button
               type="button"
               onClick={() => setSelectedSemesterFilter('all')}
-              className={`h-7 px-2.5 rounded-md text-xs font-semibold transition-colors shrink-0 ${
+              className={`h-8 sm:h-7 px-3 sm:px-2.5 rounded-md text-xs font-semibold transition-colors shrink-0 ${
                 selectedSemesterFilter === 'all'
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -527,7 +530,7 @@ export const AdminAssignments: React.FC<AdminAssignmentsProps> = () => {
                   key={sem}
                   type="button"
                   onClick={() => setSelectedSemesterFilter(sem)}
-                  className={`h-7 px-2.5 rounded-md text-xs font-semibold transition-colors shrink-0 ${
+                  className={`h-8 sm:h-7 px-3 sm:px-2.5 rounded-md text-xs font-semibold transition-colors shrink-0 ${
                     isSelected
                       ? 'bg-indigo-600 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

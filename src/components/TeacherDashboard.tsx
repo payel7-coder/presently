@@ -117,17 +117,17 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
       {/* Editorial Workspace Header */}
       <div className="pb-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-start gap-4">
-          <Avatar src={currentUser.avatar} name={currentUser.name} size="xl" />
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <div className="flex items-start gap-3 sm:gap-4">
+          <Avatar src={currentUser.avatar} name={currentUser.name} size="lg" />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs text-slate-500">
               <span className="font-semibold text-emerald-700">Teacher Portal</span>
               <span>·</span>
               <span className="font-mono">{currentUser.employeeId}</span>
-              <span>·</span>
-              <span>{currentUser.department}</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="hidden sm:inline">{currentUser.department}</span>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
               Welcome back, {currentUser.name}
             </h1>
             <p className="text-xs text-slate-500 mt-1 max-w-2xl">
@@ -136,12 +136,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto shrink-0">
           {onOpenUserProfile && (
             <button
               type="button"
               onClick={onOpenUserProfile}
-              className="inline-flex items-center justify-center gap-1.5 h-10 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
+              className={`inline-flex items-center justify-center gap-1.5 h-10 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0 ${
+                teacherAssignments.length === 0 ? 'col-span-2 sm:col-span-1' : ''
+              }`}
             >
               <UserCog className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>My Profile</span>
@@ -151,10 +153,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <button
               type="button"
               onClick={() => onStartAttendance(teacherAssignments[0].subject.id, teacherAssignments[0].assignment.part || 'theory')}
-              className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
+              className="inline-flex items-center justify-center gap-1.5 h-10 px-3.5 sm:px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
             >
               <ClipboardCheck className="w-4 h-4 shrink-0" />
-              <span>Launch 1-Click Roll Call</span>
+              <span>1-Click Roll Call</span>
             </button>
           )}
         </div>
@@ -194,13 +196,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       )}
 
       {/* KPI Metrics Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 tabular-nums">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
               Assigned Parts
             </span>
-            <BookOpen className="w-4 h-4 text-slate-400" />
+            <BookOpen className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">
             {teacherAssignments.length}
@@ -210,12 +212,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
               Total Students
             </span>
-            <Users className="w-4 h-4 text-slate-400" />
+            <Users className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">
             {totalStudents}
@@ -225,12 +227,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
               Avg Attendance Rate
             </span>
-            <TrendingUp className="w-4 h-4 text-emerald-600" />
+            <TrendingUp className="w-4 h-4 text-emerald-600 shrink-0" />
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">
             {sessionSummary.averageAttendanceRate}%
@@ -240,12 +242,12 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
               Sessions Recorded
             </span>
-            <Calendar className="w-4 h-4 text-slate-400" />
+            <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
           </div>
           <p className="text-2xl font-bold text-slate-900 mt-2">
             {teacherSessions.length}
@@ -274,68 +276,70 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
 
           {/* Target Controls */}
-          <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-200 self-start sm:self-auto tabular-nums">
+          <div className="flex items-center justify-between sm:justify-start gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200 w-full sm:w-auto tabular-nums">
             <span className="text-xs font-medium text-slate-500 px-2">Target</span>
-            <button
-              type="button"
-              onClick={() => handleUpdateTarget(dailyTarget - 1)}
-              disabled={dailyTarget <= 1}
-              className="w-7 h-7 rounded-md bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 transition-colors"
-              title="Decrease daily target"
-              aria-label="Decrease daily target"
-            >
-              <Minus className="w-3.5 h-3.5" />
-            </button>
-
-            {isEditingTarget ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleUpdateTarget(parseInt(customTargetInput, 10));
-                }}
-                className="flex items-center gap-1"
-              >
-                <input
-                  type="number"
-                  min="1"
-                  max="20"
-                  value={customTargetInput}
-                  onChange={(e) => setCustomTargetInput(e.target.value)}
-                  className="w-12 h-7 px-1.5 text-center text-xs font-bold text-slate-900 bg-white border border-emerald-500 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="h-7 px-2.5 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700"
-                >
-                  Save
-                </button>
-              </form>
-            ) : (
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => {
-                  setCustomTargetInput(String(dailyTarget));
-                  setIsEditingTarget(true);
-                }}
-                className="h-7 px-2.5 rounded-md bg-white border border-slate-200 text-xs font-semibold text-slate-900 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
-                title="Click to set custom target"
+                onClick={() => handleUpdateTarget(dailyTarget - 1)}
+                disabled={dailyTarget <= 1}
+                className="w-9 h-9 sm:w-7 sm:h-7 rounded-md bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 transition-colors"
+                title="Decrease daily target"
+                aria-label="Decrease daily target"
               >
-                <span>{dailyTarget} {dailyTarget === 1 ? 'Class' : 'Classes'}</span>
-                <Settings2 className="w-3 h-3 text-slate-400" />
+                <Minus className="w-3.5 h-3.5" />
               </button>
-            )}
 
-            <button
-              type="button"
-              onClick={() => handleUpdateTarget(dailyTarget + 1)}
-              disabled={dailyTarget >= 20}
-              className="w-7 h-7 rounded-md bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 transition-colors"
-              title="Increase daily target"
-              aria-label="Increase daily target"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+              {isEditingTarget ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleUpdateTarget(parseInt(customTargetInput, 10));
+                  }}
+                  className="flex items-center gap-1"
+                >
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={customTargetInput}
+                    onChange={(e) => setCustomTargetInput(e.target.value)}
+                    className="w-12 h-9 sm:h-7 px-1.5 text-center text-xs font-bold text-slate-900 bg-white border border-emerald-500 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-600/20"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="h-9 sm:h-7 px-2.5 bg-emerald-600 text-white rounded-md text-xs font-semibold hover:bg-emerald-700"
+                  >
+                    Save
+                  </button>
+                </form>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCustomTargetInput(String(dailyTarget));
+                    setIsEditingTarget(true);
+                  }}
+                  className="h-9 sm:h-7 px-3 sm:px-2.5 rounded-md bg-white border border-slate-200 text-xs font-semibold text-slate-900 hover:bg-slate-50 transition-colors flex items-center gap-1.5 whitespace-nowrap"
+                  title="Click to set custom target"
+                >
+                  <span>{dailyTarget} {dailyTarget === 1 ? 'Class' : 'Classes'}</span>
+                  <Settings2 className="w-3 h-3 text-slate-400" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => handleUpdateTarget(dailyTarget + 1)}
+                disabled={dailyTarget >= 20}
+                className="w-9 h-9 sm:w-7 sm:h-7 rounded-md bg-white border border-slate-200 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-slate-700 transition-colors"
+                title="Increase daily target"
+                aria-label="Increase daily target"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
             <div className="hidden md:flex items-center gap-1 pl-1.5 border-l border-slate-200 ml-1">
               {[2, 3, 4, 5, 6].map((num) => (
@@ -559,26 +563,26 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               Theory and Practical allocations assigned by your department administrator.
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full sm:w-auto">
             {teacherAssignments.length > 0 && onOpenAssignments && (
               <button
                 type="button"
                 onClick={() => onOpenAssignments()}
-                className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-1.5 h-10 sm:h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors whitespace-nowrap"
                 title="Track and grade student coursework assignments"
               >
-                <ClipboardList className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Student Assignments</span>
+                <ClipboardList className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Assignments</span>
               </button>
             )}
             {teacherAssignments.length > 0 && (
               <button
                 type="button"
                 onClick={() => setIsAbsentModalOpen(true)}
-                className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors whitespace-nowrap"
+                className="inline-flex items-center justify-center gap-1.5 h-10 sm:h-9 px-3 text-xs font-semibold text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors whitespace-nowrap"
                 title="Download subject and date-wise student absent list PDF"
               >
-                <UserX className="w-3.5 h-3.5" />
+                <UserX className="w-3.5 h-3.5 shrink-0" />
                 <span>Absent List PDF</span>
               </button>
             )}
@@ -586,13 +590,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <button
                 type="button"
                 onClick={onOpenBulkImport}
-                className="inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+                className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-1.5 h-10 sm:h-9 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
               >
-                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600 shrink-0" />
                 <span>Import Class List via CSV</span>
               </button>
             ) : (
-              <span className="text-xs text-slate-400">
+              <span className="col-span-2 sm:col-span-1 text-xs text-slate-400">
                 Student rosters are managed by administration
               </span>
             )}

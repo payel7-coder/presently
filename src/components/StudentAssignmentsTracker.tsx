@@ -554,18 +554,18 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
   if (!currentUser) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6">
       {/* Editorial Header */}
-      <div className="pb-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="pb-5 sm:pb-6 border-b border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className="font-semibold text-emerald-700">Coursework &amp; Assessment</span>
             <span>·</span>
             <span>BTEB Probidhan 2022</span>
-            <span>·</span>
-            <span>{isAdmin ? 'Institution-Wide View' : 'Assigned Courses Only'}</span>
+            <span className="hidden sm:inline">·</span>
+            <span className="hidden sm:inline">{isAdmin ? 'Institution-Wide View' : 'Assigned Courses Only'}</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Student Assignments &amp; Evaluation
           </h1>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl">
@@ -577,7 +577,7 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
           type="button"
           onClick={handleOpenCreateModal}
           disabled={creatableCourseOptions.length === 0}
-          className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0 self-start md:self-auto"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 h-10 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-semibold rounded-lg text-xs transition-colors whitespace-nowrap shrink-0"
         >
           <Plus className="w-4 h-4 shrink-0" />
           <span>Create Assignment</span>
@@ -585,18 +585,18 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
       </div>
 
       {/* Mode Switcher & Filter Toolbar */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="bg-white border border-slate-200 rounded-xl p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div
           role="tablist"
           aria-label="Assignment Workspace Mode"
-          className="inline-flex items-center gap-1 p-1 bg-slate-100 rounded-lg self-start"
+          className="grid grid-cols-2 sm:inline-flex items-center gap-1 p-1 bg-slate-100 rounded-xl sm:rounded-lg w-full sm:w-auto"
         >
           <button
             type="button"
             role="tab"
             aria-selected={viewMode === 'tracker'}
             onClick={() => setViewMode('tracker')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            className={`min-h-[38px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg sm:rounded-md transition-colors whitespace-nowrap shrink-0 ${
               viewMode === 'tracker'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
@@ -609,18 +609,18 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
             role="tab"
             aria-selected={viewMode === 'summary'}
             onClick={() => setViewMode('summary')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors whitespace-nowrap shrink-0 ${
+            className={`min-h-[38px] sm:min-h-0 px-3 py-1.5 text-xs font-semibold rounded-lg sm:rounded-md transition-colors whitespace-nowrap shrink-0 ${
               viewMode === 'summary'
                 ? 'bg-white text-slate-900 shadow-xs'
                 : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Student Evaluation Summary
+            Evaluation Summary
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <div className="relative flex-1 sm:flex-initial min-w-[200px]">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+          <div className="relative col-span-2 sm:flex-initial sm:min-w-[200px]">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="search"
@@ -636,7 +636,7 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
             aria-label="Filter by subject"
             value={selectedSubjectFilter}
             onChange={e => setSelectedSubjectFilter(e.target.value)}
-            className="h-9 max-w-[260px] px-3 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+            className="w-full sm:w-auto sm:max-w-[240px] h-9 px-3 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 truncate"
           >
             <option value="all">
               {isAdmin ? 'All Subjects' : 'All Assigned Subjects'}
@@ -654,7 +654,7 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
             aria-label="Filter by subject part"
             value={selectedPartFilter}
             onChange={e => setSelectedPartFilter(e.target.value as 'all' | SubjectPart)}
-            className="h-9 px-3 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+            className="w-full sm:w-auto h-9 px-3 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
           >
             <option value="all">All Parts</option>
             <option value="theory">Theory</option>
@@ -966,60 +966,42 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
                         No students match the current status filter or search query.
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                          <thead>
-                            <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                              <th className="py-2.5 px-4">Roll</th>
-                              <th className="py-2.5 px-4">Student</th>
-                              <th className="py-2.5 px-4">Status</th>
-                              <th className="py-2.5 px-4">Marks (/{activeCoursework.maxMarks})</th>
-                              <th className="py-2.5 px-4">Teacher Feedback</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 text-xs">
-                            {displayedStudentsInTracker.map(stu => {
-                              const draft = drafts[stu.id] || {
-                                status: 'pending' as AssignmentSubmissionStatus,
-                                marksInput: '',
-                                feedback: '',
-                              };
-                              const numericVal =
-                                draft.marksInput.trim() === '' ? null : Number(draft.marksInput);
-                              const pct =
-                                numericVal !== null &&
-                                Number.isFinite(numericVal) &&
-                                numericVal >= 0 &&
-                                numericVal <= activeCoursework.maxMarks
-                                  ? Math.round((numericVal / activeCoursework.maxMarks) * 100)
-                                  : null;
-                              const isOutOfBounds =
-                                numericVal !== null &&
-                                (!Number.isFinite(numericVal) ||
-                                  numericVal < 0 ||
-                                  numericVal > activeCoursework.maxMarks);
+                      <>
+                        {/* Mobile Evaluation Cards */}
+                        <div className="md:hidden divide-y divide-slate-100">
+                          {displayedStudentsInTracker.map(stu => {
+                            const draft = drafts[stu.id] || {
+                              status: 'pending' as AssignmentSubmissionStatus,
+                              marksInput: '',
+                              feedback: '',
+                            };
+                            const numericVal =
+                              draft.marksInput.trim() === '' ? null : Number(draft.marksInput);
+                            const isOutOfBounds =
+                              numericVal !== null &&
+                              (!Number.isFinite(numericVal) ||
+                                numericVal < 0 ||
+                                numericVal > activeCoursework.maxMarks);
 
-                              return (
-                                <tr key={stu.id} className="hover:bg-slate-50/60">
-                                  <td className="py-2.5 px-4 font-mono tabular-nums font-medium text-slate-700 whitespace-nowrap">
-                                    {stu.rollNumber}
-                                  </td>
-                                  <td className="py-2.5 px-4">
-                                    <div className="flex items-center gap-2.5 min-w-[160px]">
-                                      <Avatar src={stu.avatar} name={stu.name} size="sm" />
-                                      <div className="min-w-0">
-                                        <p className="font-semibold text-slate-900 truncate">
-                                          {stu.name}
-                                        </p>
-                                        {stu.registrationNumber && (
-                                          <p className="text-[11px] font-mono text-slate-400">
-                                            Reg {stu.registrationNumber}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="py-2.5 px-4">
+                            return (
+                              <div key={stu.id} className="p-4 space-y-3 text-xs">
+                                <div className="flex items-center gap-2.5">
+                                  <Avatar src={stu.avatar} name={stu.name} size="sm" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-semibold text-slate-900 truncate">
+                                      {stu.name}
+                                    </p>
+                                    <p className="text-[11px] font-mono text-slate-500">
+                                      Roll {stu.rollNumber}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5">
+                                  <div>
+                                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                                      Status
+                                    </label>
                                     <select
                                       aria-label={`Submission status for ${stu.name}`}
                                       value={draft.status}
@@ -1034,7 +1016,7 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
                                               : prev.marksInput,
                                         }));
                                       }}
-                                      className="h-8 px-2 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+                                      className="w-full h-9 px-2 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-800"
                                     >
                                       {STATUS_OPTIONS.map(opt => (
                                         <option key={opt.value} value={opt.value}>
@@ -1042,70 +1024,210 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
                                         </option>
                                       ))}
                                     </select>
-                                  </td>
-                                  <td className="py-2.5 px-4">
-                                    <div className="flex items-center gap-2 tabular-nums">
-                                      <input
-                                        type="number"
-                                        min={0}
-                                        max={activeCoursework.maxMarks}
-                                        step="0.5"
-                                        aria-label={`Marks for ${stu.name}`}
-                                        value={draft.marksInput}
-                                        placeholder="—"
-                                        onChange={e => {
-                                          const raw = e.target.value;
-                                          const num = raw.trim() === '' ? null : Number(raw);
-                                          updateStudentDraft(stu.id, prev => {
-                                            let nextStatus = prev.status;
-                                            if (
-                                              num !== null &&
-                                              Number.isFinite(num) &&
-                                              num >= 0 &&
-                                              num <= activeCoursework.maxMarks &&
-                                              (prev.status === 'pending' || prev.status === 'submitted')
-                                            ) {
-                                              nextStatus = 'graded';
-                                            }
-                                            return {
-                                              ...prev,
-                                              marksInput: raw,
-                                              status: nextStatus,
-                                            };
-                                          });
-                                        }}
-                                        className={`w-20 h-8 px-2 font-mono text-xs bg-white border rounded-lg focus:outline-none focus:ring-2 ${
-                                          isOutOfBounds
-                                            ? 'border-rose-500 text-rose-700 focus:ring-rose-500/20'
-                                            : 'border-slate-200 text-slate-900 focus:ring-emerald-600/20 focus:border-emerald-600'
-                                        }`}
-                                      />
-                                      <span className="text-[11px] font-mono text-slate-400 w-10">
-                                        {pct !== null ? `${pct}%` : ''}
-                                      </span>
-                                    </div>
-                                  </td>
-                                  <td className="py-2.5 px-4 min-w-[180px]">
+                                  </div>
+
+                                  <div>
+                                    <label className="block text-[11px] font-medium text-slate-500 mb-1">
+                                      Marks (/{activeCoursework.maxMarks})
+                                    </label>
                                     <input
-                                      type="text"
-                                      aria-label={`Feedback for ${stu.name}`}
-                                      value={draft.feedback}
-                                      placeholder="Remarks or evaluation notes..."
-                                      onChange={e =>
-                                        updateStudentDraft(stu.id, prev => ({
-                                          ...prev,
-                                          feedback: e.target.value,
-                                        }))
-                                      }
-                                      className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+                                      type="number"
+                                      min={0}
+                                      max={activeCoursework.maxMarks}
+                                      step="0.5"
+                                      aria-label={`Marks for ${stu.name}`}
+                                      value={draft.marksInput}
+                                      placeholder="—"
+                                      onChange={e => {
+                                        const raw = e.target.value;
+                                        const num = raw.trim() === '' ? null : Number(raw);
+                                        updateStudentDraft(stu.id, prev => {
+                                          let nextStatus = prev.status;
+                                          if (
+                                            num !== null &&
+                                            Number.isFinite(num) &&
+                                            num >= 0 &&
+                                            num <= activeCoursework.maxMarks &&
+                                            (prev.status === 'pending' || prev.status === 'submitted')
+                                          ) {
+                                            nextStatus = 'graded';
+                                          }
+                                          return {
+                                            ...prev,
+                                            marksInput: raw,
+                                            status: nextStatus,
+                                          };
+                                        });
+                                      }}
+                                      className={`w-full h-9 px-2.5 font-mono text-xs bg-white border rounded-lg ${
+                                        isOutOfBounds
+                                          ? 'border-rose-500 text-rose-700'
+                                          : 'border-slate-200 text-slate-900'
+                                      }`}
                                     />
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
+                                  </div>
+                                </div>
+
+                                <input
+                                  type="text"
+                                  aria-label={`Feedback for ${stu.name}`}
+                                  value={draft.feedback}
+                                  placeholder="Remarks or evaluation notes..."
+                                  onChange={e =>
+                                    updateStudentDraft(stu.id, prev => ({
+                                      ...prev,
+                                      feedback: e.target.value,
+                                    }))
+                                  }
+                                  className="w-full h-9 px-2.5 text-xs bg-slate-50 border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none"
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Desktop Evaluation Table */}
+                        <div className="hidden md:block overflow-x-auto">
+                          <table className="w-full text-left border-collapse">
+                            <thead>
+                              <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                <th className="py-2.5 px-4">Roll</th>
+                                <th className="py-2.5 px-4">Student</th>
+                                <th className="py-2.5 px-4">Status</th>
+                                <th className="py-2.5 px-4">Marks (/{activeCoursework.maxMarks})</th>
+                                <th className="py-2.5 px-4">Teacher Feedback</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-xs">
+                              {displayedStudentsInTracker.map(stu => {
+                                const draft = drafts[stu.id] || {
+                                  status: 'pending' as AssignmentSubmissionStatus,
+                                  marksInput: '',
+                                  feedback: '',
+                                };
+                                const numericVal =
+                                  draft.marksInput.trim() === '' ? null : Number(draft.marksInput);
+                                const pct =
+                                  numericVal !== null &&
+                                  Number.isFinite(numericVal) &&
+                                  numericVal >= 0 &&
+                                  numericVal <= activeCoursework.maxMarks
+                                    ? Math.round((numericVal / activeCoursework.maxMarks) * 100)
+                                    : null;
+                                const isOutOfBounds =
+                                  numericVal !== null &&
+                                  (!Number.isFinite(numericVal) ||
+                                    numericVal < 0 ||
+                                    numericVal > activeCoursework.maxMarks);
+
+                                return (
+                                  <tr key={stu.id} className="hover:bg-slate-50/60">
+                                    <td className="py-2.5 px-4 font-mono tabular-nums font-medium text-slate-700 whitespace-nowrap">
+                                      {stu.rollNumber}
+                                    </td>
+                                    <td className="py-2.5 px-4">
+                                      <div className="flex items-center gap-2.5 min-w-[160px]">
+                                        <Avatar src={stu.avatar} name={stu.name} size="sm" />
+                                        <div className="min-w-0">
+                                          <p className="font-semibold text-slate-900 truncate">
+                                            {stu.name}
+                                          </p>
+                                          {stu.registrationNumber && (
+                                            <p className="text-[11px] font-mono text-slate-400">
+                                              Reg {stu.registrationNumber}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-4">
+                                      <select
+                                        aria-label={`Submission status for ${stu.name}`}
+                                        value={draft.status}
+                                        onChange={e => {
+                                          const nextStatus = e.target.value as AssignmentSubmissionStatus;
+                                          updateStudentDraft(stu.id, prev => ({
+                                            ...prev,
+                                            status: nextStatus,
+                                            marksInput:
+                                              nextStatus === 'missing' && prev.marksInput === ''
+                                                ? '0'
+                                                : prev.marksInput,
+                                          }));
+                                        }}
+                                        className="h-8 px-2 text-xs font-medium bg-white border border-slate-200 rounded-lg text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+                                      >
+                                        {STATUS_OPTIONS.map(opt => (
+                                          <option key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                    <td className="py-2.5 px-4">
+                                      <div className="flex items-center gap-2 tabular-nums">
+                                        <input
+                                          type="number"
+                                          min={0}
+                                          max={activeCoursework.maxMarks}
+                                          step="0.5"
+                                          aria-label={`Marks for ${stu.name}`}
+                                          value={draft.marksInput}
+                                          placeholder="—"
+                                          onChange={e => {
+                                            const raw = e.target.value;
+                                            const num = raw.trim() === '' ? null : Number(raw);
+                                            updateStudentDraft(stu.id, prev => {
+                                              let nextStatus = prev.status;
+                                              if (
+                                                num !== null &&
+                                                Number.isFinite(num) &&
+                                                num >= 0 &&
+                                                num <= activeCoursework.maxMarks &&
+                                                (prev.status === 'pending' || prev.status === 'submitted')
+                                              ) {
+                                                nextStatus = 'graded';
+                                              }
+                                              return {
+                                                ...prev,
+                                                marksInput: raw,
+                                                status: nextStatus,
+                                              };
+                                            });
+                                          }}
+                                          className={`w-20 h-8 px-2 font-mono text-xs bg-white border rounded-lg focus:outline-none focus:ring-2 ${
+                                            isOutOfBounds
+                                              ? 'border-rose-500 text-rose-700 focus:ring-rose-500/20'
+                                              : 'border-slate-200 text-slate-900 focus:ring-emerald-600/20 focus:border-emerald-600'
+                                          }`}
+                                        />
+                                        <span className="text-[11px] font-mono text-slate-400 w-10">
+                                          {pct !== null ? `${pct}%` : ''}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2.5 px-4 min-w-[180px]">
+                                      <input
+                                        type="text"
+                                        aria-label={`Feedback for ${stu.name}`}
+                                        value={draft.feedback}
+                                        placeholder="Remarks or evaluation notes..."
+                                        onChange={e =>
+                                          updateStudentDraft(stu.id, prev => ({
+                                            ...prev,
+                                            feedback: e.target.value,
+                                          }))
+                                        }
+                                        className="w-full h-8 px-2.5 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600"
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
                     )}
                   </div>
                 </div>
@@ -1134,104 +1256,187 @@ export const StudentAssignmentsTracker: React.FC<StudentAssignmentsTrackerProps>
               No students match the selected course filters.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-                    <th className="py-2.5 px-4">Roll</th>
-                    <th className="py-2.5 px-4">Student</th>
-                    <th className="py-2.5 px-4">Assigned</th>
-                    <th className="py-2.5 px-4">Submitted · Graded</th>
-                    <th className="py-2.5 px-4">Missing</th>
-                    <th className="py-2.5 px-4">Cumulative Score</th>
-                    <th className="py-2.5 px-4">Attendance</th>
-                    <th className="py-2.5 px-4">Standing</th>
-                    <th className="py-2.5 px-4 text-right">Breakdown</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs tabular-nums">
-                  {summaryRows.map(({ student, classGroup, evalSummary, attendanceStats }) => (
-                    <tr key={student.id} className="hover:bg-slate-50/60">
-                      <td className="py-3 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
-                        {student.rollNumber}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <Avatar src={student.avatar} name={student.name} size="sm" />
-                          <div>
-                            <p className="font-semibold text-slate-900">{student.name}</p>
-                            <p className="text-[11px] text-slate-500">
-                              {classGroup?.name || student.classId}
-                            </p>
+            <>
+              {/* Mobile Evaluation Summary Cards */}
+              <div className="md:hidden divide-y divide-slate-100 text-xs tabular-nums">
+                {summaryRows.map(({ student, classGroup, evalSummary, attendanceStats }) => (
+                  <div key={student.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <Avatar src={student.avatar} name={student.name} size="sm" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                            <span className="font-mono font-semibold text-slate-800">
+                              #{student.rollNumber}
+                            </span>
+                            <span className="truncate">
+                              · {classGroup?.name || student.classId}
+                            </span>
                           </div>
+                          <p className="text-sm font-semibold text-slate-900 truncate">
+                            {student.name}
+                          </p>
                         </div>
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-700">
-                        {evalSummary.totalAssignments}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-slate-700">
-                        {evalSummary.submittedCount + evalSummary.lateCount + evalSummary.gradedCount}{' '}
-                        <span className="text-slate-400">· {evalSummary.gradedCount} graded</span>
-                      </td>
-                      <td className="py-3 px-4 font-mono">
-                        <span
-                          className={
-                            evalSummary.missingCount > 0 ? 'text-rose-700 font-semibold' : 'text-slate-500'
-                          }
-                        >
-                          {evalSummary.missingCount}
+                      </div>
+
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap shrink-0 ${getStandingClasses(
+                          evalSummary.standing
+                        )}`}
+                      >
+                        {evalSummary.standing}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 rounded-lg bg-slate-50/80 border border-slate-200/80 p-2.5 text-[11px]">
+                      <div>
+                        <span className="text-slate-500 block">Tasks</span>
+                        <span className="font-mono font-semibold text-slate-900">
+                          {evalSummary.submittedCount + evalSummary.lateCount + evalSummary.gradedCount}/{evalSummary.totalAssignments}
+                          {evalSummary.missingCount > 0 && (
+                            <span className="text-rose-700"> ({evalSummary.missingCount} miss)</span>
+                          )}
                         </span>
-                      </td>
-                      <td className="py-3 px-4 font-mono font-semibold text-slate-900 whitespace-nowrap">
-                        {evalSummary.totalMaxMarks > 0 && evalSummary.averagePercentage !== null ? (
-                          <span>
-                            {evalSummary.totalMarksObtained}/{evalSummary.totalMaxMarks}{' '}
-                            <span className="text-emerald-700">({evalSummary.averagePercentage}%)</span>
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-mono">
-                        {attendanceStats.totalSessions > 0 ? (
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Score</span>
+                        <span className="font-mono font-semibold text-slate-900">
+                          {evalSummary.totalMaxMarks > 0 && evalSummary.averagePercentage !== null
+                            ? `${evalSummary.averagePercentage}%`
+                            : '—'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Attendance</span>
+                        <span
+                          className={`font-mono font-semibold ${
+                            attendanceStats.totalSessions === 0
+                              ? 'text-slate-400'
+                              : attendanceStats.isAtRisk
+                                ? 'text-rose-700'
+                                : 'text-slate-900'
+                          }`}
+                        >
+                          {attendanceStats.totalSessions > 0
+                            ? `${attendanceStats.attendancePercentage}%`
+                            : '—'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setInspectedStudent(student)}
+                      aria-label={`Evaluate breakdown for ${student.name}`}
+                      className="w-full h-10 inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-slate-500" />
+                      <span>View Breakdown</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Evaluation Summary Table */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-slate-200 bg-slate-50/70 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                      <th className="py-2.5 px-4">Roll</th>
+                      <th className="py-2.5 px-4">Student</th>
+                      <th className="py-2.5 px-4">Assigned</th>
+                      <th className="py-2.5 px-4">Submitted · Graded</th>
+                      <th className="py-2.5 px-4">Missing</th>
+                      <th className="py-2.5 px-4">Cumulative Score</th>
+                      <th className="py-2.5 px-4">Attendance</th>
+                      <th className="py-2.5 px-4">Standing</th>
+                      <th className="py-2.5 px-4 text-right">Breakdown</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs tabular-nums">
+                    {summaryRows.map(({ student, classGroup, evalSummary, attendanceStats }) => (
+                      <tr key={student.id} className="hover:bg-slate-50/60">
+                        <td className="py-3 px-4 font-mono font-medium text-slate-700 whitespace-nowrap">
+                          {student.rollNumber}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-2.5">
+                            <Avatar src={student.avatar} name={student.name} size="sm" />
+                            <div>
+                              <p className="font-semibold text-slate-900">{student.name}</p>
+                              <p className="text-[11px] text-slate-500">
+                                {classGroup?.name || student.classId}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-700">
+                          {evalSummary.totalAssignments}
+                        </td>
+                        <td className="py-3 px-4 font-mono text-slate-700">
+                          {evalSummary.submittedCount + evalSummary.lateCount + evalSummary.gradedCount}{' '}
+                          <span className="text-slate-400">· {evalSummary.gradedCount} graded</span>
+                        </td>
+                        <td className="py-3 px-4 font-mono">
                           <span
                             className={
-                              attendanceStats.isAtRisk
-                                ? 'text-rose-700 font-semibold'
-                                : 'text-slate-700 font-medium'
+                              evalSummary.missingCount > 0 ? 'text-rose-700 font-semibold' : 'text-slate-500'
                             }
                           >
-                            {attendanceStats.attendancePercentage}%
+                            {evalSummary.missingCount}
                           </span>
-                        ) : (
-                          <span className="text-slate-400">—</span>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap ${getStandingClasses(
-                            evalSummary.standing
-                          )}`}
-                        >
-                          {evalSummary.standing}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setInspectedStudent(student)}
-                          aria-label={`Evaluate breakdown for ${student.name}`}
-                          className="inline-flex items-center gap-1 h-8 px-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors whitespace-nowrap"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Details</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                          {evalSummary.totalMaxMarks > 0 && evalSummary.averagePercentage !== null ? (
+                            <span>
+                              {evalSummary.totalMarksObtained}/{evalSummary.totalMaxMarks}{' '}
+                              <span className="text-emerald-700">({evalSummary.averagePercentage}%)</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 font-mono">
+                          {attendanceStats.totalSessions > 0 ? (
+                            <span
+                              className={
+                                attendanceStats.isAtRisk
+                                  ? 'text-rose-700 font-semibold'
+                                  : 'text-slate-700 font-medium'
+                              }
+                            >
+                              {attendanceStats.attendancePercentage}%
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span
+                            className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[11px] font-semibold whitespace-nowrap ${getStandingClasses(
+                              evalSummary.standing
+                            )}`}
+                          >
+                            {evalSummary.standing}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => setInspectedStudent(student)}
+                            aria-label={`Evaluate breakdown for ${student.name}`}
+                            className="inline-flex items-center gap-1 h-8 px-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors whitespace-nowrap"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Details</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}

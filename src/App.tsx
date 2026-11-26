@@ -69,6 +69,18 @@ function AttendanceApp() {
   const [activeFormFillupClassId, setActiveFormFillupClassId] = useState<string | undefined>(undefined);
   const [activeProfileStudentId, setActiveProfileStudentId] = useState<string | undefined>(undefined);
 
+  // Active attendance topbar context (subject code + date)
+  const [attendanceTopbarContext, setAttendanceTopbarContext] = useState<{
+    subjectCode: string;
+    date: string;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (activeTab !== 'take-attendance') {
+      setAttendanceTopbarContext(null);
+    }
+  }, [activeTab]);
+
   // Bulk import modal
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   const [importTargetClassId, setImportTargetClassId] = useState<string | undefined>(undefined);
@@ -136,10 +148,11 @@ function AttendanceApp() {
         setActiveTab={setActiveTab}
         onOpenBulkImport={() => handleOpenBulkImport()}
         onOpenLoginModal={() => setIsLoginModalOpen(true)}
+        attendanceContext={activeTab === 'take-attendance' ? attendanceTopbarContext : null}
       />
 
       {/* Main Body View */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-6 md:pb-14">
         {currentUser.role === 'teacher' ? (
           <>
             {activeTab === 'my-subjects' && (
@@ -158,6 +171,7 @@ function AttendanceApp() {
                 initialPart={activeSubjectPart}
                 initialDate={activeAttendanceDate}
                 onNavigateToReports={handleViewReports}
+                onSessionContextChange={setAttendanceTopbarContext}
               />
             )}
             {activeTab === 'assignments' && (
@@ -251,13 +265,13 @@ function AttendanceApp() {
 
       {/* Footer */}
       <footer className="bg-white border-t border-slate-200 py-5 text-xs text-slate-500 no-print">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
             <span className="font-semibold text-slate-800">Presently</span>
             <span className="text-slate-300">·</span>
             <span>BTEB Probidhan 2022</span>
-            <span className="text-slate-300">·</span>
-            <span>Diploma in Computer Science &amp; Technology (85)</span>
+            <span className="hidden sm:inline text-slate-300">·</span>
+            <span className="hidden sm:inline">Diploma in Computer Science &amp; Technology (85)</span>
           </div>
           <span className="text-slate-400">
             Bangladesh Technical Education Board

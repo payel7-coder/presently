@@ -26,6 +26,16 @@ test('drawInstitutionalPdfHeader renders Model Institute of Science and Technolo
   const output = doc.output();
   assert.ok(output.includes(PDF_INSTITUTE_NAME), 'PDF output must include institute name');
   assert.ok(output.includes(PDF_DEPARTMENT_NAME), 'PDF output must include department name');
+  assert.equal(
+    output.includes('0.059 0.090 0.165 rg'),
+    false,
+    'Minimalist header must not draw dark slate background banner'
+  );
+  assert.equal(
+    /0\.00 237\.6\d+ m|re\s+f/.test(output),
+    false,
+    'Minimalist header must not draw filled background rectangles'
+  );
 
   const docWithFooter = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
   const tallerBanner = drawInstitutionalPdfHeader(docWithFooter, {

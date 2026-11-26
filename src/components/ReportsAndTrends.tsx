@@ -249,7 +249,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6">
       {/* Print-Only Institutional Header */}
       <div className="hidden print-only text-center border-b-2 border-slate-900 pb-4 mb-4">
         <h2 className="text-lg font-bold text-slate-950">{PDF_INSTITUTE_NAME}</h2>
@@ -260,14 +260,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       </div>
 
       {/* Editorial Header */}
-      <div className="pb-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
+      <div className="pb-5 sm:pb-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4 no-print">
         <div>
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <span className="font-semibold text-emerald-700">Performance Analytics</span>
             <span>·</span>
             <span>Live Attendance Ledger</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Attendance Reports &amp; Trend Analysis
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -275,43 +275,44 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start lg:self-auto flex-wrap">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full lg:w-auto shrink-0">
           <button
             type="button"
             onClick={handleOpenPdfRegister}
             disabled={visibleSubjects.length === 0}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Download official BTEB PDF attendance register"
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Download PDF Register</span>
+            <FileText className="w-3.5 h-3.5 shrink-0" />
+            <span className="sm:hidden">PDF Register</span>
+            <span className="hidden sm:inline">Download PDF Register</span>
           </button>
           <button
             type="button"
             onClick={() => setIsAbsentListModalOpen(true)}
             disabled={visibleSubjects.length === 0}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Download subject and date-wise student absent list PDF"
           >
-            <UserX className="w-3.5 h-3.5" />
+            <UserX className="w-3.5 h-3.5 shrink-0" />
             <span>Absent List PDF</span>
           </button>
           <button
             type="button"
             onClick={handleExportCSV}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Download formatted CSV spreadsheet"
           >
-            <Download className="w-3.5 h-3.5" />
+            <Download className="w-3.5 h-3.5 shrink-0" />
             <span>Export CSV</span>
           </button>
           <button
             type="button"
             onClick={handlePrint}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap"
             title="Print Attendance Summary"
           >
-            <Printer className="w-3.5 h-3.5 text-slate-500" />
+            <Printer className="w-3.5 h-3.5 text-slate-500 shrink-0" />
             <span>Print Report</span>
           </button>
         </div>
@@ -443,12 +444,12 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 tabular-nums">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight block">
             Average Attendance
           </span>
-          <p className="text-3xl font-bold text-slate-900 mt-2">
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2">
             {summary.averageAttendanceRate}%
           </p>
           <p
@@ -460,11 +461,11 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight block">
             Total Sessions
           </span>
-          <p className="text-3xl font-bold text-slate-900 mt-2">
+          <p className="text-2xl sm:text-3xl font-bold text-slate-900 mt-2">
             {summary.totalSessions}
           </p>
           <p className="text-xs text-slate-500 mt-1.5">
@@ -472,24 +473,24 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight block">
             Present vs Absent
           </span>
-          <p className="text-3xl font-bold text-emerald-700 mt-2">
+          <p className="text-2xl sm:text-3xl font-bold text-emerald-700 mt-2">
             {summary.totalPresent}{' '}
-            <span className="text-base font-medium text-slate-400">/ {summary.totalAbsent} abs</span>
+            <span className="text-sm sm:text-base font-medium text-slate-400">/ {summary.totalAbsent} abs</span>
           </p>
           <p className="text-xs text-slate-500 mt-1.5">
             {summary.totalLate} late · {summary.totalExcused} excused
           </p>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-slate-200">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">
-            At-Risk Students (&lt;75%)
+        <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight block">
+            At-Risk (&lt;75%)
           </span>
-          <p className="text-3xl font-bold text-rose-600 mt-2">
+          <p className="text-2xl sm:text-3xl font-bold text-rose-600 mt-2">
             {atRiskStudents.length}
           </p>
           <p className="text-xs text-rose-600 font-medium mt-1.5">
@@ -501,7 +502,7 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
       {/* Current Week Per-Student Attendance Bar Chart Summary (Recharts) */}
       <div
         data-testid="weekly-summary-card"
-        className="bg-white rounded-xl p-6 border border-slate-200 space-y-4"
+        className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 space-y-4"
       >
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div>
@@ -559,20 +560,32 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
             </p>
           </div>
         ) : (
-          <div className="w-full h-72 pt-2" data-testid="weekly-bar-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={weeklySummary.studentPoints}
-                margin={{ top: 16, right: 28, left: 0, bottom: 12 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis
-                  dataKey="shortLabel"
-                  tick={{ fontSize: 11, fill: '#475569' }}
-                  axisLine={{ stroke: '#cbd5e1' }}
-                  tickLine={false}
-                  interval={weeklySummary.studentPoints.length > 12 ? 'preserveStartEnd' : 0}
-                />
+          <div className="w-full overflow-x-auto no-scrollbar" data-testid="weekly-bar-chart">
+            <div
+              className="h-72 pt-2"
+              style={{
+                minWidth:
+                  weeklySummary.studentPoints.length > 5
+                    ? `${Math.min(weeklySummary.studentPoints.length * 76, 1800)}px`
+                    : '100%',
+              }}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={weeklySummary.studentPoints}
+                  margin={{ top: 16, right: 24, left: 0, bottom: 14 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis
+                    dataKey="shortLabel"
+                    tick={{ fontSize: 10, fill: '#475569' }}
+                    axisLine={{ stroke: '#cbd5e1' }}
+                    tickLine={false}
+                    angle={-22}
+                    textAnchor="end"
+                    height={52}
+                    interval={0}
+                  />
                 <YAxis
                   domain={[0, 100]}
                   tickFormatter={val => `${val}%`}
@@ -641,13 +654,14 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                   ))}
                 </Bar>
               </BarChart>
-            </ResponsiveContainer>
+              </ResponsiveContainer>
+            </div>
           </div>
         )}
       </div>
 
       {/* Session Attendance Trend Chart */}
-      <div className="bg-white rounded-xl p-6 border border-slate-200 space-y-4">
+      <div className="bg-white rounded-xl p-4 sm:p-6 border border-slate-200 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
             <h3 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
@@ -811,51 +825,33 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
             No recorded attendance sessions match your current filters.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs tabular-nums">
-              <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Course &amp; Part</th>
-                  <th className="py-3 px-4">Class</th>
-                  <th className="py-3 px-4">Lesson / Topic</th>
-                  <th className="py-3 px-4 text-center">P / A / L / E</th>
-                  <th className="py-3 px-4 text-right">Rate</th>
-                  <th className="py-3 px-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {(showAllRecordedSessions
-                  ? recentSessionsDesc
-                  : recentSessionsDesc.slice(0, 8)
-                ).map(sess => {
-                  const sub =
-                    visibleSubjects.find(s => s.id === sess.subjectId) ||
-                    subjects.find(s => s.id === sess.subjectId);
-                  const cls =
-                    visibleClasses.find(c => c.id === sess.classId) ||
-                    classes.find(c => c.id === sess.classId);
-                  const part: SubjectPart = sess.part || 'theory';
-                  const total = sess.totalStudents || 1;
-                  const effective =
-                    sess.presentCount + sess.lateCount * 0.75 + sess.excusedCount;
-                  const rate = Math.round((effective / total) * 100);
-                  const editable = canEditAttendanceSession(currentUser, sess, assignments);
+          <>
+            {/* Mobile Recorded Sessions Cards */}
+            <div className="md:hidden divide-y divide-slate-100 tabular-nums">
+              {(showAllRecordedSessions
+                ? recentSessionsDesc
+                : recentSessionsDesc.slice(0, 8)
+              ).map(sess => {
+                const sub =
+                  visibleSubjects.find(s => s.id === sess.subjectId) ||
+                  subjects.find(s => s.id === sess.subjectId);
+                const cls =
+                  visibleClasses.find(c => c.id === sess.classId) ||
+                  classes.find(c => c.id === sess.classId);
+                const part: SubjectPart = sess.part || 'theory';
+                const total = sess.totalStudents || 1;
+                const effective =
+                  sess.presentCount + sess.lateCount * 0.75 + sess.excusedCount;
+                const rate = Math.round((effective / total) * 100);
+                const editable = canEditAttendanceSession(currentUser, sess, assignments);
 
-                  return (
-                    <tr key={sess.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">
-                        <div>{sess.date}</div>
-                        {sess.updatedAt && (
-                          <div className="text-[10px] font-sans font-medium text-sky-700">
-                            Edited
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono font-semibold text-slate-900">
-                            {sub?.code || 'Course'}
+                return (
+                  <div key={sess.id} className="p-4 space-y-2.5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-xs font-semibold text-slate-900">
+                            {sess.date}
                           </span>
                           <span
                             className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
@@ -866,49 +862,148 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
                           >
                             {part === 'practical' ? 'Practical' : 'Theory'}
                           </span>
+                          {sess.updatedAt && (
+                            <span className="text-[10px] font-semibold text-sky-700">
+                              Edited
+                            </span>
+                          )}
                         </div>
-                        <p className="text-[11px] text-slate-500 truncate max-w-[200px] mt-0.5">
-                          {sub?.name || 'Subject'}
+                        <p className="text-xs font-semibold text-slate-800 truncate mt-1">
+                          {sub?.code ? `${sub.code} · ` : ''}{sub?.name || 'Subject'}
                         </p>
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">
-                        {cls?.name || 'Class'}
-                      </td>
-                      <td className="py-3 px-4 text-slate-600 max-w-[220px] truncate">
-                        {sess.topic || '—'}
-                      </td>
-                      <td className="py-3 px-4 text-center whitespace-nowrap">
-                        <span className="font-semibold text-emerald-700">{sess.presentCount}</span>
-                        <span className="text-slate-300 mx-1">/</span>
-                        <span className="font-semibold text-rose-600">{sess.absentCount}</span>
-                        <span className="text-slate-300 mx-1">/</span>
-                        <span className="font-semibold text-amber-600">{sess.lateCount}</span>
-                        <span className="text-slate-300 mx-1">/</span>
-                        <span className="font-semibold text-sky-700">{sess.excusedCount}</span>
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
-                        {rate}%
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        {editable ? (
-                          <button
-                            type="button"
-                            onClick={() => setEditingModalTarget({ session: sess })}
-                            className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap"
-                          >
-                            <Pencil className="w-3 h-3" />
-                            <span>Edit Attendance</span>
-                          </button>
-                        ) : (
-                          <span className="text-[11px] text-slate-400">Read Only</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {cls?.name || 'Class'}{sess.topic ? ` · ${sess.topic}` : ''}
+                        </p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <span className="text-sm font-mono font-bold text-slate-900 block">
+                          {rate}%
+                        </span>
+                        <span className="text-[11px] text-slate-500 whitespace-nowrap">
+                          <strong className="text-emerald-700">{sess.presentCount}</strong>/
+                          <strong className="text-rose-600">{sess.absentCount}</strong>/
+                          <strong className="text-amber-600">{sess.lateCount}</strong>/
+                          <strong className="text-sky-700">{sess.excusedCount}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    {editable && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingModalTarget({ session: sess })}
+                        className="w-full h-10 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                        <span>Edit Attendance</span>
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Recorded Sessions Table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-xs tabular-nums">
+                <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
+                  <tr>
+                    <th className="py-3 px-4">Date</th>
+                    <th className="py-3 px-4">Course &amp; Part</th>
+                    <th className="py-3 px-4">Class</th>
+                    <th className="py-3 px-4">Lesson / Topic</th>
+                    <th className="py-3 px-4 text-center">P / A / L / E</th>
+                    <th className="py-3 px-4 text-right">Rate</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {(showAllRecordedSessions
+                    ? recentSessionsDesc
+                    : recentSessionsDesc.slice(0, 8)
+                  ).map(sess => {
+                    const sub =
+                      visibleSubjects.find(s => s.id === sess.subjectId) ||
+                      subjects.find(s => s.id === sess.subjectId);
+                    const cls =
+                      visibleClasses.find(c => c.id === sess.classId) ||
+                      classes.find(c => c.id === sess.classId);
+                    const part: SubjectPart = sess.part || 'theory';
+                    const total = sess.totalStudents || 1;
+                    const effective =
+                      sess.presentCount + sess.lateCount * 0.75 + sess.excusedCount;
+                    const rate = Math.round((effective / total) * 100);
+                    const editable = canEditAttendanceSession(currentUser, sess, assignments);
+
+                    return (
+                      <tr key={sess.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 px-4 font-mono font-semibold text-slate-800 whitespace-nowrap">
+                          <div>{sess.date}</div>
+                          {sess.updatedAt && (
+                            <div className="text-[10px] font-sans font-medium text-sky-700">
+                              Edited
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono font-semibold text-slate-900">
+                              {sub?.code || 'Course'}
+                            </span>
+                            <span
+                              className={`text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded ${
+                                part === 'practical'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-indigo-50 text-indigo-700'
+                              }`}
+                            >
+                              {part === 'practical' ? 'Practical' : 'Theory'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate max-w-[200px] mt-0.5">
+                            {sub?.name || 'Subject'}
+                          </p>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 font-medium whitespace-nowrap">
+                          {cls?.name || 'Class'}
+                        </td>
+                        <td className="py-3 px-4 text-slate-600 max-w-[220px] truncate">
+                          {sess.topic || '—'}
+                        </td>
+                        <td className="py-3 px-4 text-center whitespace-nowrap">
+                          <span className="font-semibold text-emerald-700">{sess.presentCount}</span>
+                          <span className="text-slate-300 mx-1">/</span>
+                          <span className="font-semibold text-rose-600">{sess.absentCount}</span>
+                          <span className="text-slate-300 mx-1">/</span>
+                          <span className="font-semibold text-amber-600">{sess.lateCount}</span>
+                          <span className="text-slate-300 mx-1">/</span>
+                          <span className="font-semibold text-sky-700">{sess.excusedCount}</span>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-slate-900">
+                          {rate}%
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          {editable ? (
+                            <button
+                              type="button"
+                              onClick={() => setEditingModalTarget({ session: sess })}
+                              className="h-8 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-colors whitespace-nowrap"
+                            >
+                              <Pencil className="w-3 h-3" />
+                              <span>Edit Attendance</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">Read Only</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -928,7 +1023,85 @@ export const ReportsAndTrends: React.FC<ReportsAndTrendsProps> = ({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile Student Performance Cards */}
+        <div className="md:hidden divide-y divide-slate-100 tabular-nums">
+          {displayedStudents.map(({ student, stats }) => {
+            const classGroup = classes.find(c => c.id === student.classId);
+
+            return (
+              <div
+                key={student.id}
+                onClick={() => setDrilldownStudent(student)}
+                className="p-4 space-y-2.5 active:bg-slate-50 cursor-pointer"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Avatar src={student.avatar} name={student.name} size="sm" />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-500">
+                        <span className="font-mono font-semibold text-slate-800">
+                          #{student.rollNumber}
+                        </span>
+                        {classGroup?.name && <span>· {classGroup.name}</span>}
+                      </div>
+                      <p className="text-sm font-semibold text-slate-900 truncate">
+                        {student.name}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0">
+                    <span
+                      className={`text-sm font-bold font-mono block ${
+                        stats.isAtRisk
+                          ? 'text-rose-600'
+                          : stats.attendancePercentage >= 90
+                          ? 'text-emerald-700'
+                          : 'text-slate-900'
+                      }`}
+                    >
+                      {stats.attendancePercentage}%
+                    </span>
+                    {stats.isAtRisk ? (
+                      <span className="text-[10px] font-semibold text-rose-600">At Risk</span>
+                    ) : stats.attendancePercentage >= 90 ? (
+                      <span className="text-[10px] font-semibold text-emerald-700">Good</span>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between gap-2 pt-1 text-[11px] text-slate-600">
+                  <div className="flex items-center gap-3">
+                    <span>
+                      <strong className="text-emerald-700">{stats.present}</strong> P
+                    </span>
+                    <span>
+                      <strong className="text-rose-600">{stats.absent}</strong> A
+                    </span>
+                    <span>
+                      <strong className="text-amber-600">{stats.late}</strong> L
+                    </span>
+                    <span className="text-slate-400">({stats.totalSessions} total)</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation();
+                      setDrilldownStudent(student);
+                    }}
+                    className="h-8 px-2.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors whitespace-nowrap"
+                  >
+                    History →
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Student Performance Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 text-[11px] uppercase font-semibold text-slate-500 border-b border-slate-200">
               <tr>

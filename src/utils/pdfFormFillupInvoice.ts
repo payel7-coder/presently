@@ -48,7 +48,7 @@ function drawMetricRowCells(
     ctx.strokeRect(colX[c], y, colW[c], rowH);
   }
 
-  ctx.fillStyle = '#111827';
+  ctx.fillStyle = '#000000';
   ctx.font = `500 28px ${FONT_STACK}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
@@ -96,7 +96,7 @@ export async function renderFormFillupInvoiceCanvas(
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
 
-  const strokeColor = '#1e293b';
+  const strokeColor = '#000000';
   const marginX = 105;
   const tableWidth = width - marginX * 2; // 1444
 
@@ -110,18 +110,18 @@ export async function renderFormFillupInvoiceCanvas(
   }
   const mergedLabelW = colW[0] + colW[1]; // 400
 
-  // Title Header Block (Centered)
-  ctx.fillStyle = '#1e293b';
+  // Title Header Block (Centered, Clean Monochrome)
+  ctx.fillStyle = '#000000';
   ctx.textAlign = 'center';
 
   ctx.font = `700 30px ${FONT_STACK}`;
   ctx.fillText(invoice.instituteEnglishName, width / 2, 128, tableWidth);
 
   ctx.font = `600 24px ${FONT_STACK}`;
-  ctx.fillStyle = '#334155';
+  ctx.fillStyle = '#262626';
   ctx.fillText(invoice.departmentName, width / 2, 166, tableWidth);
 
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#000000';
   ctx.font = `700 40px ${FONT_STACK}`;
   ctx.fillText(invoice.instituteName, width / 2, 224, tableWidth);
 
@@ -153,7 +153,7 @@ export async function renderFormFillupInvoiceCanvas(
     ctx.strokeRect(colX[c], tableStartY, colW[c], headerTotalH);
   }
 
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#000000';
   ctx.font = `700 26px ${FONT_STACK}`;
   drawCenteredLines(ctx, ['টেকনোলজি'], colX[0], tableStartY, colW[0], headerTopH, 32);
   drawCenteredLines(ctx, ['পর্ব'], colX[1], tableStartY, colW[1], headerTopH, 32);
@@ -288,7 +288,7 @@ export async function renderFormFillupInvoiceCanvas(
 
   // Footer Row: সর্ব মোটঃ (Left label unboxed, Right 5 cells boxed exactly like picture)
   const footerH = 100;
-  ctx.fillStyle = '#0f172a';
+  ctx.fillStyle = '#000000';
   ctx.font = `700 29px ${FONT_STACK}`;
   drawCenteredLines(ctx, ['সর্ব মোটঃ'], colX[0], y, mergedLabelW, footerH, 34);
 
@@ -305,7 +305,7 @@ export async function renderFormFillupInvoiceCanvas(
 
   if (includeSignatures) {
     const sigY = Math.max(y + 240, 1980);
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
 
     // Left signature
@@ -320,14 +320,14 @@ export async function renderFormFillupInvoiceCanvas(
     ctx.lineTo(width - marginX - 20, sigY);
     ctx.stroke();
 
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = '#000000';
     ctx.font = `600 23px ${FONT_STACK}`;
     ctx.fillText('দায়িত্বপ্রাপ্ত শিক্ষক / সমন্বয়ক', marginX + 220, sigY + 38);
     ctx.fillText('অধ্যক্ষ / বিভাগীয় প্রধান', width - marginX - 220, sigY + 38);
 
     const signer = coordinator?.name || generatedBy?.name;
     if (signer) {
-      ctx.fillStyle = '#475569';
+      ctx.fillStyle = '#404040';
       ctx.font = `400 20px ${FONT_STACK}`;
       ctx.fillText(signer, marginX + 220, sigY + 70);
     }
@@ -336,7 +336,7 @@ export async function renderFormFillupInvoiceCanvas(
   // Discreet generation line at page footer
   const dateStr = new Date().toISOString().split('T')[0];
   const actorName = generatedBy?.name || coordinator?.name || 'Assigned Coordinator';
-  ctx.fillStyle = '#64748b';
+  ctx.fillStyle = '#525252';
   ctx.font = `400 18px ${FONT_STACK}`;
   ctx.textAlign = 'left';
   ctx.fillText(

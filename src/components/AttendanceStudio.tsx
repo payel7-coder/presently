@@ -36,6 +36,7 @@ interface AttendanceStudioProps {
   initialPart?: SubjectPart;
   initialDate?: string;
   onNavigateToReports: (subjectId?: string, part?: SubjectPart) => void;
+  onSessionContextChange?: (context: { subjectCode: string; date: string } | null) => void;
 }
 
 export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
@@ -43,6 +44,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   initialPart,
   initialDate,
   onNavigateToReports,
+  onSessionContextChange,
 }) => {
   const {
     currentUser,
@@ -113,6 +115,15 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   const activeClass = activeAssignment?.classGroup;
   const activePart: SubjectPart = activeAssignment?.assignment.part || 'theory';
   const activeSubjectId = activeSubject?.id || '';
+
+  useEffect(() => {
+    if (!onSessionContextChange) return;
+    if (activeSubject?.code && sessionDate) {
+      onSessionContextChange({ subjectCode: activeSubject.code, date: sessionDate });
+    } else {
+      onSessionContextChange(null);
+    }
+  }, [activeSubject?.code, sessionDate, onSessionContextChange]);
 
   const matchingSession = useMemo(() => {
     if (!activeSubjectId || !sessionDate) return undefined;
@@ -317,22 +328,30 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6">
       {/* Editorial Header & Subject Switcher */}
       <div className="pb-5 border-b border-slate-200 space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span className="font-semibold text-emerald-700">1-Click Roll Call</span>
+              {activeSubject?.code && (
+                <>
+                  <span>·</span>
+                  <span className="font-mono font-semibold text-slate-800">{activeSubject.code}</span>
+                </>
+              )}
               <span>·</span>
               <span
-                className={`font-semibold px-2 py-0.5 rounded-md ${
-                  activePart === 'practical'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
-                    : 'bg-indigo-50 text-indigo-700 border border-indigo-200/80'
+                className={`font-semibold ${
+                  activePart === 'practical' ? 'text-emerald-700' : 'text-indigo-700'
                 }`}
               >
                 {activePart === 'practical' ? 'Practical Session' : 'Theory Session'}
+              </span>
+              <span>·</span>
+              <span className="font-mono tabular-nums font-semibold text-slate-700">
+                {sessionDate}
               </span>
               {existingSessionId && (
                 <>
@@ -343,7 +362,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                 </>
               )}
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
               {existingSessionId ? 'Edit Recorded Attendance' : 'Take Student Attendance'}
             </h1>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -356,7 +375,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           <button
             type="button"
             onClick={() => setIsAbsentModalOpen(true)}
-            className="h-9 inline-flex items-center gap-1.5 px-3.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 self-start lg:self-auto"
+            className="h-10 sm:h-9 inline-flex items-center justify-center gap-1.5 px-3.5 bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 self-start lg:self-auto"
             title="Download subject and date-wise student absent list PDF"
           >
             <UserX className="w-3.5 h-3.5" />
@@ -365,7 +384,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
         </div>
 
         {/* Course & Part Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
           {assignedSubjects.map(({ subject, classGroup, assignment }) => {
             const part: SubjectPart = assignment.part || 'theory';
             const isSelected = assignment.id === selectedAssignmentId;
@@ -472,12 +491,14 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
         {recordedSubjectSessions.length > 0 && (
           <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 text-xs text-slate-600">
-              <History className="w-4 h-4 text-slate-500 shrink-0" />
-              <span className="font-semibold text-slate-800">
-                Edit Past / Recorded Session ({recordedSubjectSessions.length}):
-              </span>
-              <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-xs text-slate-600 min-w-0">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <History className="w-4 h-4 text-slate-500 shrink-0" />
+                <span className="font-semibold text-slate-800 whitespace-nowrap">
+                  Edit Past / Recorded Session ({recordedSubjectSessions.length}):
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar max-w-full pb-0.5">
                 {recordedSubjectSessions.slice(0, 4).map(sess => {
                   const isCurrent = sess.date === sessionDate;
                   return (
@@ -488,13 +509,13 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                         setSessionDate(sess.date);
                         setJustSubmitted(false);
                       }}
-                      className={`h-7 px-2.5 rounded-md border text-[11px] font-medium tabular-nums inline-flex items-center gap-1.5 transition-colors ${
+                      className={`h-8 sm:h-7 px-2.5 rounded-md border text-[11px] font-medium tabular-nums inline-flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 ${
                         isCurrent
                           ? 'bg-slate-900 text-white border-slate-900'
                           : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                       }`}
                     >
-                      <Pencil className="w-3 h-3" />
+                      <Pencil className="w-3 h-3 shrink-0" />
                       <span className="font-mono">{sess.date}</span>
                       <span className={isCurrent ? 'text-slate-300' : 'text-slate-500'}>
                         ({sess.presentCount}/{sess.totalStudents})
@@ -505,7 +526,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <select
                 aria-label="Select recorded attendance date to edit"
                 value={existingSessionId || ''}
@@ -516,7 +537,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                     setJustSubmitted(false);
                   }
                 }}
-                className="h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 max-w-[240px]"
+                className="h-9 sm:h-8 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 flex-1 sm:flex-initial max-w-full sm:max-w-[240px]"
               >
                 <option value="">Jump to recorded date...</option>
                 {recordedSubjectSessions.map(sess => (
@@ -534,7 +555,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                     setSessionDate(today);
                     setJustSubmitted(false);
                   }}
-                  className="h-8 px-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap"
+                  className="h-9 sm:h-8 px-2.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 whitespace-nowrap"
                 >
                   Today ({today})
                 </button>
@@ -563,10 +584,10 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
       </div>
 
       {/* Live Metrics HUD & 1-Click Action Bar */}
-      <div className="sticky top-16 z-30 bg-slate-900 text-white rounded-xl p-4 border border-slate-800 flex flex-wrap items-center justify-between gap-4 tabular-nums">
-        <div className="flex items-center gap-5">
+      <div className="md:sticky md:top-16 z-30 bg-slate-900 text-white rounded-xl p-4 border border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-4 tabular-nums">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3.5 sm:gap-5">
           <div className="flex items-center gap-3">
-            <div className="relative w-11 h-11 flex items-center justify-center">
+            <div className="relative w-11 h-11 flex items-center justify-center shrink-0">
               <svg className="w-11 h-11 -rotate-90" viewBox="0 0 36 36">
                 <path
                   className="text-slate-800"
@@ -588,7 +609,9 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
               <span className="absolute text-[11px] font-bold tracking-tight">{stats.rate}%</span>
             </div>
             <div>
-              <p className="text-[11px] text-slate-400 font-medium">Attendance Rate</p>
+              <p className="text-[11px] font-mono tabular-nums text-emerald-300 font-semibold">
+                {activeSubject?.code} · {activePart === 'practical' ? 'Practical' : 'Theory'} · {sessionDate}
+              </p>
               <p className="text-xs font-semibold text-white">
                 {stats.present + stats.late + stats.excused} of {stats.total} Attended
               </p>
@@ -597,7 +620,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
 
           <div className="h-7 w-px bg-slate-800 hidden sm:block" />
 
-          <div className="flex items-center gap-3 text-xs font-medium flex-wrap">
+          <div className="flex items-center gap-x-3 gap-y-1.5 text-xs font-medium flex-wrap">
             <span className="inline-flex items-center gap-1.5 text-emerald-300">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
               {stats.present} Present
@@ -623,18 +646,18 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 ml-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:ml-auto">
           <button
             type="button"
             onClick={() => markAll('present')}
             disabled={isFutureDate}
-            className={`h-9 flex items-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-colors border whitespace-nowrap ${
+            className={`flex-1 sm:flex-initial h-10 sm:h-9 flex items-center justify-center gap-1.5 px-3 rounded-lg text-xs font-semibold transition-colors border whitespace-nowrap ${
               isFutureDate
                 ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed'
                 : 'bg-slate-800 hover:bg-slate-700 text-emerald-300 border-slate-700'
             }`}
           >
-            <CheckCircle2 className="w-3.5 h-3.5" />
+            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
             <span>Mark All Present</span>
           </button>
 
@@ -643,13 +666,13 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             onClick={clearAllMarks}
             disabled={isFutureDate}
             title="Clear all P / A / L / E marks"
-            className={`flex h-9 items-center gap-1 px-2.5 rounded-lg text-xs font-medium transition-colors border whitespace-nowrap ${
+            className={`flex h-10 sm:h-9 items-center justify-center gap-1 px-3 sm:px-2.5 rounded-lg text-xs font-medium transition-colors border whitespace-nowrap ${
               isFutureDate
                 ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
             }`}
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5 shrink-0" />
             <span>Clear</span>
           </button>
 
@@ -657,13 +680,13 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
             type="button"
             onClick={handleSaveAttendance}
             disabled={isFutureDate}
-            className={`h-9 flex items-center gap-1.5 px-4 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap ${
+            className={`w-full sm:w-auto h-10 sm:h-9 flex items-center justify-center gap-1.5 px-4 font-semibold rounded-lg text-xs transition-colors whitespace-nowrap ${
               isFutureDate
                 ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white'
             }`}
           >
-            <Check className="w-4 h-4" />
+            <Check className="w-4 h-4 shrink-0" />
             <span>{existingSessionId ? 'Update Attendance' : 'Save Attendance'}</span>
           </button>
         </div>
@@ -931,7 +954,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'present')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isPresent
                         ? 'bg-emerald-600 text-white'
                         : 'bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700'
@@ -944,7 +967,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'absent')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isAbsent
                         ? 'bg-rose-600 text-white'
                         : 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-700'
@@ -957,7 +980,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'late')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isLate
                         ? 'bg-amber-600 text-white'
                         : 'bg-slate-100 hover:bg-amber-50 text-slate-600 hover:text-amber-700'
@@ -970,7 +993,7 @@ export const AttendanceStudio: React.FC<AttendanceStudioProps> = ({
                   <button
                     type="button"
                     onClick={() => setStudentStatus(student.id, 'excused')}
-                    className={`py-1.5 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
+                    className={`min-h-[44px] py-2 rounded-lg text-xs font-semibold transition-colors flex flex-col items-center justify-center ${
                       isExcused
                         ? 'bg-sky-600 text-white'
                         : 'bg-slate-100 hover:bg-sky-50 text-slate-600 hover:text-sky-700'

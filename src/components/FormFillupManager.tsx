@@ -736,9 +736,9 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8 space-y-5 sm:space-y-6">
       {/* Header */}
-      <div className="pb-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="pb-5 sm:pb-6 border-b border-slate-200 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             <span className="font-semibold text-emerald-700 inline-flex items-center gap-1">
@@ -748,7 +748,7 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
             <span>·</span>
             <span>BTEB Diploma Examination Fee Calculator</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight mt-1">
             Form Fill-up Fee Desk
           </h1>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl">
@@ -758,19 +758,19 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
           </p>
         </div>
 
-        <div className="flex flex-wrap lg:flex-nowrap items-center gap-2 shrink-0">
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap lg:flex-nowrap items-center gap-2 w-full lg:w-auto shrink-0">
           {isAdmin && (
             <button
               type="button"
               onClick={() => setShowCoordinatorPanel(!showCoordinatorPanel)}
-              className="h-9 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+              className="h-10 sm:h-9 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
             >
-              <UserCog className="w-3.5 h-3.5 text-slate-500" />
+              <UserCog className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>Coordinators</span>
               {showCoordinatorPanel ? (
-                <ChevronUp className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronUp className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               ) : (
-                <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
               )}
             </button>
           )}
@@ -780,18 +780,18 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                 type="button"
                 onClick={handleExportCSV}
                 disabled={activeClassStudents.length === 0}
-                className="h-9 px-3 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                className="h-10 sm:h-9 px-3 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
               >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
+                <Download className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 <span>Export CSV</span>
               </button>
               <button
                 type="button"
                 onClick={handleDownloadPDF}
                 disabled={activeClassStudents.length === 0}
-                className="h-9 px-3 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                className="h-10 sm:h-9 px-3 bg-white hover:bg-slate-50 disabled:opacity-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
               >
-                <FileText className="w-3.5 h-3.5 text-slate-600" />
+                <FileText className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                 <span>Ledger PDF</span>
               </button>
               {canGenerateInvoice && (
@@ -799,9 +799,9 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                   type="button"
                   onClick={() => setIsInvoiceModalOpen(true)}
                   disabled={activeClassStudents.length === 0}
-                  className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 whitespace-nowrap shrink-0"
+                  className="h-10 sm:h-9 px-3.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0"
                 >
-                  <FileCheck2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <FileCheck2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                   <span>Generate Invoice</span>
                 </button>
               )}
@@ -989,8 +989,8 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
         effectiveFeeConfig && (
           <>
             {/* Semester Selector Bar */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="bg-white rounded-xl border border-slate-200 p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex items-center sm:flex-wrap gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar pb-0.5 sm:pb-0">
                 {visibleClasses.map(cls => {
                   const isActive = cls.id === selectedClass.id;
                   const resp = formFillupResponsibilities.find(r => r.classId === cls.id);
@@ -1000,7 +1000,7 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                       key={cls.id}
                       type="button"
                       onClick={() => setSelectedClassId(cls.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap ${
+                      className={`h-8 sm:h-auto px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 ${
                         isActive
                           ? 'bg-slate-900 text-white'
                           : 'bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100'
@@ -1030,15 +1030,15 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
             </div>
 
             {/* 4-Card Batch KPI Summary */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
-              <div className="bg-white rounded-xl p-5 border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 tabular-nums">
+              <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
                     Candidates
                   </span>
-                  <Users className="w-4 h-4 text-slate-400" />
+                  <Users className="w-4 h-4 text-slate-400 shrink-0" />
                 </div>
-                <p className="text-2xl font-bold text-slate-900 mt-2">
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-2">
                   {batchSummary.totalStudents}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
@@ -1046,14 +1046,14 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl p-5 border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
                     Result Mix
                   </span>
-                  <Receipt className="w-4 h-4 text-indigo-500" />
+                  <Receipt className="w-4 h-4 text-indigo-500 shrink-0" />
                 </div>
-                <p className="text-2xl font-bold text-slate-900 mt-2">
+                <p className="text-lg sm:text-2xl font-bold text-slate-900 mt-2 whitespace-nowrap">
                   {batchSummary.regularCount} Reg · {batchSummary.referredCount} Ref
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
@@ -1061,14 +1061,14 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl p-5 border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
                     Total Collectible
                   </span>
-                  <Wallet className="w-4 h-4 text-emerald-600" />
+                  <Wallet className="w-4 h-4 text-emerald-600 shrink-0" />
                 </div>
-                <p className="text-2xl font-bold text-slate-900 mt-2 font-mono">
+                <p className="text-xl sm:text-2xl font-bold text-slate-900 mt-2 font-mono">
                   ৳ {batchSummary.totalCollectibleTk.toLocaleString()}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
@@ -1076,14 +1076,14 @@ export const FormFillupManager: React.FC<{ initialClassId?: string }> = ({ initi
                 </p>
               </div>
 
-              <div className="bg-white rounded-xl p-5 border border-slate-200">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+              <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
                     Collected / Paid
                   </span>
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                 </div>
-                <p className="text-2xl font-bold text-emerald-700 mt-2 font-mono">
+                <p className="text-xl sm:text-2xl font-bold text-emerald-700 mt-2 font-mono">
                   ৳ {batchSummary.totalCollectedTk.toLocaleString()}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">

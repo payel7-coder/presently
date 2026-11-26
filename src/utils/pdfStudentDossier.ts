@@ -26,27 +26,25 @@ export function generateStudentDossierPDF(
 
   const pageWidth = doc.internal.pageSize.getWidth();
 
-  // Institutional Dark Slate Header
+  // Minimalist Black & White Institutional Header
   const bannerHeight = drawInstitutionalPdfHeader(doc, {
     reportTitle: 'OFFICIAL STUDENT ACADEMIC DOSSIER',
     boardSubtitle: 'BANGLADESH TECHNICAL EDUCATION BOARD (BTEB) • DIPLOMA IN ENGINEERING (PROBIDHAN 2022)',
-    accentColor: [5, 150, 105],
-    titleColor: [110, 231, 183],
     footerNote: `Generated: ${new Date().toISOString().split('T')[0]} · Authorized By: ${
       generatedBy?.name || 'Academic Registrar'
     }`,
   });
 
   // Student Identity & Registrar Block
-  const identityY = bannerHeight + 10; // 46mm
-  doc.setTextColor(15, 23, 42);
+  const identityY = bannerHeight + 9; // 45mm
+  doc.setTextColor(0, 0, 0);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(13);
   doc.text(student.name, 14, identityY);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9);
-  doc.setTextColor(71, 85, 105);
+  doc.setTextColor(70, 70, 70);
   doc.text(
     `Board Roll: ${student.rollNumber}  ·  Registration No: ${
       student.registrationNumber || 'N/A'
@@ -62,12 +60,14 @@ export function generateStudentDossierPDF(
     styles: {
       fontSize: 8.5,
       cellPadding: 2.5,
-      textColor: [30, 41, 59],
-      lineColor: [226, 232, 240],
+      textColor: [0, 0, 0],
+      fillColor: [255, 255, 255],
+      lineColor: [170, 170, 170],
+      lineWidth: 0.15,
     },
     headStyles: {
-      fillColor: [248, 250, 252],
-      textColor: [71, 85, 105],
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
       fontStyle: 'bold',
     },
     body: [
@@ -107,9 +107,9 @@ export function generateStudentDossierPDF(
       ],
     ],
     columnStyles: {
-      0: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 36 },
+      0: { fontStyle: 'bold', fillColor: [255, 255, 255], cellWidth: 36 },
       1: { cellWidth: 56 },
-      2: { fontStyle: 'bold', fillColor: [248, 250, 252], cellWidth: 36 },
+      2: { fontStyle: 'bold', fillColor: [255, 255, 255], cellWidth: 36 },
       3: { cellWidth: 54 },
     },
     margin: { left: 14, right: 14 },
@@ -119,21 +119,26 @@ export function generateStudentDossierPDF(
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(10.5);
-  doc.setTextColor(15, 23, 42);
+  doc.setTextColor(0, 0, 0);
   doc.text('Subject-wise Attendance & Coursework Performance', 14, nextY);
 
   autoTable(doc, {
     startY: nextY + 3,
-    theme: 'striped',
+    theme: 'grid',
     styles: {
       fontSize: 8,
       cellPadding: 2.3,
-      textColor: [15, 23, 42],
+      textColor: [0, 0, 0],
+      fillColor: [255, 255, 255],
+      lineColor: [170, 170, 170],
+      lineWidth: 0.15,
     },
     headStyles: {
-      fillColor: [15, 23, 42],
-      textColor: [255, 255, 255],
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
       fontStyle: 'bold',
+      lineColor: [0, 0, 0],
+      lineWidth: 0.25,
     },
     head: [
       [
